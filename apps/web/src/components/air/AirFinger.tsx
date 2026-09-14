@@ -43,8 +43,9 @@ const PARTS: Part[] = [
   { kind: "capsule", args: [2.9, 5.0, 8, 12], pos: [-18.2, 14.1, 2.9], rot: [2.05, 0, -0.08] },
   // back of hand, sloping up toward the wrist
   { kind: "box", args: [21, 11, 12.5], pos: [-6.5, 23.5, 0.5], rot: [0.22, 0, 0] },
-  // thumb tucked against the index side
-  { kind: "capsule", args: [3.5, 5.5, 8, 14], pos: [4.8, 14, 3.2], rot: [0.4, 0, -0.6] },
+  // no thumb: at this scale it read as a cut-off stub glued to the index
+  // (user feedback) — the folded-fingers silhouette alone reads as a hand
+  // without the ambiguity.
   // wrist stub receding toward the camera (kept compact for the framing)
   { kind: "capsule", args: [5.0, 7, 8, 16], pos: [-7, 29, 8.5], rot: [0.7, 0, 0] },
 ];
