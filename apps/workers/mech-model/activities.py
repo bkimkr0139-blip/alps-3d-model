@@ -7,7 +7,13 @@ sys.path.insert(0, str(REPO_ROOT / "apps" / "api"))
 
 from temporalio import activity
 
-from fs_model import predict_bridge_transfer, predict_detent_curve, predict_fs_curve
+from fs_model import (
+    derive_asic_gesture_summary,
+    predict_bridge_transfer,
+    predict_detent_curve,
+    predict_fs_curve,
+    predict_proximity_capacitance,
+)
 
 TOOL_VERSION = "analytical-mech-model-v2"
 
@@ -15,9 +21,10 @@ TOOL_VERSION = "analytical-mech-model-v2"
 # model_type also picks the metric naming family — the correlation API
 # (app/correlation.py) parses the same prefixes, so the two lists must stay
 # in sync:
-#   fs_dome         → force_mN_at_x_<x>     (mm, mN)   [tact switch]
-#   detent_torque   → torque_mNm_at_deg_<x> (deg, mN·m) [rotary encoder]
-#   bridge_transfer → vout_mv_at_kpa_<x>    (kPa, mV)  [MEMS pressure sensor]
+#   fs_dome               → force_mN_at_x_<x>       (mm, mN)   [tact switch]
+#   detent_torque         → torque_mNm_at_deg_<x>   (deg, mN·m) [rotary encoder]
+#   bridge_transfer       → vout_mv_at_kpa_<x>      (kPa, mV)  [MEMS pressure sensor]
+#   proximity_capacitance → delta_c_fF_at_d_<x>     (mm, fF)   [AirInput proximity sensor]
 MODEL_DEFAULTS = {
     "fs_dome": {
         "dome_thickness_mm": 0.10,
@@ -38,6 +45,19 @@ MODEL_DEFAULTS = {
         "pressure_max_kpa": 400.0,
         "num_points": 15,
     },
+    "proximity_capacitance": {
+        "electrode_area_mm2": 100.0,
+        "cover_thickness_mm": 1.0,
+        "cover_dielectric_constant": 4.0,
+        "is_glove": False,
+        "distance_min_mm": 0.0,
+        "distance_max_mm": 40.0,
+        "num_points": 21,
+        # ASIC behavioral stand-in (§IF-03) — see fs_model.derive_asic_gesture_summary.
+        "gain_counts_per_fF": 50.0,
+        "offset_counts": 200.0,
+        "threshold_counts": 260.0,
+    },
 }
 
 # model_type → (metric prefix, y_unit)
@@ -45,6 +65,7 @@ MODEL_METRICS = {
     "fs_dome": ("force_mN_at_x", "mN"),
     "detent_torque": ("torque_mNm_at_deg", "mN·m"),
     "bridge_transfer": ("vout_mv_at_kpa", "mV"),
+    "proximity_capacitance": ("delta_c_fF_at_d", "fF"),
 }
 
 
@@ -91,12 +112,22 @@ def run_mech_model_activity(simulation_run_id: str) -> None:
                     angle_span_deg=params["angle_span_deg"],
                     num_points=int(params["num_points"]),
                 )
-            else:  # bridge_transfer
+            elif model_type == "bridge_transfer":
                 xs, ys = predict_bridge_transfer(
                     supply_voltage_v=params["supply_voltage_v"],
                     sensitivity_mv_per_v_per_kpa=params["sensitivity_mv_per_v_per_kpa"],
                     pressure_min_kpa=params["pressure_min_kpa"],
                     pressure_max_kpa=params["pressure_max_kpa"],
+                    num_points=int(params["num_points"]),
+                )
+            else:  # proximity_capacitance
+                xs, ys = predict_proximity_capacitance(
+                    electrode_area_mm2=params["electrode_area_mm2"],
+                    cover_thickness_mm=params["cover_thickness_mm"],
+                    cover_dielectric_constant=params["cover_dielectric_constant"],
+                    is_glove=bool(params["is_glove"]),
+                    distance_min_mm=params["distance_min_mm"],
+                    distance_max_mm=params["distance_max_mm"],
                     num_points=int(params["num_points"]),
                 )
 
@@ -109,6 +140,29 @@ def run_mech_model_activity(simulation_run_id: str) -> None:
                         name=name,
                         value=y,
                         unit=y_unit,
+                        created_by="mech-model-worker",
+                    )
+                )
+
+            if model_type == "proximity_capacitance":
+                # ASIC behavioral + threshold gesture-decision summary
+                # (§IF-03/IF-04 stand-in) — a couple of bonus named metrics
+                # alongside the swept ΔC curve, same pattern as the SPICE
+                # worker's worst_case_logic_low_margin next to v_out_rc_*.
+                summary = derive_asic_gesture_summary(
+                    xs,
+                    ys,
+                    gain_counts_per_fF=params["gain_counts_per_fF"],
+                    offset_counts=params["offset_counts"],
+                    threshold_counts=params["threshold_counts"],
+                )
+                db.add(
+                    ResultMetric(
+                        business_id=f"{run.business_id}-max-reliable-distance",
+                        simulation_run_id=run.id,
+                        name="max_reliable_distance_mm",
+                        value=summary["max_reliable_distance_mm"],
+                        unit="mm",
                         created_by="mech-model-worker",
                     )
                 )

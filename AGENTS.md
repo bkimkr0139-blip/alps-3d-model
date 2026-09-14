@@ -754,6 +754,113 @@ Per `docs/AlpsAlpine_TACT_Switch_Product_Process_Twin_고도화_개발지시서_
   button). Demo spec band 260–360 mN is a module const applied only for
   PROD-TACT-SWITCH and labelled 데모 사양·합성 데이터.
 
+## AirInput vertical slice — proximity_capacitance model family (DONE, scope-cut by design)
+
+First vertical slice of
+`docs/AlpsAlpine_AirInput_3D_Interaction_Field_Twin_구현지시서_v1.0.md` §14,
+built the exact same minimal-infra way Phase 2 added Rotary Encoder/MEMS:
+a 4th `model_type` on the existing analytical-model dispatch, **not** any of
+the spec's new entities (SensorGeometry/FieldRun/ASICBehaviorModel/
+AlgorithmRun/SensitivityVolume/DeadZone/RobotScan — none of that exists, or
+should be added, for this slice). Product `PROD-AIRINPUT-SENSOR` ("AirInput
+Proximity Sensor"), 2 variants (`VAR-AIR-A`/`VAR-AIR-B` = Electrode Layout
+A/B), seeded by `seed_airinput_product`/`seed_airinput_variant` in
+`scripts/seed_golden_dataset.py` — deliberately **not** added to the
+`PRODUCTS` list / run through `seed_variant()`, see why below.
+
+**Physics stand-in** (`fs_model.predict_proximity_capacitance`): self-
+capacitance change ΔC(d) as a finger/glove approaches an electrode —
+
+```
+ΔC(d) = C0 / (1 + (d_eff / D0) ** N)
+d_eff = d + cover_thickness_mm / cover_dielectric_constant
+          + (GLOVE_STANDOFF_MM if is_glove else 0)
+```
+
+`C0 = 0.6 fF/mm² × electrode_area_mm2`, `D0 = 6.0 mm`, `N = 2.0`,
+`GLOVE_STANDOFF_MM = 1.5` — illustrative shape constants, not measured/
+datasheet values, disclosed in the docstring exactly like fs_dome's
+f_peak/f_valley/f0 (§HANDOFF §7: no unlabeled invented physical constants).
+This is the §IF-02 electrostatic FEM/BEM solver stand-in — a real solver
+drops in later with the same `(distance_mm[], delta_c_fF[])` shape. The
+cover is modeled as a series dielectric slab (cover thickness/permittivity
+⇒ an equivalent air-gap addition — a textbook simplification, not a
+fringing-aware solve); a glove adds a fixed extra standoff instead of any
+specific glove's measured thickness. Both increase `d_eff` and therefore
+*lower* ΔC at every nominal distance — regression-tested in
+`apps/api/tests/test_fs_model_proximity.py` (monotonic decrease, cover/glove/
+both-stacked all reduce ΔC vs. bare-finger-no-cover, larger electrode area
+scales ΔC up).
+
+**ASIC + gesture decision, summary-only** (`fs_model.derive_asic_gesture_summary`):
+`raw_count = ΔC·gain + offset` (fixed illustrative
+`gain_counts_per_fF=50`, `offset_counts=200`) is the §IF-03 ASIC behavioral
+stand-in; `detected = raw_count >= threshold_counts` (`threshold_counts=260`)
+is the §IF-04 Algorithm Twin stand-in — no Feature/State timeline, no
+debounce, no confidence score, on purpose. The worker stores exactly one
+bonus metric per run, `max_reliable_distance_mm`, alongside the swept curve
+— same pattern as the SPICE worker's `worst_case_logic_low_margin` next to
+`v_out_rc_*`. It's read off the swept array by linear interpolation (not a
+fresh analytic solve), clamped to the sweep's endpoints if the threshold is
+never/always crossed within the modeled range.
+
+**Contract entries added, all four places** (mech worker `MODEL_METRICS`,
+API `app/correlation.py CURVE_FAMILIES`, web `apps/web/src/lib/curve.ts`,
+`TestCorrelationPanel` — confirmed generic, needed no changes since it reads
+`curve.ts` as the single source of truth):
+`proximity_capacitance → delta_c_fF_at_d_<x> (mm, fF)`. i18n: added
+`correlation.axis.distance`/`correlation.axis.capacitance` to all three
+locale files (en/ko/ja) for the new axis labels.
+
+**Seed story**: `seed_airinput_variant` mirrors only the *mech-model→
+correlation* slice of the other three products' `seed_variant()` —
+Requirements (3: REQ-DETECT/REQ-NOFALSE/REQ-GLOVE, all `safety_class: QM`
+since §1.2 of the spec explicitly scopes this PoC to a non-safety-critical
+"Shadow" environment — "자동차 기능안전 입력을 직접 제어하지 않는다"),
+2 Components (Capacitive Electrode PCB / Cover Lens, traced from every
+requirement, no CAD behind them), a bare-finger `RUN-MECH-01` correlated
+against a synthetic robot-scan CSV (`scripts/fixtures/variant_{a,b}_
+proximity_measured.csv`, generated from the analytical curve + ~4% Gaussian
+noise, fixed seed), a second `RUN-MECH-02-GLOVE` run (`is_glove: true`, same
+variant, illustrative prediction only — no physical glove bench CSV yet,
+which is exactly why REQ-GLOVE's `verification_method` is `analysis` not
+`test`), and a Baseline. Variant B (Electrode Layout B) uses a larger
+electrode (160 vs 100 mm²) but a thicker/lower-permittivity cover (1.2 mm /
+k=3.2 vs 1.0 mm / k=4.0) — a deliberate trade-off so neither variant
+strictly dominates, matching §VF-04's "no single variant always wins" point.
+
+**Deliberately NOT built, and why**:
+- **No CAD/STEP assembly, no SPICE run, no Model Canvas/UQ config** for this
+  product — `seed_variant()`/`_FAMILIES` assume all three, and building a
+  new 3D assembly or a SPICE netlist for an ASIC excitation circuit that's
+  explicitly modeled only as a summary-metric behavioral stand-in (not a
+  circuit netlist) would be exactly the scope creep the task and HANDOFF.md
+  §7 warn against. This is why AirInput is NOT in the `PRODUCTS` list.
+- **No Gate for AirInput variants**: `app/gate_readiness.py`'s
+  `spice_analysis_succeeded` check is unconditional per variant (not
+  model-type-aware) — without a SPICE run, `POST /gates/{id}/submit` 412s.
+  Fabricating a SPICE netlist purely to satisfy an unrelated readiness gate
+  would itself be invented evidence. Baseline is still created (it only
+  snapshots whatever exists, no SPICE dependency); Gate submission is
+  skipped and documented, not worked around.
+- **No SensorGeometry/Electrode/FieldRun/ASICBehaviorModel/AlgorithmRun/
+  SensitivityVolume/DeadZone/RobotScan/UserStudy entities** (§10.1 of the
+  spec) — the existing Product/Variant/SimulationRun/ResultMetric/
+  CorrelationRecord path expresses everything this slice needs.
+- **No new Temporal worker/task queue** — `proximity_capacitance` runs on
+  the existing mech-model worker/queue, same as the other three model types.
+- **No 3D Sensitivity Volume / Dead Zone map / Trajectory Replay / robot-scan
+  file import / Algorithm Twin state machine / any of the 12 AI01–AI12
+  screens** — this slice proves the *causal chain* (ΔC(d) → ASIC counts →
+  threshold decision → correlation), not the spec's full 3D visualization or
+  production/quality layers (§4, §9, §13 weeks 5–16).
+- Regression tests live at the fs_model function level
+  (`apps/api/tests/test_fs_model_proximity.py`, imported by adding
+  `apps/workers/mech-model` to `sys.path` — mirrors how `activities.py` adds
+  `apps/api` to `sys.path` in the other direction) — there is still no
+  pytest coverage of an actual Temporal mech-model run for ANY model_type
+  (pre-existing gap, see the M2 section above), so this is unit-level only.
+
 ## Known gaps / deliberately deferred
 
 - **Read endpoints have no auth.** There is no router-level/global auth
