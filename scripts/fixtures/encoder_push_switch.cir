@@ -1,0 +1,5 @@
+* Rotary Encoder Push-Switch Circuit (47k pull-up)
+V1 VCC 0 DC 5
+Rpullup VCC OUT 47k
+Rcontact OUT 0 1
+.end

@@ -1,0 +1,25 @@
+# Copy to infra/frp/frpc.toml (gitignored — contains the shared frps token)
+# and run: frpc -c infra/frp/frpc.toml
+#
+# Tunnels the local nginx gateway (infra/nginx/local-gateway.conf, port 8090
+# — combines web + API + Keycloak under one origin) to the remote frps
+# server this machine already runs other projects through.
+
+serverAddr = "140.238.31.159"
+serverPort = 7000
+
+auth.method = "token"
+auth.token = "REPLACE_WITH_TOKEN_FROM_SERVER_frps.toml"
+# Must match frps.toml's auth.additionalScopes exactly, or every proxied
+# request fails with "token in NewWorkConn doesn't match token from
+# configuration" even though the control-channel login succeeds.
+auth.additionalScopes = ["HeartBeats", "NewWorkConns"]
+
+transport.tls.enable = true
+
+[[proxies]]
+name = "alps-twin-web"
+type = "http"
+localIP = "127.0.0.1"
+localPort = 8090
+customDomains = ["alps-twin.wizbase.ai.kr"]

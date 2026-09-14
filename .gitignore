@@ -1,0 +1,24 @@
+.env
+.env.local
+node_modules/
+dist/
+build/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+infra/frp/frpc.toml
+infra/keycloak/*.local.json
+# realm-export.json imports demo users AND the alps-twin-api client secret —
+# machine-local only, never pushed to the remote.
+infra/keycloak/realm-export.json
+*.log
+.DS_Store
+infra/minio-data/
+infra/pg-data/
+infra/opensearch-data/
+.claude/
+
