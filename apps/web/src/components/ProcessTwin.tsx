@@ -1,12 +1,26 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { enumLabel } from "../i18n";
 import {
   api,
+  type Capa,
+  type CapaEvent,
   type CavityComparison,
+  type Defect,
+  type FailureAnalysis,
   type LotCard,
   type LotGenealogy,
   type RootCauseHypothesis,
 } from "../lib/api";
+
+const inputStyle: React.CSSProperties = {
+  background: "#0f172a",
+  color: "white",
+  border: "1px solid #334155",
+  borderRadius: 4,
+  padding: "4px 6px",
+  fontSize: 11.5,
+};
 
 /** Status uses icon + text together (§5.1: never colour alone). */
 function DispositionBadge({ disposition }: { disposition: LotCard["disposition"] }) {
@@ -79,9 +93,313 @@ function RootCauseSection({ lotId }: { lotId: string }) {
   );
 }
 
+/** TS10 Defect & FA Workspace lite: one CAPA's status + append-only event
+ * trail + the one legal next action for its current state. RBAC (reviewer
+ * role for approve/reject/close) is server-enforced only — same pattern as
+ * GatePanel.tsx, which shows its buttons unconditionally and lets the API
+ * 403 an unauthorized actor. */
+function CapaCard({
+  capa,
+  testRunOptions,
+  onChange,
+}: {
+  capa: Capa;
+  testRunOptions: { id: string; business_id: string }[];
+  onChange: () => void;
+}) {
+  const { t } = useTranslation();
+  const [events, setEvents] = useState<CapaEvent[]>([]);
+  const [comment, setComment] = useState("");
+  const [testRunId, setTestRunId] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.listCapaEvents(capa.id).then(setEvents).catch(() => {});
+  }, [capa.id, capa.status]);
+
+  async function run(action: () => Promise<unknown>) {
+    setError(null);
+    try {
+      await action();
+      setComment("");
+      onChange();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  const needsComment = ["draft", "pending_review", "approved", "implemented", "effectiveness_verified"].includes(
+    capa.status
+  );
+
+  return (
+    <div style={{ background: "#0b1220", border: "1px solid #334155", borderRadius: 8, padding: "8px 10px", marginTop: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+        <strong style={{ fontSize: 12.5 }}>{capa.title}</strong>
+        <span style={{ fontSize: 11 }}>{enumLabel(t, "capaStatus", capa.status)}</span>
+      </div>
+      <div style={{ opacity: 0.6, fontSize: 10.5 }}>
+        {capa.business_id} · {enumLabel(t, "capaType", capa.capa_type)} · {t("proc.quality.capa.owner")}: {capa.owner}
+      </div>
+      <div style={{ fontSize: 11.5, marginTop: 4 }}>{capa.description}</div>
+
+      {events.length > 0 && (
+        <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 2 }}>
+          {events.map((e) => (
+            <div key={e.id} style={{ fontSize: 10, opacity: 0.65, borderLeft: "2px solid #334155", paddingLeft: 6 }}>
+              {enumLabel(t, "capaEventType", e.event_type)} · {e.actor} ({new Date(e.occurred_at).toLocaleString()})
+              {e.comment ? ` — ${e.comment}` : ""}
+              {e.evidence?.test_run_business_id
+                ? ` · ${t("proc.quality.capa.retest")}: ${String(e.evidence.test_run_business_id)}`
+                : ""}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {needsComment && (
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder={t("proc.quality.capa.commentPlaceholder")}
+          style={{ ...inputStyle, width: "100%", minHeight: 32, marginTop: 6 }}
+        />
+      )}
+
+      <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {capa.status === "draft" && (
+          <button onClick={() => run(() => api.submitCapa(capa.id, comment))}>{t("proc.quality.capa.submit")}</button>
+        )}
+        {capa.status === "pending_review" && (
+          <>
+            <button style={{ background: "#166534" }} onClick={() => run(() => api.decideCapa(capa.id, "approved", comment))}>
+              {t("proc.quality.capa.approve")}
+            </button>
+            <button style={{ background: "#7f1d1d" }} onClick={() => run(() => api.decideCapa(capa.id, "rejected", comment))}>
+              {t("proc.quality.capa.reject")}
+            </button>
+          </>
+        )}
+        {capa.status === "approved" && (
+          <button onClick={() => run(() => api.implementCapa(capa.id, comment))}>{t("proc.quality.capa.markImplemented")}</button>
+        )}
+        {capa.status === "implemented" && (
+          <>
+            <select value={testRunId} onChange={(e) => setTestRunId(e.target.value)} style={inputStyle}>
+              <option value="">{t("proc.quality.capa.selectTestRun")}</option>
+              {testRunOptions.map((tr) => (
+                <option key={tr.id} value={tr.id}>
+                  {tr.business_id}
+                </option>
+              ))}
+            </select>
+            <button disabled={!testRunId} onClick={() => run(() => api.verifyCapaEffectiveness(capa.id, testRunId, comment))}>
+              {t("proc.quality.capa.verify")}
+            </button>
+          </>
+        )}
+        {capa.status === "effectiveness_verified" && (
+          <button onClick={() => run(() => api.closeCapa(capa.id, comment))}>{t("proc.quality.capa.close")}</button>
+        )}
+      </div>
+      {error && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 4 }}>{error}</div>}
+    </div>
+  );
+}
+
+/** Per-defect FA/CAPA management: create an FA, then create/drive CAPAs
+ * under it. `testRunOptions` (the lot's own inspection runs) feeds the
+ * effectiveness-verification picker — a retest must point at a real
+ * TestRun, never a free-text claim. */
+function DefectQualitySection({
+  defectId,
+  testRunOptions,
+}: {
+  defectId: string;
+  testRunOptions: { id: string; business_id: string }[];
+}) {
+  const { t } = useTranslation();
+  const [fas, setFas] = useState<FailureAnalysis[]>([]);
+  const [capasByFa, setCapasByFa] = useState<Record<string, Capa[]>>({});
+  const [showFaForm, setShowFaForm] = useState(false);
+  const [faForm, setFaForm] = useState({ method: "5-Why", findings: "", analyst: "", root_cause: "", root_cause_confirmed: false });
+  const [capaFormFor, setCapaFormFor] = useState<string | null>(null);
+  const [capaForm, setCapaForm] = useState<{ title: string; capa_type: "corrective" | "preventive" | "both"; description: string; owner: string }>({
+    title: "",
+    capa_type: "corrective",
+    description: "",
+    owner: "",
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  async function refresh() {
+    const list = await api.listFailureAnalyses(defectId);
+    setFas(list);
+    const entries = await Promise.all(list.map(async (fa) => [fa.id, await api.listCapas(fa.id)] as const));
+    setCapasByFa(Object.fromEntries(entries));
+  }
+
+  useEffect(() => {
+    refresh().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defectId]);
+
+  async function createFa() {
+    setError(null);
+    try {
+      const bid = `FA-${defectId.slice(0, 8)}-${Date.now()}`;
+      await api.createFailureAnalysis(defectId, {
+        business_id: bid,
+        method: faForm.method,
+        findings: faForm.findings,
+        analyst: faForm.analyst,
+        analyzed_at: new Date().toISOString(),
+        root_cause: faForm.root_cause || null,
+        root_cause_confirmed: faForm.root_cause_confirmed,
+      });
+      setShowFaForm(false);
+      setFaForm({ method: "5-Why", findings: "", analyst: "", root_cause: "", root_cause_confirmed: false });
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function createCapa(faId: string) {
+    setError(null);
+    try {
+      const bid = `CAPA-${faId.slice(0, 8)}-${Date.now()}`;
+      await api.createCapa(faId, { business_id: bid, ...capaForm });
+      setCapaFormFor(null);
+      setCapaForm({ title: "", capa_type: "corrective", description: "", owner: "" });
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 8, borderTop: "1px dashed #334155", paddingTop: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontSize: 11.5, fontWeight: 700, opacity: 0.85 }}>{t("proc.quality.title")}</div>
+        <button onClick={() => setShowFaForm((s) => !s)} style={{ fontSize: 10.5, padding: "2px 6px" }}>
+          {t("proc.quality.fa.createButton")}
+        </button>
+      </div>
+
+      {showFaForm && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+          <input
+            placeholder={t("proc.quality.fa.method")}
+            value={faForm.method}
+            onChange={(e) => setFaForm({ ...faForm, method: e.target.value })}
+            style={inputStyle}
+          />
+          <textarea
+            placeholder={t("proc.quality.fa.findings")}
+            value={faForm.findings}
+            onChange={(e) => setFaForm({ ...faForm, findings: e.target.value })}
+            style={{ ...inputStyle, minHeight: 40 }}
+          />
+          <input
+            placeholder={t("proc.quality.fa.analyst")}
+            value={faForm.analyst}
+            onChange={(e) => setFaForm({ ...faForm, analyst: e.target.value })}
+            style={inputStyle}
+          />
+          <textarea
+            placeholder={t("proc.quality.fa.rootCause")}
+            value={faForm.root_cause}
+            onChange={(e) => setFaForm({ ...faForm, root_cause: e.target.value })}
+            style={{ ...inputStyle, minHeight: 30 }}
+          />
+          <label style={{ fontSize: 11, display: "flex", gap: 4, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={faForm.root_cause_confirmed}
+              onChange={(e) => setFaForm({ ...faForm, root_cause_confirmed: e.target.checked })}
+            />
+            {t("proc.quality.fa.rootCauseConfirmed")}
+          </label>
+          <button onClick={createFa} disabled={!faForm.findings.trim() || !faForm.analyst.trim()}>
+            {t("proc.quality.fa.create")}
+          </button>
+        </div>
+      )}
+
+      {fas.length === 0 ? (
+        <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>{t("proc.quality.fa.empty")}</div>
+      ) : (
+        fas.map((fa) => (
+          <div key={fa.id} style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 600 }}>
+              {fa.method} <span style={{ opacity: 0.6, fontWeight: 400 }}>· {fa.analyst} · {new Date(fa.analyzed_at).toLocaleDateString()}</span>
+            </div>
+            <div style={{ fontSize: 11.5, opacity: 0.85 }}>{fa.findings}</div>
+            {fa.root_cause && (
+              <div style={{ fontSize: 11, marginTop: 2 }}>
+                <span style={{ color: fa.root_cause_confirmed ? "#4ade80" : "#fbbf24", fontWeight: 600 }}>
+                  {fa.root_cause_confirmed ? t("proc.quality.fa.confirmed") : t("proc.quality.fa.unconfirmed")}
+                </span>{" "}
+                {fa.root_cause}
+              </div>
+            )}
+
+            {(capasByFa[fa.id] ?? []).map((capa) => (
+              <CapaCard key={capa.id} capa={capa} testRunOptions={testRunOptions} onChange={refresh} />
+            ))}
+
+            {capaFormFor === fa.id ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+                <input
+                  placeholder={t("proc.quality.capa.titleField")}
+                  value={capaForm.title}
+                  onChange={(e) => setCapaForm({ ...capaForm, title: e.target.value })}
+                  style={inputStyle}
+                />
+                <select
+                  value={capaForm.capa_type}
+                  onChange={(e) => setCapaForm({ ...capaForm, capa_type: e.target.value as typeof capaForm.capa_type })}
+                  style={inputStyle}
+                >
+                  <option value="corrective">{t("enums.capaType.corrective")}</option>
+                  <option value="preventive">{t("enums.capaType.preventive")}</option>
+                  <option value="both">{t("enums.capaType.both")}</option>
+                </select>
+                <textarea
+                  placeholder={t("proc.quality.capa.description")}
+                  value={capaForm.description}
+                  onChange={(e) => setCapaForm({ ...capaForm, description: e.target.value })}
+                  style={{ ...inputStyle, minHeight: 40 }}
+                />
+                <input
+                  placeholder={t("proc.quality.capa.owner")}
+                  value={capaForm.owner}
+                  onChange={(e) => setCapaForm({ ...capaForm, owner: e.target.value })}
+                  style={inputStyle}
+                />
+                <button onClick={() => createCapa(fa.id)} disabled={!capaForm.title.trim() || !capaForm.description.trim() || !capaForm.owner.trim()}>
+                  {t("proc.quality.capa.create")}
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setCapaFormFor(fa.id)} style={{ fontSize: 10.5, padding: "2px 6px", marginTop: 4 }}>
+                {t("proc.quality.capa.createButton")}
+              </button>
+            )}
+          </div>
+        ))
+      )}
+      {error && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 4 }}>{error}</div>}
+    </div>
+  );
+}
+
 function LotDetail({ lot }: { lot: LotCard }) {
   const { t } = useTranslation();
   const [gene, setGene] = useState<LotGenealogy | null>(null);
+  const [defects, setDefects] = useState<Defect[]>([]);
+  const [expandedDefectId, setExpandedDefectId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,6 +407,12 @@ function LotDetail({ lot }: { lot: LotCard }) {
       .lotGenealogy(lot.id)
       .then((g) => {
         if (!cancelled) setGene(g);
+      })
+      .catch(() => {});
+    api
+      .listLotDefects(lot.id)
+      .then((d) => {
+        if (!cancelled) setDefects(d);
       })
       .catch(() => {});
     return () => {
@@ -178,24 +502,36 @@ function LotDetail({ lot }: { lot: LotCard }) {
           {gene.defects.length === 0 ? (
             <div style={{ fontSize: 12, opacity: 0.6 }}>{t("proc.genealogy.none")}</div>
           ) : (
-            gene.defects.map((d) => (
-              <div key={d.business_id} style={{ fontSize: 12 }}>
-                <span
-                  style={{
-                    color: d.severity === "critical" ? "#f87171" : d.severity === "major" ? "#fbbf24" : "#7dd3fc",
-                    fontWeight: 600,
-                  }}
+            gene.defects.map((d) => {
+              const real = defects.find((rd) => rd.business_id === d.business_id);
+              const expanded = real && real.id === expandedDefectId;
+              return (
+                <div
+                  key={d.business_id}
+                  onClick={() => real && setExpandedDefectId(expanded ? null : real.id)}
+                  style={{ fontSize: 12, cursor: real ? "pointer" : "default" }}
+                  title={real ? t("proc.quality.expandHint") : undefined}
                 >
-                  ✕ {d.defect_class}
-                </span>{" "}
-                <span style={{ opacity: 0.6 }}>
-                  ({t(`proc.severity.${d.severity}`)} ×{d.quantity})
-                </span>
-              </div>
-            ))
+                  <span
+                    style={{
+                      color: d.severity === "critical" ? "#f87171" : d.severity === "major" ? "#fbbf24" : "#7dd3fc",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✕ {d.defect_class}
+                  </span>{" "}
+                  <span style={{ opacity: 0.6 }}>
+                    ({t(`proc.severity.${d.severity}`)} ×{d.quantity})
+                  </span>
+                  {real && <span style={{ opacity: 0.4, fontSize: 11 }}> {expanded ? "▲" : "▼"}</span>}
+                </div>
+              );
+            })
           )}
         </div>
       </div>
+
+      {expandedDefectId && <DefectQualitySection defectId={expandedDefectId} testRunOptions={gene.test_runs} />}
 
       <RootCauseSection lotId={lot.id} />
     </div>

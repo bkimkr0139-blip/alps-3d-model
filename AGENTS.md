@@ -754,6 +754,124 @@ Per `docs/AlpsAlpine_TACT_Switch_Product_Process_Twin_고도화_개발지시서_
   button). Demo spec band 260–360 mN is a module const applied only for
   PROD-TACT-SWITCH and labelled 데모 사양·합성 데이터.
 
+## FA/CAPA workflow — Defect → FailureAnalysis → CAPA (DONE, API-level; browser pass deferred)
+
+Per `docs/AlpsAlpine_TACT_Switch_Product_Process_Twin_고도화_개발지시서_v1.0.md`
+(TS10 Defect & FA Workspace) and HANDOFF §5 item 4. Built in
+`feature/fa-capa-workflow` alongside a parallel AN-04 DOE workstream sharing
+the same infra — see the isolation notes below before touching any of this.
+
+- **New files on purpose, not additions to the process_twin trio**:
+  `app/models/fa_capa.py`, `app/schemas/fa_capa.py`, `app/routers/fa_capa.py`
+  (+ a matching `tests/test_fa_capa.py`). `routers/process_twin.py` itself
+  was not touched at all — a new endpoint (`GET /lots/{lot_id}/defects`) was
+  added to the new router instead, importing `DefectRead` from
+  `schemas/process_twin.py` rather than growing that module. Reason: a
+  concurrent agent was expected to be touching process-twin code for AN-04 in
+  a sibling worktree at the same time; isolating the diff avoids merge
+  conflicts. If this pattern (new router file importing another module's
+  schemas for a read-only cross-cutting endpoint) recurs, it's the preferred
+  shape over inserting into someone else's active file.
+- **Two different "AI never concludes" boundaries, don't conflate them**:
+  `FailureAnalysis.root_cause`/`root_cause_confirmed` are human-entered
+  fields (an analyst fills them) — there is no `confidence` field on this
+  model at all, because this isn't AI output to begin with (contrast
+  `RootCauseCandidate` in `schemas/process_twin.py`, which *is* AI output and
+  *does* carry `confidence="check_required"`). Don't add a confidence field
+  to FailureAnalysis — that would misrepresent a human judgment as a
+  machine one.
+- **CAPA state machine** (`CapaStatus`): `draft --submit--> pending_review
+  --decide(approved)--> approved --implement--> implemented
+  --verify_effectiveness--> effectiveness_verified --close--> closed`;
+  `pending_review --decide(rejected)--> rejected` is terminal, as is
+  `closed`. RBAC mirrors `app/routers/gates.py`: `CAN_MANAGE_QUALITY`
+  (`quality_engineer`/`manufacturing_engineer`/`system_architect`) creates
+  FAs/CAPAs and drives submit/implement/verify; `CAN_DECIDE_CAPA`
+  (`reviewer_approver` only) gates both the approve/reject decision **and**
+  the final close — closing is treated as the quality sign-off that the fix
+  actually worked, not just whoever implemented it, so it gets the same
+  independent-reviewer gate as the original approval. Every transition
+  (including submit — broader than Gate, which only journals decisions/
+  comments) writes an immutable `CapaEvent` row, mirroring `GateDecision`'s
+  append-only pattern; `CAPA.status` only ever reflects the latest one.
+  State-transition endpoints (submit/decisions/implement/verify/close) are
+  **not** wrapped in `idempotent_write` — same reasoning as
+  `gates.py submit_gate`/`decide_gate`: they mutate an existing row by path
+  id and take a client-supplied `business_id` for the event row itself, so a
+  retry fails on either the status precondition (400) or a business_id
+  collision (409) rather than needing a cached-replay wrapper. Only the two
+  genuine "create a new business entity" endpoints (create FA, create CAPA)
+  use `idempotent_write`.
+- **Effectiveness verification links a real TestRun, never free text**
+  (HANDOFF §5 item 5, scoped to CAPA closure): `POST
+  /capas/{id}/verify-effectiveness` requires an existing `test_run_id`
+  (404 if it doesn't resolve) and stores it on `CAPA.verification_test_run_id`
+  plus as `{test_run_id, test_run_business_id}` evidence on the
+  `CapaEvent` row — a retest that actually ran, not a claim.
+- **Endpoints**: `POST/GET /defects/{id}/failure-analyses`, `GET
+  /failure-analyses/{id}`, `GET /lots/{id}/defects` (id-bearing defect list —
+  see above), `POST/GET /failure-analyses/{id}/capas`, `GET /capas` (optional
+  `?status=`), `GET /capas/{id}`, `GET /capas/{id}/events`, and
+  `POST /capas/{id}/{submit,decisions,implement,verify-effectiveness,close}`.
+- **Migration** `8aaac1ba4a8b` (3 new tables: `failure_analyses`, `capas`,
+  `capa_events`) branches cleanly off the single P1 head `b8f2e4a6c7d1`.
+  Autogenerate also picked up an unrelated pre-existing drift on
+  `model_cards` (a unique constraint vs. the model's unique index — same
+  effect, different catalog representation) — deliberately left OUT of this
+  revision (hand-edited the generated file) to keep the diff scoped and avoid
+  touching a table the parallel AN-04/model_canvas work might also touch.
+  `alembic check` after upgrading confirms that's the *only* remaining
+  drift, i.e. this revision is otherwise complete and correct.
+- **Worktree gotcha for any future parallel-agent session**: a fresh `git
+  worktree` checkout has neither `.env` (gitignored, needed for
+  `Settings()`/alembic to even import) nor `node_modules`. Copy `.env` from
+  the main checkout (safe, still gitignored) and symlink
+  `apps/web/node_modules` from the main checkout instead of a full `npm
+  install` (fast, and `package.json`/lockfile are identical across worktrees
+  of the same commit — diff them first if unsure).
+- **Frontend**: extended `ProcessTwin.tsx` (not a new tab) — clicking a
+  defect row in the existing Lot Genealogy defects list expands a
+  `DefectQualitySection` (FA list + create-FA form; each FA's CAPAs render
+  via `CapaCard` with its event trail and the one legal next-action button
+  for its current status). Approve/Reject/Close buttons are shown
+  unconditionally, same as `GatePanel.tsx` — RBAC is server-enforced only,
+  the frontend never role-gates a button. The genealogy's `GenealogyDefect`
+  shape (from `process_twin.py`, unmodified) has no `id`, so the panel
+  resolves real defect UUIDs via the new `GET /lots/{id}/defects` instead.
+  The effectiveness-verification picker reuses the lot's own
+  `LotGenealogy.test_runs` (already fetched) as its TestRun options — no new
+  endpoint needed for that.
+- **Seed**: `scripts/seed_golden_dataset.py` `seed_fa_capa()` adds one FA on
+  `LOT-TACT-A-04-DEF-1` (the existing P1 anomaly lot's force_high defect)
+  and two CAPAs: `CAPA-LOT-TACT-A-04-1` driven all the way through
+  submit→approve→implement→verify(a real new retest TestRun,
+  `LOT-TACT-A-04-TR-RETEST-01`, peak 320mN vs. the 260–360mN demo band)→
+  close, and `CAPA-LOT-TACT-A-04-2` left at `approved` to show a mid-flight
+  ledger state. Follows the established reseed-safety pattern from the M8
+  gotcha: since submit/decide/implement/verify/close are non-idempotent
+  (see above), the script re-`GET`s the CAPA's live status before attempting
+  each step and only acts if the precondition still holds — safe to re-run.
+  Not yet run against a live stack in this session (see isolation note
+  below); verified by `py_compile` + code review only.
+- **Deliberately deferred / known limitations**: no independence check on
+  CAPA decide/close (Gate's "reviewer ≠ submitter" rule was not replicated —
+  not requested by the task and CAPA's RBAC-only gate was judged sufficient
+  for this slice); no `gate_readiness`-style pre-submit evidence check
+  gating CAPA submission on `FailureAnalysis.root_cause_confirmed`; no
+  dedicated FA/CAPA Keycloak users (`demo.architect`/`demo.approver`/
+  `demo.mech_engineer` cover every role the seed needs, since
+  `system_architect` is in `CAN_MANAGE_QUALITY`) — add
+  `demo.quality_engineer`/`demo.manufacturing_engineer` to
+  `infra/keycloak/realm-export.json` if a future slice needs to distinguish
+  them from the architect. Built and verified in a `git worktree` whose
+  shared Docker infra (Postgres/Keycloak/MinIO/Temporal) and dev
+  `alps_twin`/`alps_twin_test` DBs are used by another parallel agent's
+  session at the same time — per that session's isolation rules, the shared
+  port-8000 uvicorn/port-5173 Vite/port-8090 nginx were never started or
+  restarted here (pytest's `TestClient` doesn't need them), and no live
+  Playwright browser pass was run; both a live reseed and a browser pass are
+  deferred to the centralized post-merge verification pass.
+
 ## Known gaps / deliberately deferred
 
 - **Read endpoints have no auth.** There is no router-level/global auth
@@ -773,8 +891,9 @@ Per `docs/AlpsAlpine_TACT_Switch_Product_Process_Twin_고도화_개발지시서_
 - Docker Desktop is still at ~7.7GB memory allocation. Everything so far runs
   as host processes against dockerized infra (not containerized itself), so
   this hasn't bitten yet — revisit before containerizing apps/workers for M7.
-- FMEA/NCR/CAPA (§9.1, S12 Quality screen) not implemented — out of scope for
-  the first vertical slice per the plan.
+- FMEA/NCR (§9.1, S12 Quality screen) not implemented — out of scope for the
+  first vertical slice per the plan. Defect→FA→CAPA *is* now implemented,
+  see "FA/CAPA workflow" above.
 - Only one Gate type ("Virtual Verification Complete") is wired up; the
   other §FR-09 gate stages (Design Ready, Prototype Test Complete, Production
   Readiness) use the same model/endpoints but nothing seeds or drives them.

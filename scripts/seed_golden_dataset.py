@@ -1106,7 +1106,7 @@ def seed_process_twin(
                 y_unit="mN",
             )
         if disposition != "ok":
-            post(
+            def1 = post(
                 client,
                 "/api/v1/defects",
                 idem_key=f"seed-{lot_bid}-DEF-1",
@@ -1132,10 +1132,172 @@ def seed_process_twin(
                     "note": "클릭비 저하 (데모 합성 데이터)",
                 },
             )
+            seed_fa_capa(client, test_client, approver_client, lot_bid, lot["id"], def1["id"], test_plan_id)
     print(
         "process-twin: mold=MOLD-TACT-01 cavities=2 operations=3 lots=4 "
-        "(normal=3 quarantine=1, one out-of-window run, defects=2)"
+        "(normal=3 quarantine=1, one out-of-window run, defects=2, "
+        "fa=1 capa=2 [1 closed w/ verified retest, 1 approved])"
     )
+
+
+def seed_fa_capa(
+    client: httpx.Client,
+    test_client: httpx.Client,
+    approver_client: httpx.Client,
+    lot_bid: str,
+    lot_id: str,
+    defect_id: str,
+    test_plan_id: str | None,
+) -> None:
+    """Defect → FailureAnalysis → CAPA (HANDOFF §5 item 4, TS10). One FA on
+    the anomaly lot's force_high defect, two CAPAs in different lifecycle
+    states — one driven all the way to CLOSED with effectiveness verified
+    against a real retest TestRun (never a free-text claim), one left at
+    APPROVED to show the ledger mid-flight. `client` = demo.architect
+    (system_architect, in CAN_MANAGE_QUALITY); `approver_client` =
+    demo.approver (reviewer_approver, the only role that may decide/close)."""
+    fa = post(
+        client,
+        f"/api/v1/defects/{defect_id}/failure-analyses",
+        idem_key=f"seed-FA-{lot_bid}-1",
+        body={
+            "business_id": f"FA-{lot_bid}-1",
+            "method": "5-Why",
+            "findings": (
+                f"{lot_bid} 작동력 상한 초과 불량 분석: OP-TACT-10(돔 프레스) 실측 두께가 "
+                "승인 윈도우(0.07–0.13mm)를 벗어난 0.145mm로 기록됨 — F-S 피크(365mN)가 "
+                "규격 상한(360mN)을 초과한 것과 시기적으로 일치."
+            ),
+            "analyst": "demo.mech_engineer",
+            "analyzed_at": "2026-09-09T09:00:00Z",
+            "root_cause": "돔 프레스 공정(OP-TACT-10) 두께 설정 편차로 성형 두께가 상한을 초과하여 작동력이 상승함.",
+            "root_cause_confirmed": True,
+            "evidence": [
+                {
+                    "kind": "process_run",
+                    "business_id": f"{lot_bid}-PR-10",
+                    "note": "돔 프레스 실측 0.145mm (윈도우 0.07–0.13mm)",
+                },
+                {
+                    "kind": "test_run",
+                    "business_id": f"{lot_bid}-TR-01",
+                    "note": "F-S 피크 365mN (데모 스펙 상한 360mN)",
+                },
+            ],
+        },
+    )
+
+    # -- CAPA 1: corrective, driven to CLOSED with a verified retest ---------
+    capa1 = post(
+        client,
+        f"/api/v1/failure-analyses/{fa['id']}/capas",
+        idem_key=f"seed-CAPA-{lot_bid}-1",
+        body={
+            "business_id": f"CAPA-{lot_bid}-1",
+            "title": "돔 프레스 공정 파라미터 재관리",
+            "capa_type": "corrective",
+            "description": "돔 프레스 두께 관리 범위를 재설정하고 공정 파라미터를 재조정한다.",
+            "owner": "demo.mech_engineer",
+            "due_date": "2026-09-20T00:00:00Z",
+        },
+    )
+    # Idempotent-create cache lesson (AGENTS.md M8): re-fetch live status
+    # before deciding which (non-idempotent, Gate-style) transition to try.
+    status1 = client.get(f"/api/v1/capas/{capa1['id']}").json()["status"]
+    if status1 == "draft":
+        r = client.post(
+            f"/api/v1/capas/{capa1['id']}/submit",
+            json={"business_id": f"CAPA-{lot_bid}-1-EV-SUBMIT", "comment": "원인 확정, 대책안 제출"},
+        )
+        status1 = _capa_step(r, f"CAPA-{lot_bid}-1 submit", status1)
+    if status1 == "pending_review":
+        r = approver_client.post(
+            f"/api/v1/capas/{capa1['id']}/decisions",
+            json={
+                "business_id": f"CAPA-{lot_bid}-1-EV-DEC",
+                "decision": "approved",
+                "comment": "근거(공정 윈도우 이탈) 확인, 대책안 승인",
+            },
+        )
+        status1 = _capa_step(r, f"CAPA-{lot_bid}-1 decide", status1)
+    if status1 == "approved":
+        r = client.post(
+            f"/api/v1/capas/{capa1['id']}/implement",
+            json={"business_id": f"CAPA-{lot_bid}-1-EV-IMPL", "comment": "돔 프레스 파라미터 재설정 완료"},
+        )
+        status1 = _capa_step(r, f"CAPA-{lot_bid}-1 implement", status1)
+    if status1 == "implemented" and test_plan_id:
+        # A real retest TestRun on the same lot/plan (never a free-text
+        # "fixed" claim) — the effectiveness-verification anchor.
+        retest = post(
+            test_client,
+            "/api/v1/test-runs",
+            idem_key=f"seed-{lot_bid}-TR-RETEST-01",
+            body={
+                "business_id": f"{lot_bid}-TR-RETEST-01",
+                "test_plan_id": test_plan_id,
+                "lot_id": lot_id,
+                "executed_at": "2026-09-21T11:00:00Z",
+                "equipment_id": "FS-TESTER-01",
+            },
+        )
+        upload_csv_measurements(
+            test_client,
+            test_run_id=retest["id"],
+            csv_bytes=_fs_curve_csv(320.0),
+            filename=f"{lot_bid}-retest-fs.csv",
+            x_unit="mm",
+            y_unit="mN",
+        )
+        r = client.post(
+            f"/api/v1/capas/{capa1['id']}/verify-effectiveness",
+            json={
+                "business_id": f"CAPA-{lot_bid}-1-EV-VERIFY",
+                "test_run_id": retest["id"],
+                "comment": "재검사 결과 F-S 피크 320mN — 규격(360mN) 이내로 재발 없음 확인",
+            },
+        )
+        status1 = _capa_step(r, f"CAPA-{lot_bid}-1 verify", status1)
+    if status1 == "effectiveness_verified":
+        r = approver_client.post(
+            f"/api/v1/capas/{capa1['id']}/close",
+            json={"business_id": f"CAPA-{lot_bid}-1-EV-CLOSE", "comment": "효과 검증 확인, CAPA 종결"},
+        )
+        status1 = _capa_step(r, f"CAPA-{lot_bid}-1 close", status1)
+
+    # -- CAPA 2: preventive, left APPROVED (mid-flight ledger state) --------
+    capa2 = post(
+        client,
+        f"/api/v1/failure-analyses/{fa['id']}/capas",
+        idem_key=f"seed-CAPA-{lot_bid}-2",
+        body={
+            "business_id": f"CAPA-{lot_bid}-2",
+            "title": "돔 프레스 공정 SPC 관리도 도입",
+            "capa_type": "preventive",
+            "description": "돔 두께에 대한 관리도를 도입하여 윈도우 이탈을 사전에 탐지한다.",
+            "owner": "demo.mech_engineer",
+        },
+    )
+    status2 = client.get(f"/api/v1/capas/{capa2['id']}").json()["status"]
+    if status2 == "draft":
+        r = client.post(
+            f"/api/v1/capas/{capa2['id']}/submit",
+            json={"business_id": f"CAPA-{lot_bid}-2-EV-SUBMIT", "comment": "예방조치안 제출"},
+        )
+        status2 = _capa_step(r, f"CAPA-{lot_bid}-2 submit", status2)
+    if status2 == "pending_review":
+        r = approver_client.post(
+            f"/api/v1/capas/{capa2['id']}/decisions",
+            json={"business_id": f"CAPA-{lot_bid}-2-EV-DEC", "decision": "approved", "comment": "예방조치안 승인"},
+        )
+        status2 = _capa_step(r, f"CAPA-{lot_bid}-2 decide", status2)
+
+
+def _capa_step(resp: httpx.Response, label: str, fallback_status: str) -> str:
+    if resp.status_code >= 400:
+        print(f"WARNING: {label} failed: {resp.text}", file=sys.stderr)
+        return fallback_status
+    return resp.json()["status"]
 
 
 def main() -> None:
