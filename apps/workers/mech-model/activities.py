@@ -295,9 +295,12 @@ def run_field_curve(db, run, params: dict) -> None:
     import numpy as np
 
     from artifacts import write_run_artifact
-    from field_model import GeometrySpec, FingerState, delta_c_self_fF, predict_field_curve, solve_potential, build_environment
+    from field_model import GeometrySpec, FingerState, delta_c_self_fF, lateral_slice_sweep, predict_field_curve, solve_potential, build_environment
 
     geom = _field_geometry(params)
+    # The curve solves double as the slice library's gap axis (slices_out
+    # captures each pose's y=0 potential as it is solved — no extra solves).
+    gap_slices: list = []
     xs, ys = predict_field_curve(
         electrode_area_mm2=float(params["electrode_area_mm2"]),
         cover_thickness_mm=float(params["cover_thickness_mm"]),
@@ -308,6 +311,8 @@ def run_field_curve(db, run, params: dict) -> None:
         distance_max_mm=float(params["distance_max_mm"]),
         num_points=int(params["num_points"]),
         cell_mm=float(params["cell_mm"]),
+        slices_out=gap_slices,
+        slice_stride=2,
     )
 
     # Per-channel split + potential slice from one representative solve
@@ -317,6 +322,13 @@ def run_field_curve(db, run, params: dict) -> None:
     per_ch, sol = delta_c_self_fF(
         geom, FingerState(0.0, 0.0, 0.0, bool(params["is_glove"])), cell_mm, baseline_cache,
         want_potential_slice=True,
+    )
+    # Off-center poses on a radial line so the web slice panel can follow
+    # lateral finger movement (lookup by radius — both layouts are
+    # rotationally symmetric about the electrode axis).
+    lateral = lateral_slice_sweep(
+        geom, [4.0, 8.0, 12.0, 16.0], gap_mm=0.0,
+        cell_mm=cell_mm, baseline_cache=baseline_cache, slice_stride=2,
     )
     env = build_environment(geom, cell_mm)
     base = solve_potential(env, None)
@@ -342,7 +354,17 @@ def run_field_curve(db, run, params: dict) -> None:
         },
         "touch_pose_channels_fF": per_ch,
         "potential_slice_y_mid": sol.potential_slice,
-        "slice_note": "electric potential [V] on the y=0 plane at the touch pose; downsampled for transport",
+        # Pose-resolved slices (gap sweep + radial line at touch) so the web
+        # panel can follow the finger with SOLVED fields only — the client
+        # picks the nearest solved pose, it never interpolates or recomputes
+        # physics (지시서: 클라이언트 field 계산 금지).
+        "pose_slices": gap_slices + lateral,
+        "slice_note": (
+            "electric potential [V] on the y=0 plane; potential_slice_y_mid is "
+            "the touch pose at full resolution, pose_slices carries the gap "
+            "sweep (center) plus a radial line at touch (stride-2 downsampled) "
+            "for pose-driven display"
+        ),
     }
     version = write_run_artifact(
         db, run, _input_version(db, run), payload, "field-grid.json",

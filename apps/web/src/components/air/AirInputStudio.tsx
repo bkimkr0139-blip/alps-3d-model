@@ -39,7 +39,10 @@ async function fetchArtifactJson<T>(versionId: string | null): Promise<T | null>
 }
 
 function latestSucceeded(runs: SimulationRun[], toolVersion: string): SimulationRun | null {
-  return runs.filter((r) => r.tool_version === toolVersion && r.status === "succeeded").slice(-1)[0] ?? null;
+  // The runs API returns created_at DESC — the NEWEST run is first. (This
+  // used to take .slice(-1), i.e. the oldest, which went unnoticed until
+  // re-seeding with a new suffix left several succeeded runs per tool.)
+  return runs.filter((r) => r.tool_version === toolVersion && r.status === "succeeded")[0] ?? null;
 }
 
 export function AirInputStudio({ variantId, runs }: { variantId: string | null; runs: SimulationRun[] }) {
@@ -62,7 +65,17 @@ export function AirInputStudio({ variantId, runs }: { variantId: string | null; 
     const sur = latestSucceeded(runs, TOOL.surrogate);
     const vol = latestSucceeded(runs, TOOL.volume);
     const fld = latestSucceeded(runs, TOOL.field);
-    const rps = runs.filter((r) => r.tool_version === TOOL.replay && r.status === "succeeded");
+    // One replay per scenario — the newest (re-seeding with a new suffix
+    // leaves older replays behind; the runs list is newest-first).
+    const seenScenarios = new Set<string>();
+    const rps = runs
+      .filter((r) => r.tool_version === TOOL.replay && r.status === "succeeded")
+      .filter((r) => {
+        const sid = (r.parameters as { scenario_id?: string } | null)?.scenario_id ?? "";
+        if (!sid || seenScenarios.has(sid)) return false;
+        seenScenarios.add(sid);
+        return true;
+      });
     (async () => {
       const [surP, volP, fldP, rpPs] = await Promise.all([
         fetchArtifactJson<SurrogatePayload>(sur?.output_artifact_version_id ?? null),
@@ -245,7 +258,7 @@ export function AirInputStudio({ variantId, runs }: { variantId: string | null; 
         </div>
         <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 8, overflowY: "auto" }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>{t("air.panels.slice")}</div>
-          <AirFieldSlice field={field} />
+          <AirFieldSlice field={field} pose={pose} />
         </div>
       </div>
 

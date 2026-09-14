@@ -354,10 +354,14 @@ def solve_potential(
     max_sweeps: int = 2500,
     tol: float = 1e-5,
     want_potential_slice: bool = False,
+    slice_stride: int = 0,
 ) -> FieldSolution:
     """One red-black SOR solve for one finger pose over a cached environment.
 
     Returns per-channel electrode charge (fF) + solver provenance.
+    ``slice_stride`` overrides the y=0 slice downsampling (0 = auto, which
+    keeps ~48 columns); the pose-slice library uses 2 so ~18 solved poses
+    still fit a compact artifact.
     """
     eps = env.eps.copy()
     fixed = env.fixed
@@ -469,7 +473,7 @@ def solve_potential(
     if want_potential_slice:
         j_mid = env.shape[1] // 2
         sub = potential[:, j_mid, :]
-        stride = max(1, int(max(sub.shape) / 48))
+        stride = slice_stride if slice_stride > 0 else max(1, int(max(sub.shape) / 48))
         s = sub[::stride, ::stride]
         slice_out = {
             "plane": "y_mid",
@@ -496,6 +500,7 @@ def delta_c_self_fF(
     cell_mm: float = 1.0,
     baseline_cache: dict | None = None,
     want_potential_slice: bool = False,
+    slice_stride: int = 0,
 ) -> tuple[dict[str, float], FieldSolution]:
     """Per-channel self-capacitance change (fF) for one finger pose.
 
@@ -523,7 +528,9 @@ def delta_c_self_fF(
         base = solve_potential(env, None).channel_q_ff
         if baseline_cache is not None:
             baseline_cache[key] = base
-    sol = solve_potential(env, finger, want_potential_slice=want_potential_slice)
+    sol = solve_potential(
+        env, finger, want_potential_slice=want_potential_slice, slice_stride=slice_stride
+    )
     return {ch: sol.channel_q_ff[ch] - base[ch] for ch in sol.channel_q_ff}, sol
 
 
@@ -538,6 +545,8 @@ def predict_field_curve(
     num_points: int = 13,
     cell_mm: float = 1.0,
     baseline_cache: dict | None = None,
+    slices_out: list | None = None,
+    slice_stride: int = 0,
 ) -> tuple[list[float], list[float]]:
     """ΔC(d) curve with the SAME contract shape as fs_model's analytic
     version: ascending distance (mm), ΔC monotone NON-INCREASING in d.
@@ -550,14 +559,63 @@ def predict_field_curve(
     model's ``d``. For the split ring (layout B) the curve value is the
     SUM of both half-ring channels — the total electrode response; the
     per-channel split travels in the run's artifact.
+
+    ``slices_out`` (optional list) collects each solve's y=0 potential
+    slice as it happens — the curve's poses ARE the slice library's gap
+    axis, so the artifact gets a pose-resolved field view at zero extra
+    solve cost. ``slice_stride`` downsamples those slices (0 = auto).
     """
     geom = GeometrySpec(electrode_area_mm2, cover_thickness_mm, cover_eps_r, split_ring)
     distances = np.linspace(distance_min_mm, distance_max_mm, num_points)
     out = []
     cache = baseline_cache if baseline_cache is not None else {}
     for d in distances:
-        per_ch, _ = delta_c_self_fF(
-            geom, FingerState(0.0, 0.0, float(d), is_glove), cell_mm, cache
+        per_ch, sol = delta_c_self_fF(
+            geom, FingerState(0.0, 0.0, float(d), is_glove), cell_mm, cache,
+            want_potential_slice=slices_out is not None,
+            slice_stride=slice_stride,
         )
         out.append(float(sum(per_ch.values())))
+        if slices_out is not None and sol.potential_slice is not None:
+            slices_out.append(
+                {
+                    "pose": {"x_mm": 0.0, "y_mm": 0.0, "gap_mm": round(float(d), 4), "is_glove": is_glove},
+                    "slice": sol.potential_slice,
+                }
+            )
     return [float(d) for d in distances], out
+
+
+def lateral_slice_sweep(
+    geom: GeometrySpec,
+    radii_mm: list[float],
+    gap_mm: float = 0.0,
+    is_glove: bool = False,
+    cell_mm: float = 1.0,
+    baseline_cache: dict | None = None,
+    slice_stride: int = 2,
+) -> list:
+    """y=0 potential slices for OFF-CENTER finger poses, solved on a radial
+    line (+x). Both shipped layouts are rotationally symmetric about the
+    electrode axis (center pad / concentric rings), so the web client looks
+    slices up by radius r = |(x, y)| — the library stores the SOLVED pose
+    (x=r, y=0) and the client discloses that lookup as an approximation.
+    r=0 is skipped: the gap sweep at center already covers it.
+    """
+    out = []
+    cache = baseline_cache if baseline_cache is not None else {}
+    for r in radii_mm:
+        if r <= 0.0:
+            continue
+        _, sol = delta_c_self_fF(
+            geom, FingerState(float(r), 0.0, gap_mm, is_glove), cell_mm, cache,
+            want_potential_slice=True, slice_stride=slice_stride,
+        )
+        if sol.potential_slice is not None:
+            out.append(
+                {
+                    "pose": {"x_mm": float(r), "y_mm": 0.0, "gap_mm": gap_mm, "is_glove": is_glove},
+                    "slice": sol.potential_slice,
+                }
+            )
+    return out

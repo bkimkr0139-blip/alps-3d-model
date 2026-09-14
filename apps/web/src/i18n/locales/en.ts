@@ -515,7 +515,10 @@ const en = {
     },
     slice: {
       unavailable: "Field-grid artifact not available for this variant.",
-      note: "Electric potential [V] at the touch pose on the y=0 plane — solver output, rendered only.",
+      solvedAt: "FD slice — solved at r={{r}}mm · gap={{gap}}mm (bare finger)",
+      nearest: "(nearest solved pose — lookup only, nothing recomputed)",
+      scale: "scale {{lo}}–{{hi}} V (fixed across poses — the field itself changes with pose)",
+      note: "Electric potential [V] on the y=0 plane — displayed from the worker's library of solved poses; the client never computes the field.",
     },
     signal: {
       truth: "Truth counts (noiseless)",

@@ -130,3 +130,45 @@ def test_edge_finger_weaker_than_center():
     center, _ = delta_c_self_fF(GEOM, FingerState(0, 0, 2.0), 1.5, cache)
     edge, _ = delta_c_self_fF(GEOM, FingerState(12.0, 0.0, 2.0), 1.5, cache)
     assert edge["E1"] < center["E1"]  # 가장자리 감도 저하 (§11.2)
+
+
+def test_curve_slice_collection_builds_the_pose_library():
+    """slices_out collects one y=0 slice per curve solve — the gap axis of
+    the artifact's pose library comes free with the curve (no extra
+    solves), and slice_stride=2 downsamples for transport."""
+    slices: list = []
+    predict_field_curve(num_points=4, distance_max_mm=18.0, cell_mm=1.5, slices_out=slices, slice_stride=2)
+    assert len(slices) == 4
+    gaps = [s["pose"]["gap_mm"] for s in slices]
+    assert gaps == sorted(gaps) and gaps[0] == 0.0
+    assert all(s["pose"]["x_mm"] == 0.0 and s["pose"]["y_mm"] == 0.0 for s in slices)
+    rows = len(slices[0]["slice"]["values"])
+    cols = len(slices[0]["slice"]["values"][0])
+    assert cols < rows  # z axis is the shorter one after stride-2 downsampling
+    # Solved fields: bounded by the Dirichlet range and genuinely pose-
+    # dependent (the display's premise — the slice must change with pose).
+    for s in slices:
+        flat = [v for row in s["slice"]["values"] for v in row]
+        assert min(flat) >= 0.0 and max(flat) <= 1.0
+    assert slices[0]["slice"]["values"] != slices[-1]["slice"]["values"]
+
+
+def test_slice_stride_controls_transport_resolution():
+    _, coarse = delta_c_self_fF(GEOM, FingerState(0, 0, 0.0), 1.5, want_potential_slice=True, slice_stride=3)
+    _, fine = delta_c_self_fF(GEOM, FingerState(0, 0, 0.0), 1.5, want_potential_slice=True, slice_stride=1)
+    nx = build_environment(GEOM, 1.5).shape[0]
+    assert len(fine.potential_slice["values"]) == nx  # stride 1 keeps every x cell
+    # numpy's ::3 keeps ceil(n/3) rows
+    assert len(coarse.potential_slice["values"]) == (nx + 2) // 3
+
+
+def test_lateral_slice_sweep_follows_radius():
+    from field_model import lateral_slice_sweep
+
+    out = lateral_slice_sweep(GEOM, [0.0, 6.0, 12.0], gap_mm=0.0, cell_mm=1.5)
+    assert [s["pose"]["x_mm"] for s in out] == [6.0, 12.0]  # r=0 skipped (gap sweep covers center)
+    assert all(s["pose"]["y_mm"] == 0.0 for s in out)
+    # Off-center solves stay valid fields (same Dirichlet range) and differ
+    # from the centered touch solve — the display's premise.
+    _, center = delta_c_self_fF(GEOM, FingerState(0, 0, 0.0), 1.5, want_potential_slice=True)
+    assert out[0]["slice"]["values"] != center.potential_slice["values"]

@@ -67,6 +67,10 @@ export interface FieldGridPayload {
   curve: { distance_mm: number[]; delta_c_total_fF: number[] };
   touch_pose_channels_fF: Record<string, number>;
   potential_slice_y_mid: { plane: string; values: number[][] } | null;
+  // Pose-resolved slice library (gap sweep at center + radial line at
+  // touch) — the client DISPLAYS the nearest solved pose; it never
+  // interpolates or recomputes the field (지시서: 클라이언트 계산 금지).
+  pose_slices?: { pose: { x_mm: number; y_mm: number; gap_mm: number; is_glove: boolean }; slice: { plane: string; values: number[][] } }[];
   slice_note: string;
 }
 
