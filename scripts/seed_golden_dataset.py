@@ -972,6 +972,247 @@ def _fs_curve_csv(peak_mn: float) -> bytes:
     return ("x_value,y_value\n" + "\n".join(rows) + "\n").encode()
 
 
+# --- AirInput vertical slice (4th product family, proximity_capacitance) --
+#
+# Deliberately NOT added to PRODUCTS/seed_variant() above: that pipeline
+# assumes every product gets a CAD assembly (STEP→glTF), a SPICE circuit
+# sweep and a Model Canvas/UQ config (_FAMILIES). This vertical slice is
+# scoped to the mech-model→correlation chain only (per the AirInput
+# implementation spec §14 "첫 Vertical Slice", built the same minimal-infra
+# way the other three product families reuse the analytical model dispatch)
+# — no new 3D geometry, no SPICE/ASIC circuit netlist, no Model Canvas. See
+# AGENTS.md "AirInput vertical slice" section for the full scope-cut
+# rationale. Gate submission is skipped for the same reason: gate_readiness's
+# `spice_analysis_succeeded` check is unconditional for every variant, and
+# fabricating a SPICE netlist for a product with no represented circuit here
+# would be exactly the invented-evidence problem HANDOFF.md §7 forbids.
+AIRINPUT_REQUIREMENTS = [
+    {
+        "suffix": "REQ-DETECT",
+        "text": "지정된 접근 거리 이내에서 손가락 접근을 안정적으로 검출해야 한다.",
+        "verification_method": "test",
+        # QM, not ASIL: §1.2 "첫 PoC에서는 자동차 기능안전 입력을 직접 제어하지 않는다 —
+        # 설명·설계검증용 Shadow 환경으로 한정한다."
+        "safety_class": "QM",
+    },
+    {
+        "suffix": "REQ-NOFALSE",
+        "text": "노이즈 환경에서 오검출(false trigger)이 발생하지 않아야 한다.",
+        "verification_method": "test",
+        "safety_class": "QM",
+    },
+    {
+        "suffix": "REQ-GLOVE",
+        "text": "대표 장갑 착용 조건에서도 규정된 축소 검출거리 이내에서 검출되어야 한다.",
+        # No physical glove bench test in this vertical slice yet — current
+        # evidence is the bare-vs-glove mech-model run comparison only.
+        "verification_method": "analysis",
+        "safety_class": "QM",
+    },
+]
+AIRINPUT_COMPONENTS = [
+    {"suffix": "CMP-ELECTRODE", "name": "Capacitive Electrode PCB"},
+    {"suffix": "CMP-COVER", "name": "Cover Lens"},
+]
+
+# Electrode Layout A/B = the spec's two geometry variants (§1.2), expressed
+# as electrode_area_mm2/cover parameters on the proximity_capacitance model
+# — no CAD/STEP assembly behind them for this vertical slice.
+AIRINPUT_VARIANTS = [
+    {
+        "business_id": "VAR-AIR-A",
+        "name": "AirInput Proximity Sensor Variant A (Electrode Layout A — center pad)",
+        "mech_parameters": {
+            "model_type": "proximity_capacitance",
+            "electrode_area_mm2": 100.0,
+            "cover_thickness_mm": 1.0,
+            "cover_dielectric_constant": 4.0,
+            "is_glove": False,
+        },
+        "measured_fixture": "variant_a_proximity_measured.csv",
+    },
+    {
+        "business_id": "VAR-AIR-B",
+        "name": "AirInput Proximity Sensor Variant B (Electrode Layout B — larger split-ring)",
+        "mech_parameters": {
+            "model_type": "proximity_capacitance",
+            "electrode_area_mm2": 160.0,
+            "cover_thickness_mm": 1.2,
+            "cover_dielectric_constant": 3.2,
+            "is_glove": False,
+        },
+        "measured_fixture": "variant_b_proximity_measured.csv",
+    },
+]
+
+
+def seed_airinput_variant(
+    client: httpx.Client, test_client: httpx.Client, product_id: str, spec: dict
+) -> str:
+    variant_business_id = spec["business_id"]
+    variant = post(
+        client,
+        f"/api/v1/products/{product_id}/variants",
+        idem_key=f"seed-{variant_business_id}",
+        body={"business_id": variant_business_id, "name": spec["name"]},
+    )
+    variant_id = variant["id"]
+
+    req_ids = []
+    for req in AIRINPUT_REQUIREMENTS:
+        business_id = f"{variant_business_id}-{req['suffix']}"
+        requirement = post(
+            client,
+            "/api/v1/requirements",
+            idem_key=f"seed-{business_id}",
+            body={
+                "business_id": business_id,
+                "variant_id": variant_id,
+                "text": req["text"],
+                "verification_method": req["verification_method"],
+                "safety_class": req["safety_class"],
+                "owner": "demo.architect",
+                "source": "AlpsAlpine_AirInput_3D_Interaction_Field_Twin_구현지시서_v1.0 §1.2/§11.2",
+            },
+        )
+        req_ids.append(requirement["id"])
+
+    comp_ids = []
+    for comp in AIRINPUT_COMPONENTS:
+        business_id = f"{variant_business_id}-{comp['suffix']}"
+        component = post(
+            client,
+            "/api/v1/components",
+            idem_key=f"seed-{business_id}",
+            body={"business_id": business_id, "variant_id": variant_id, "name": comp["name"]},
+        )
+        comp_ids.append(component["id"])
+
+    for req_id, req in zip(req_ids, AIRINPUT_REQUIREMENTS):
+        for comp_id, comp in zip(comp_ids, AIRINPUT_COMPONENTS):
+            link_business_id = f"{variant_business_id}-{req['suffix']}-{comp['suffix']}"
+            post(
+                client,
+                f"/api/v1/requirements/{req_id}/trace-links",
+                idem_key=f"seed-{link_business_id}",
+                body={
+                    "business_id": link_business_id,
+                    "target_type": "component",
+                    "target_id": comp_id,
+                },
+            )
+
+    # Bare-finger prediction (FR-05 analytical model), correlated against a
+    # synthetic measured bench-scan CSV (FR-07, §5.3) — same as the other
+    # three product families.
+    bare_run = run_simulation_and_wait(
+        client,
+        business_id=f"{variant_business_id}-RUN-MECH-01",
+        variant_id=variant_id,
+        run_type="mech_model",
+        parameters=spec["mech_parameters"],
+    )
+    if bare_run["status"] != "succeeded":
+        print(f"WARNING: {variant_business_id} bare-finger mech run failed: {bare_run['error_message']}", file=sys.stderr)
+
+    # Glove condition (§1.2 "Bare finger와 대표 Glove 조건"): a second run on
+    # the same variant with is_glove=True, illustrative-prediction only — no
+    # physical glove bench data in this vertical slice (see REQ-GLOVE above).
+    glove_run = run_simulation_and_wait(
+        client,
+        business_id=f"{variant_business_id}-RUN-MECH-02-GLOVE",
+        variant_id=variant_id,
+        run_type="mech_model",
+        parameters={**spec["mech_parameters"], "is_glove": True},
+    )
+    if glove_run["status"] != "succeeded":
+        print(f"WARNING: {variant_business_id} glove mech run failed: {glove_run['error_message']}", file=sys.stderr)
+
+    test_plan = post(
+        test_client,
+        "/api/v1/test-plans",
+        idem_key=f"seed-{variant_business_id}-TP-PROX",
+        body={
+            "business_id": f"{variant_business_id}-TP-PROX",
+            "variant_id": variant_id,
+            "name": "Proximity Capacitance Bench Scan",
+        },
+    )
+    test_run = post(
+        test_client,
+        "/api/v1/test-runs",
+        idem_key=f"seed-{variant_business_id}-TR-PROX-01",
+        body={
+            "business_id": f"{variant_business_id}-TR-PROX-01",
+            "test_plan_id": test_plan["id"],
+            "executed_at": "2026-09-14T09:00:00Z",
+            "equipment_id": "AIRINPUT-ROBOT-SCAN-01",
+        },
+    )
+    csv_bytes = (FIXTURES_DIR / spec["measured_fixture"]).read_bytes()
+    measurements = upload_csv_measurements(
+        test_client,
+        test_run_id=test_run["id"],
+        csv_bytes=csv_bytes,
+        filename=spec["measured_fixture"],
+        x_unit="mm",
+        y_unit="fF",
+    )
+
+    correlation = None
+    if bare_run["status"] == "succeeded" and measurements:
+        corr_resp = test_client.post(
+            "/api/v1/correlations",
+            headers={"Idempotency-Key": f"seed-{variant_business_id}-CORR-PROX-01"},
+            json={
+                "business_id": f"{variant_business_id}-CORR-PROX-01",
+                "simulation_run_id": bare_run["id"],
+                "test_run_id": test_run["id"],
+            },
+        )
+        if corr_resp.status_code >= 400:
+            print(f"WARNING: {variant_business_id} correlation failed: {corr_resp.text}", file=sys.stderr)
+        else:
+            correlation = corr_resp.json()
+
+    baseline = post(
+        client,
+        "/api/v1/baselines",
+        idem_key=f"seed-{variant_business_id}-BL-01",
+        body={"business_id": f"{variant_business_id}-BL-01", "variant_id": variant_id},
+    )
+
+    corr_summary = (
+        f"rmse={correlation['rmse']:.2f}fF corr={correlation['correlation_coefficient']:.3f}"
+        if correlation
+        else "none"
+    )
+    print(
+        f"{variant_business_id}: variant={variant_id} baseline={baseline['id']} "
+        f"mech_bare={bare_run['status']} mech_glove={glove_run['status']} "
+        f"correlation=({corr_summary}) gate=not_submitted(no SPICE run — see AGENTS.md)"
+    )
+    return variant_id
+
+
+def seed_airinput_product(client: httpx.Client, test_client: httpx.Client) -> None:
+    product = post(
+        client,
+        "/api/v1/products",
+        idem_key="seed-PROD-AIRINPUT-SENSOR",
+        body={
+            "business_id": "PROD-AIRINPUT-SENSOR",
+            "name": "AirInput Proximity Sensor",
+            "description": (
+                "Capacitive proximity/gesture sensing module (electrode → ASIC → "
+                "gesture decision vertical slice; synthetic demo data)"
+            ),
+        },
+    )
+    for variant_spec in AIRINPUT_VARIANTS:
+        seed_airinput_variant(client, test_client, product["id"], variant_spec)
+
+
 def seed_process_twin(
     client: httpx.Client,
     test_client: httpx.Client,
@@ -1329,6 +1570,10 @@ def main() -> None:
             # 권장 대상: TACT Switch 제품군 1개).
             if product_spec["business_id"] == "PROD-TACT-SWITCH":
                 seed_process_twin(client, test_client, variant_ids)
+
+        # AirInput vertical slice: 4th product family, mech-model→correlation
+        # only (see seed_airinput_product for the scope-cut rationale).
+        seed_airinput_product(client, test_client)
 
 
 if __name__ == "__main__":

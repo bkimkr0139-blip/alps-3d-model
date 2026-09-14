@@ -166,6 +166,8 @@ const ko: Resources = {
       torque: "토크 (mN·m)",
       pressure: "압력 (kPa)",
       output: "출력 (mV)",
+      distance: "거리 (mm)",
+      capacitance: "ΔC (fF)",
     },
     modelPrefix: "모델:",
     runPrefix: "런:",

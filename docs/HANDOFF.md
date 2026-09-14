@@ -20,7 +20,7 @@ Rotary Encoder, MEMS Pressure Sensor) × A/B Variant에 대해 요구사항 → 
   1. `AlpsAlpine_Engineering_Digital_Twin_Workbench_개발지시서_v1.0.md` — 베이스 (M0~M9 완료)
   2. `AlpsAlpine_AI_3D_System_Modeling_고도화_개발지시서_v1.0.md` — 고도화 (완료)
   3. `AlpsAlpine_TACT_Switch_Product_Process_Twin_고도화_개발지시서_v1.0.md` — Product–Process Twin (**P1 완료, P2 이후 미구현**)
-  4. `AlpsAlpine_AirInput_3D_Interaction_Field_Twin_구현지시서_v1.0.md` — **미착수**
+  4. `AlpsAlpine_AirInput_3D_Interaction_Field_Twin_구현지시서_v1.0.md` — **P1(vertical slice) 완료, 나머지 미구현**
 - **상세 기술 노트**: 루트 `AGENTS.md` — 마일스톤별 구현 사실·함정(gotcha)·
   시드 데이터 이야기가 모두 기록되어 있다. **작업 전 반드시 읽을 것.**
 
@@ -75,6 +75,7 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
 | M9 | Port Contracts(unit_dimension·check_link_units), Model Review(규칙 기반 findings), UQ lite(Monte-Carlo 밴드), Gap 분석 |
 | **TACT P1** | **공정 트윈**: 금형 1식·Cavity 2개, 공정 라우트(Setpoint/Actual 분리·윈도우), Lot 계보, Lot별 F–S 검사, 불량, Cavity 비교(AN-02/03, MAD 강건 통계), 근거형 원인 후보(AI-01), 신규 웹 탭 "공정 트윈 (TS03~05)" |
 | **FA/CAPA** | **Defect→FA→CAPA 워크플로** (§5 항목 4, TS10): FailureAnalysis(사람이 입력하는 근거 기반 원인, AI 결론 아님) + CAPA 상태기계(draft→pending_review→approved/rejected→implemented→effectiveness_verified→closed, Gate와 동일 RBAC), append-only CapaEvent 이력, 효과검증은 실제 TestRun 연결(자유 텍스트 금지). API 레벨 완료(pytest), **브라우저 패스는 병렬 작업 종료 후 중앙 검증에서 보류** — `feature/fa-capa-workflow` 브랜치 |
+| **AirInput P1** | **AirInput 감지 체인 vertical slice**: 4번째 제품군(PROD-AIRINPUT-SENSOR, Electrode Layout A/B), `model_type=proximity_capacitance`로 ΔC(d) 정전용량 근사 + ASIC 카운트/임계값 판정 요약 지표(`max_reliable_distance_mm`)까지 기존 mech-model 분석 dispatch에 4번째로 추가. 신규 3D 감지공간·ASIC/Algorithm 엔터티·SPICE·Gate는 의도적으로 미구현(AGENTS.md 참조) |
 
 마이그레이션 head: `8aaac1ba4a8b` (36 테이블, TACT P1의 `b8f2e4a6c7d1` 위에 FA/CAPA 3테이블 추가). 테스트 75개 전부 통과 (P1까지 67 + FA/CAPA 8).
 최종 시드: `process-twin: mold=MOLD-TACT-01 cavities=2 operations=3 lots=4` + FA 1건·CAPA 2건(1건 종결+효과검증, 1건 승인 상태) — `feature/fa-capa-workflow` 브랜치 코드 기준, 아직 공유 개발 서버에 라이브 재시드는 안 함(병렬 작업 격리 규칙, §6).
@@ -98,7 +99,12 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
    연결 (P1은 후보 표시까지만). CAPA 종결 단계의 좁은 범위(TestRun 연결)는
    위 FA/CAPA 항목에서 구현됨 — 이 항목은 Gate 자체와의 전체 연계가 남음.
 6. **관리도(Control chart)** — AN-03의 Cp/Cpk까지만 구현, 시계열 관리도 없음.
-7. **AirInput 지시서** — 별도 신규 과제, 미착수.
+7. **AirInput 지시서** — ~~별도 신규 과제, 미착수~~ **P1(vertical slice) 완료**
+   (2026-09-14): `model_type=proximity_capacitance` (ΔC(d) 근사 + ASIC 카운트/
+   임계값 판정 요약), Product/Variant A·B, 상관 검증까지. 나머지(3D 감지공간/
+   Dead Zone/Trajectory Replay, ASIC/Algorithm 엔터티, Robot scan import,
+   AI01–AI12 화면, Gate)는 여전히 미구현 — AGENTS.md "AirInput vertical
+   slice" 절 참조.
 8. **성능·보안·복구·일본어 QA, KPI 실증** — §12 15~16주.
 
 ## 6. 병렬 작업 규칙 (반드시 준수)

@@ -13,6 +13,7 @@ CURVE_FAMILIES: dict[str, tuple[str, str]] = {
     "force_mN_at_x": ("mm", "mN"),  # fs_dome (tact switch F–S curve)
     "torque_mNm_at_deg": ("deg", "mN·m"),  # detent_torque (rotary encoder)
     "vout_mv_at_kpa": ("kPa", "mV"),  # bridge_transfer (MEMS pressure sensor)
+    "delta_c_fF_at_d": ("mm", "fF"),  # proximity_capacitance (AirInput proximity sensor)
 }
 
 

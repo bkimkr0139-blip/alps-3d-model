@@ -166,6 +166,8 @@ const ja: Resources = {
       torque: "トルク (mN·m)",
       pressure: "圧力 (kPa)",
       output: "出力 (mV)",
+      distance: "距離 (mm)",
+      capacitance: "ΔC (fF)",
     },
     modelPrefix: "モデル:",
     runPrefix: "ラン:",

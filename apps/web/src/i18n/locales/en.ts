@@ -167,6 +167,8 @@ const en = {
       torque: "Torque (mN·m)",
       pressure: "Pressure (kPa)",
       output: "Output (mV)",
+      distance: "Distance (mm)",
+      capacitance: "ΔC (fF)",
     },
     modelPrefix: "model:",
     runPrefix: "run:",
