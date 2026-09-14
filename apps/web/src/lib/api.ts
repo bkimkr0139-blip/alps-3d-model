@@ -80,6 +80,7 @@ export interface SimulationRun {
   status: string;
   output_artifact_version_id: string | null;
   tool_version: string | null;
+  parameters: Record<string, unknown> | null;
   error_message: string | null;
   metrics: { name: string; value: number; unit: string | null }[];
 }

@@ -202,12 +202,14 @@ function AssemblyModel({ scene }: { scene: Group }) {
 // the TwinControls overlay (outside the Canvas) and mesh clicks both drive it.
 const PLUNGER_TRAVEL_MM = 0.25;
 const DOME_TRAVEL_MM = 0.12;
-// Radial spread multiplier for the exploded view: explodeDir is each part's
-// RAW (unnormalized) offset from the assembly's bbox center, so a part
-// already near the edge of the assembly moves further than one buried near
-// the middle — this factor just scales that natural spread up to a clearly
-// visible separation without needing a per-product tuned distance.
-const EXPLODE_FACTOR = 2.2;
+// Vertical-only layer separation for the exploded view: explodeDir is each
+// part's RAW z offset from the assembly's bbox center (x/y stay 0 — parts
+// never drift sideways), so the stack fans out into its natural layers:
+// everything above the center rises, everything below sinks. The factor
+// scales that raw layer offset up to a clearly visible gap without needing
+// a per-product tuned distance (a thin stack's z spread is smaller than its
+// footprint, hence the larger factor than the old radial version had).
+const EXPLODE_FACTOR = 3.2;
 // Full assemble → explode → reassemble cycle when playing, seconds. Smooth
 // sinusoidal easing (not a linear triangle wave) so the direction reversal
 // at each end doesn't read as a jolt.
@@ -243,7 +245,7 @@ function TwinAnimator({ scenes }: { scenes: Group[] }) {
         const meshCenter = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
         const explodeDir = BODY_KINDS.has(kind)
           ? new THREE.Vector3()
-          : meshCenter.sub(assemblyCenter).multiplyScalar(EXPLODE_FACTOR);
+          : new THREE.Vector3(0, 0, (meshCenter.z - assemblyCenter.z) * EXPLODE_FACTOR);
         map.push({
           mesh,
           kind,

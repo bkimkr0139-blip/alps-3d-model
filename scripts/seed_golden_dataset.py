@@ -12,7 +12,9 @@ re-running against an existing deployment only appends the two new products.
 """
 
 import hashlib
+import json
 import os
+import random
 import sys
 import time
 import uuid
@@ -1254,6 +1256,210 @@ def seed_airinput_product(client: httpx.Client, test_client: httpx.Client) -> No
         seed_airinput_variant(client, test_client, product["id"], variant_spec)
 
 
+# --- AirInput 3D Interaction Field Twin (§6.2 two-tier + §11.2 GOLD) -------
+#
+# Rides the SAME mech_model run_type via model_type dispatch — no new
+# endpoints, no new worker. Per variant: FD field curve → surrogate DOE →
+# sensitivity volume → synthetic correlation → GOLD replays.
+
+# Dev gotcha (seen twice on the CAD side): a FAILED run is cached forever
+# under its idempotency key — after fixing a worker bug mid-development,
+# rerun with ALPS_FIELD_TWIN_SEED_SUFFIX=-r2 to get fresh keys.
+FIELD_TWIN_IDEM_SUFFIX = os.environ.get("ALPS_FIELD_TWIN_SEED_SUFFIX", "")
+
+AIRINPUT_FIELD_VARIANTS = [
+    {
+        "business_id": "VAR-AIR-A",
+        "split_ring": False,
+        "electrode_area_mm2": 100.0,
+        "cover_thickness_mm": 1.0,
+        "cover_dielectric_constant": 4.0,
+        "ground_plate": None,
+    },
+    {
+        "business_id": "VAR-AIR-B",
+        "split_ring": True,
+        "electrode_area_mm2": 160.0,
+        "cover_thickness_mm": 1.2,
+        "cover_dielectric_constant": 3.2,
+        # §11.2 금속/접지 scenario structure for GOLD-06 (solver engine):
+        # grounded plate 6 mm above the touch surface (z = 6.5 + 6).
+        "ground_plate": [0.0, 0.0, 12.5, 12.0, 10.0],
+    },
+]
+
+
+def get_artifact_json(client: httpx.Client, artifact_version_id: str) -> dict:
+    resp = client.get(f"/api/v1/artifacts/versions/{artifact_version_id}/content")
+    resp.raise_for_status()
+    return json.loads(resp.content)
+
+
+def seed_airinput_field_twin(client: httpx.Client, test_client: httpx.Client) -> None:
+    sfx = FIELD_TWIN_IDEM_SUFFIX
+    print("== AirInput 3D Interaction Field Twin seeding ==")
+    product = post(
+        client,
+        "/api/v1/products",
+        idem_key="seed-PROD-AIRINPUT-SENSOR",
+        body={
+            "business_id": "PROD-AIRINPUT-SENSOR",
+            "name": "AirInput Proximity Sensor",
+        },
+    )
+    variants = client.get(f"/api/v1/products/{product['id']}/variants").json()
+    for spec in AIRINPUT_FIELD_VARIANTS:
+        bid = spec["business_id"]
+        variant_id = next(v["id"] for v in variants if v["business_id"] == bid)
+
+        geo = {
+            "electrode_area_mm2": spec["electrode_area_mm2"],
+            "cover_thickness_mm": spec["cover_thickness_mm"],
+            "cover_dielectric_constant": spec["cover_dielectric_constant"],
+            "split_ring": spec["split_ring"],
+        }
+        print(f"[{bid}] variant={variant_id}", flush=True)
+
+        # ① FD reference curve + field-grid artifact (potential slice)
+        field_run = run_simulation_and_wait(
+            client,
+            business_id=f"{bid}-RUN-FIELD-01{sfx}",
+            variant_id=variant_id,
+            run_type="mech_model",
+            parameters={"model_type": "electrostatic_field", **geo},
+            timeout_s=300.0,
+        )
+        if field_run["status"] != "succeeded":
+            print(f"WARNING: {bid} field run failed: {field_run['error_message']}", file=sys.stderr)
+            continue
+        field_payload = get_artifact_json(client, field_run["output_artifact_version_id"])
+        print(f"[{bid}] RUN-FIELD-01 ok — touch ΔC={field_payload['touch_pose_channels_fF']}", flush=True)
+
+        # ② Surrogate DOE (~114 FD solves, ~6 min) + TS-parity artifact
+        surrogate_run = run_simulation_and_wait(
+            client,
+            business_id=f"{bid}-RUN-SURROGATE-01{sfx}",
+            variant_id=variant_id,
+            run_type="mech_model",
+            parameters={"model_type": "surrogate_train", **geo},
+            timeout_s=1200.0,
+        )
+        if surrogate_run["status"] != "succeeded":
+            print(f"WARNING: {bid} surrogate run failed: {surrogate_run['error_message']}", file=sys.stderr)
+            continue
+        surrogate_payload = get_artifact_json(client, surrogate_run["output_artifact_version_id"])
+        print(f"[{bid}] RUN-SURROGATE-01 ok — holdout rmse={surrogate_payload['channels']['E1']['holdout']['rmse_fF']} fF", flush=True)
+
+        # ③ Sensitivity volume (감지영역/Dead Zone grid, surrogate tier)
+        volume_run = run_simulation_and_wait(
+            client,
+            business_id=f"{bid}-RUN-VOLUME-01{sfx}",
+            variant_id=variant_id,
+            run_type="mech_model",
+            parameters={"model_type": "sensitivity_volume", "surrogate_payload": surrogate_payload},
+            timeout_s=300.0,
+        )
+        if volume_run["status"] != "succeeded":
+            print(f"WARNING: {bid} volume run failed: {volume_run['error_message']}", file=sys.stderr)
+        else:
+            print(f"[{bid}] RUN-VOLUME-01 ok", flush=True)
+
+        # ④ Synthetic bench CSV from the FD curve + seeded noise — the
+        # "measured" side of the 예측-실측 check. SYNTHETIC by construction
+        # (equipment id + filename disclose it); never presented as bench data.
+        test_plan = post(
+            test_client,
+            "/api/v1/test-plans",
+            idem_key=f"seed-{bid}-TP-FIELD{sfx}",
+            body={
+                "business_id": f"{bid}-TP-FIELD{sfx}",
+                "variant_id": variant_id,
+                "name": "Field-Twin Proximity Scan (synthetic FD-derived)",
+            },
+        )
+        test_run = post(
+            test_client,
+            "/api/v1/test-runs",
+            idem_key=f"seed-{bid}-TR-PROX-02{sfx}",
+            body={
+                "business_id": f"{bid}-TR-PROX-02{sfx}",
+                "test_plan_id": test_plan["id"],
+                "executed_at": "2026-09-14T11:00:00Z",
+                "equipment_id": "SYNTHETIC-GENERATOR-FD-01",
+            },
+        )
+        curve = field_payload["curve"]
+        rng = random.Random(20260914)
+        csv_lines = ["x_value,y_value"]
+        for x, y in zip(curve["distance_mm"], curve["delta_c_total_fF"]):
+            noise = rng.gauss(0.0, 0.03 * y + 0.0005)
+            csv_lines.append(f"{x:.4f},{max(y + noise, 0.0):.6f}")
+        csv_bytes = ("\n".join(csv_lines) + "\n").encode("utf-8")
+        csv_name = f"variant_{'b' if spec['split_ring'] else 'a'}_field_twin_synthetic.csv"
+        upload_csv_measurements(
+            test_client,
+            test_run_id=test_run["id"],
+            csv_bytes=csv_bytes,
+            filename=csv_name,
+            x_unit="mm",
+            y_unit="fF",
+        )
+        corr_resp = test_client.post(
+            "/api/v1/correlations",
+            headers={"Idempotency-Key": f"seed-{bid}-CORR-FIELD-01{sfx}"},
+            json={
+                "business_id": f"{bid}-CORR-FIELD-01{sfx}",
+                "simulation_run_id": field_run["id"],
+                "test_run_id": test_run["id"],
+            },
+        )
+        corr_summary = f"failed HTTP {corr_resp.status_code}: {corr_resp.text[:140]}"
+        if corr_resp.status_code < 400:
+            c = corr_resp.json()
+            corr_summary = f"rmse={c['rmse']:.4f}fF r={c['correlation_coefficient']:.3f}"
+        print(f"[{bid}] TR-PROX-02 + CORR-FIELD-01: {corr_summary} (synthetic, disclosed)", flush=True)
+
+        # ⑤ GOLD scenario replays (§11.2) — surrogate engine embeds the
+        # promoted payload; GOLD-06 runs the solver on the plate geometry.
+        scenario_ids = [
+            "GOLD-01-CENTER-APPROACH",
+            "GOLD-02-EDGE-DEGRADATION",
+            "GOLD-03-GLOVE-SLOW",
+            "GOLD-04-NOISE-FALSE-TRIGGER",
+            "GOLD-05-OOD-HOVER",
+        ]
+        if spec["split_ring"]:
+            scenario_ids.append("GOLD-06-GROUND-PLATE")
+        for sid in scenario_ids:
+            sid_short = "-".join(sid.split("-")[:2])  # GOLD-01 … matches worker naming
+            params = {
+                "model_type": "algorithm_replay",
+                "scenario_id": sid,
+                "surrogate_payload": surrogate_payload,
+                **geo,
+            }
+            if sid == "GOLD-06-GROUND-PLATE":
+                params.pop("surrogate_payload")
+                params["geometry"] = {"ground_plate": spec["ground_plate"]}
+            rp = run_simulation_and_wait(
+                client,
+                # short run id — result-metric business ids append the metric
+                # name and result_metrics.business_id is VARCHAR(64)
+                # (e.g. "VAR-AIR-A-RP-GOLD-01-r4-replay_gold-01_v1_false_triggers")
+                business_id=f"{bid}-RP-{sid_short}{sfx}",
+                variant_id=variant_id,
+                run_type="mech_model",
+                parameters=params,
+                timeout_s=900.0,
+            )
+            if rp["status"] != "succeeded":
+                print(f"WARNING: {bid} {sid} replay failed: {rp['error_message']}", file=sys.stderr)
+                continue
+            rp_metrics = {m["name"]: m["value"] for m in client.get(f"/api/v1/simulation-runs/{rp['id']}").json().get("metrics", [])}
+            pass_flag = rp_metrics.get(f"replay_{sid_short.lower()}_pass")
+            print(f"[{bid}] {sid}: pass={pass_flag}", flush=True)
+
+
 def seed_process_twin(
     client: httpx.Client,
     test_client: httpx.Client,
@@ -1730,14 +1936,39 @@ def seed_process_monitoring(
     )
 
 
+class RefreshingAuth(httpx.Auth):
+    """Password-grant login, refreshed transparently on 401.
+
+    Keycloak access tokens live ~5 min (realm default) while the seed —
+    especially the AirInput FD-solver section — runs far longer than that,
+    so a token captured once at startup expires mid-run.
+    """
+
+    def __init__(self, username: str, password: str):
+        self.username = username
+        self.password = password
+        self._token: str | None = None
+
+    def _login(self) -> str:
+        self._token = get_token(self.username, self.password)
+        return self._token
+
+    def auth_flow(self, request: httpx.Request):
+        if self._token is None:
+            self._login()
+        request.headers["Authorization"] = f"Bearer {self._token}"
+        response = yield request
+        if response.status_code == 401:
+            self._login()
+            request.headers["Authorization"] = f"Bearer {self._token}"
+            yield request
+
+
 def main() -> None:
-    token = get_token("demo.architect", "demo1234")
-    test_token = get_token("demo.mech_engineer", "demo1234")
-    approver_token = get_token("demo.approver", "demo1234")
     with (
-        httpx.Client(base_url=API_URL, headers={"Authorization": f"Bearer {token}"}) as client,
-        httpx.Client(base_url=API_URL, headers={"Authorization": f"Bearer {test_token}"}) as test_client,
-        httpx.Client(base_url=API_URL, headers={"Authorization": f"Bearer {approver_token}"}) as approver_client,
+        httpx.Client(base_url=API_URL, auth=RefreshingAuth("demo.architect", "demo1234")) as client,
+        httpx.Client(base_url=API_URL, auth=RefreshingAuth("demo.mech_engineer", "demo1234")) as test_client,
+        httpx.Client(base_url=API_URL, auth=RefreshingAuth("demo.approver", "demo1234")) as approver_client,
     ):
         for product_spec in PRODUCTS:
             product = post(
@@ -1764,6 +1995,9 @@ def main() -> None:
         # AirInput vertical slice: 4th product family, mech-model→correlation
         # only (see seed_airinput_product for the scope-cut rationale).
         seed_airinput_product(client, test_client)
+        # AirInput 3D Interaction Field Twin: FD solver + surrogate + GOLD
+        # replays on the same two variants (§6.2 two-tier, §11.2 scenarios).
+        seed_airinput_field_twin(client, test_client)
 
 
 if __name__ == "__main__":

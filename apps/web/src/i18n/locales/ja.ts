@@ -13,6 +13,7 @@ const ja: Resources = {
     testbench: "開発/テスト ボード",
         sysmodel: "システムモデル (E02)",
     proctwin: "プロセスツイン (TS03–05)",
+    air: "AirInputフィールドツイン (3D)",
     simulation: "結果比較 (S08)",
     sweep: "SPICE 抵抗スイープ — バリアント比較 (S08)",
     correlation: "試験と相関 (S09)",
@@ -491,6 +492,62 @@ const ja: Resources = {
       fitted: "近似トレンド線",
     },
   },
+  air: {
+    noVariant: "フィールドツインを開くAirInputバリアントを選択してください。",
+    live: "ライブプレビュー（無ノイズ）",
+    ood: "有効範囲外（OOD）— 通常結果ではありません",
+    state: { IDLE: "待機", NEAR: "近接", TOUCH: "タッチ" },
+    controls: {
+      title: "指の姿勢",
+      x_mm: "x",
+      y_mm: "y",
+      gap_mm: "間隔",
+      glove: "グローブ（多孔ニット、ε1.3公開）",
+      volume: "検知領域 / デッドゾーン体積",
+      trajectory: "シナリオ軌跡",
+    },
+    panels: {
+      signal: "ASIC信号リプレイ（シード固定）",
+      slice: "電位スライス y=0（FDソルバー）",
+      scenarios: "GOLDシナリオ — 期待 vs 実測（ワーカー検証）",
+    },
+    slice: {
+      unavailable: "このバリアントのフィールドグリッド成果物がありません。",
+      note: "タッチ姿勢での y=0 平面の電位 [V] — ソルバー出力の描画にすぎません。",
+    },
+    signal: {
+      truth: "真値カウント（無ノイズ）",
+      noisy: "カウント（シードノイズ）",
+      baseline: "v2 EMAベースライン",
+      unavailable: "このバリアントのリプレイ成果物がありません。",
+      derived: "ΔCしきい値はカウント設定から導出 — NEAR {near} fF / TOUCH {touch} fF",
+    },
+    scn: {
+      scenario: "シナリオ",
+      engine: "エンジン",
+      result: "結果",
+      detail: "v1/v2 誤検知、v2 初検出ティック",
+      pass: "合格",
+      fail: "不合格",
+      unavailable: "リプレイ成果物がまだありません — シードのRP-GOLDリプレイを実行してください。",
+    },
+    tier: {
+      solver: "参照層 — 3D FDラプラスソルバー",
+      surrogate: "対話層 — RBFサロゲート（LLMではない、証拠ではない）",
+      correlation: "予測 vs 実測（合成FD CSV）",
+      cell: "セルサイズ",
+      grid: "グリッド",
+      sweeps: "ベースラインSOR反復",
+      touchDc: "タッチΔC（中央、チャネル合計）",
+      holdoutRmse: "ホールドアウトRMSE（E1）",
+      holdoutMax: "ホールドアウト最大誤差（E1）",
+      gloveRmse: "グローブ ホールドアウトRMSE（E1）",
+      extrapWarning: "外挿警告 — 重複区間が限定",
+      disclosure: "サロゲート値はDOE範囲内で公開されたソルバーの補間であり、範囲外はOODで表示されます。相関数値はパイプライン点検であり検知精度の主張ではありません（指示書 §13）。",
+    },
+  },
 };
+
+
 
 export default ja;

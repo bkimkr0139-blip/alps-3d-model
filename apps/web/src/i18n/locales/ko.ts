@@ -13,6 +13,7 @@ const ko: Resources = {
     testbench: "개발/테스트 보드",
         sysmodel: "시스템 모델 (E02)",
     proctwin: "공정 트윈 (TS03~05)",
+    air: "AirInput 필드 트윈 (3D)",
     simulation: "결과 비교 (S08)",
     sweep: "SPICE 저항 스윕 — 변형 비교 (S08)",
     correlation: "시험 및 상관 (S09)",
@@ -491,6 +492,62 @@ const ko: Resources = {
       fitted: "적합 추세선",
     },
   },
+  air: {
+    noVariant: "필드 트윈을 열 AirInput 변형을 선택하세요.",
+    live: "실시간 미리보기 (무노이즈)",
+    ood: "유효범위 밖 (OOD) — 정상 결과가 아닙니다",
+    state: { IDLE: "대기", NEAR: "근접", TOUCH: "터치" },
+    controls: {
+      title: "손가락 자세",
+      x_mm: "x",
+      y_mm: "y",
+      gap_mm: "간격",
+      glove: "장갑 (다공성 니트, ε1.3 공개)",
+      volume: "감지영역 / Dead Zone 볼륨",
+      trajectory: "시나리오 궤적",
+    },
+    panels: {
+      signal: "ASIC 신호 리플레이 (시드 고정)",
+      slice: "전위 슬라이스 y=0 (FD 솔버)",
+      scenarios: "GOLD 시나리오 — 기대 vs 실측 (워커 검증)",
+    },
+    slice: {
+      unavailable: "이 변형의 필드 그리드 아티팩트가 없습니다.",
+      note: "터치 자세에서 y=0 평면의 전위 [V] — 솔버 출력 렌더링일 뿐입니다.",
+    },
+    signal: {
+      truth: "진실 카운트 (무노이즈)",
+      noisy: "카운트 (시드 노이즈)",
+      baseline: "v2 EMA 베이스라인",
+      unavailable: "이 변형의 리플레이 아티팩트가 없습니다.",
+      derived: "ΔC 임계값은 카운트 설정에서 유도 — NEAR {near} fF / TOUCH {touch} fF",
+    },
+    scn: {
+      scenario: "시나리오",
+      engine: "엔진",
+      result: "결과",
+      detail: "v1/v2 오타검출, v2 최초 검출 틱",
+      pass: "통과",
+      fail: "실패",
+      unavailable: "리플레이 아티팩트가 아직 없습니다 — 시드의 RP-GOLD 리플레이를 실행하세요.",
+    },
+    tier: {
+      solver: "참조 계층 — 3D FD 라플라스 솔버",
+      surrogate: "대화형 계층 — RBF 서로게이트 (LLM 아님, 증거 아님)",
+      correlation: "예측 vs 실측 (합성 FD CSV)",
+      cell: "셀 크기",
+      grid: "그리드",
+      sweeps: "베이스라인 SOR 반복",
+      touchDc: "터치 ΔC (중앙, 채널 합)",
+      holdoutRmse: "홀드아웃 RMSE (E1)",
+      holdoutMax: "홀드아웃 최대 오차 (E1)",
+      gloveRmse: "장갑 홀드아웃 RMSE (E1)",
+      extrapWarning: "외삽 경고 — 겹침 구간 제한",
+      disclosure: "서로게이트 값은 DOE 범위 안에서 공개된 솔버의 보간이며, 범위 밖은 OOD로 표시됩니다. 상관 수치는 파이프라인 점검일 뿐 감지 정확도 주장이 아닙니다 (지시서 §13).",
+    },
+  },
 };
+
+
 
 export default ko;

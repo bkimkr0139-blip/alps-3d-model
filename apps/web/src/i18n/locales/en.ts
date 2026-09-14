@@ -14,6 +14,7 @@ const en = {
     testbench: "Dev/Test Board",
     sysmodel: "System Model (E02)",
     proctwin: "Process Twin (TS03–05)",
+    air: "AirInput Field Twin (3D)",
     simulation: "Result Compare (S08)",
     sweep: "SPICE Resistance Sweep — Variant Compare (S08)",
     correlation: "Test & Correlation (S09)",
@@ -493,7 +494,62 @@ const en = {
       fitted: "Fitted trend",
     },
   },
+  air: {
+    noVariant: "Select an AirInput variant to open the field twin.",
+    live: "Live preview (noiseless)",
+    ood: "Out of validity envelope (OOD) — not a normal result",
+    state: { IDLE: "IDLE", NEAR: "NEAR", TOUCH: "TOUCH" },
+    controls: {
+      title: "Finger pose",
+      x_mm: "x",
+      y_mm: "y",
+      gap_mm: "gap",
+      glove: "Glove (porous knit, ε1.3 disclosed)",
+      volume: "Detect / dead-zone volume",
+      trajectory: "Scenario trajectory",
+    },
+    panels: {
+      signal: "ASIC signal replay (seeded)",
+      slice: "Potential slice y=0 (FD solver)",
+      scenarios: "GOLD scenarios — expected vs actual (worker-verified)",
+    },
+    slice: {
+      unavailable: "Field-grid artifact not available for this variant.",
+      note: "Electric potential [V] at the touch pose on the y=0 plane — solver output, rendered only.",
+    },
+    signal: {
+      truth: "Truth counts (noiseless)",
+      noisy: "Counts (seeded noise)",
+      baseline: "v2 EMA baseline",
+      unavailable: "Replay artifact not available for this variant.",
+      derived: "ΔC thresholds derived from counts config — NEAR {near} fF / TOUCH {touch} fF",
+    },
+    scn: {
+      scenario: "Scenario",
+      engine: "Engine",
+      result: "Result",
+      detail: "v1/v2 false triggers, v2 first detect tick",
+      pass: "PASS",
+      fail: "FAIL",
+      unavailable: "No replay artifacts yet — run the seed's RP-GOLD replays.",
+    },
+    tier: {
+      solver: "Reference tier — 3D FD Laplace solver",
+      surrogate: "Interactive tier — RBF surrogate (not an LLM, not evidence)",
+      correlation: "Prediction vs measurement (synthetic FD CSV)",
+      cell: "Cell size",
+      grid: "Grid",
+      sweeps: "Baseline SOR sweeps",
+      touchDc: "Touch ΔC (center, per channel sum)",
+      holdoutRmse: "Holdout RMSE (E1)",
+      holdoutMax: "Holdout max error (E1)",
+      gloveRmse: "Glove holdout RMSE (E1)",
+      extrapWarning: "Extrapolation warning — overlap limited",
+      disclosure: "Surrogate values are interpolations of the disclosed solver inside the DOE envelope; outside it they are flagged OOD. Correlation numbers are pipeline checks, never accuracy claims (지시서 §13).",
+    },
+  },
 };
+
 
 export type Resources = typeof en;
 export default en;

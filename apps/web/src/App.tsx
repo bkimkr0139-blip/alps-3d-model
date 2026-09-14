@@ -9,6 +9,7 @@ import { ThreeViewer } from "./components/ThreeViewer";
 import { TestBench } from "./components/TestBench";
 import { SystemModelView } from "./components/SystemModel";
 import { ProcessTwin } from "./components/ProcessTwin";
+import { AirInputStudio } from "./components/air/AirInputStudio";
 import { RequirementsPanel } from "./components/RequirementsPanel";
 import { SimulationPanel } from "./components/SimulationPanel";
 import { SweepChart } from "./components/SweepChart";
@@ -43,7 +44,7 @@ function Workbench() {
   const [products, setProducts] = useState<Product[]>([]);
   const [product, setProduct] = useState<Product | null>(null);
   const [variants, setVariants] = useState<Variant[]>([]);
-  const [centerTab, setCenterTab] = useState<"model" | "bench" | "sysmodel" | "proc">("model");
+  const [centerTab, setCenterTab] = useState<"model" | "bench" | "sysmodel" | "proc" | "air">("model");
 
   // Selection from another product/variant must not leak into the new one —
   // ids would match no mesh/requirement and leave a stale highlight.
@@ -169,7 +170,7 @@ function Workbench() {
         </div>
         <div style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", gap: 14, marginBottom: 8 }}>
-            {(["model", "bench", "sysmodel", "proc"] as const).map((tab) => (
+            {(["model", "bench", "sysmodel", "proc", "air"] as const).map((tab) => (
               <h3
                 key={tab}
                 onClick={() => setCenterTab(tab)}
@@ -188,7 +189,9 @@ function Workbench() {
                     ? t("panels.testbench")
                     : tab === "sysmodel"
                       ? t("panels.sysmodel")
-                      : t("panels.proctwin")}
+                      : tab === "proc"
+                        ? t("panels.proctwin")
+                        : t("panels.air")}
               </h3>
             ))}
           </div>
@@ -199,6 +202,8 @@ function Workbench() {
               <TestBench product={product} runs={runs} />
             ) : centerTab === "sysmodel" ? (
               <SystemModelView key={variantId ?? "none"} variantId={variantId} />
+            ) : centerTab === "air" ? (
+              <AirInputStudio key={variantId ?? "none"} variantId={variantId} runs={runs} />
             ) : (
               <ProcessTwin
                 key={variantId ?? "none"}
