@@ -1268,11 +1268,23 @@ def seed_process_twin(
             },
         )
 
-    def _runs_for_lot(lot_id: str, lot_bid: str, op10_actual: float) -> None:
+    def _runs_for_lot(
+        lot_id: str,
+        lot_bid: str,
+        op10_actual: float,
+        op20_actual: float = 2.60,
+        op30_actual: float = 2.95,
+    ) -> None:
+        # OP-TACT-20/30 used to be hardcoded to the setpoint on every lot —
+        # zero variance, so AN-04's response-surface fit (which requires
+        # np.ptp(x) > 0, §7 never fabricate a trend from flat data) always
+        # 422'd for plunger_diameter_mm/assembly_height_mm even though the
+        # UI lets a user pick either parameter. Real per-lot variation (like
+        # OP-TACT-10 already had) is what makes those two selectable.
         actuals = {
             "OP-TACT-10": {"dome_thickness_mm": op10_actual},
-            "OP-TACT-20": {"plunger_diameter_mm": 2.60},
-            "OP-TACT-30": {"assembly_height_mm": 2.95},
+            "OP-TACT-20": {"plunger_diameter_mm": op20_actual},
+            "OP-TACT-30": {"assembly_height_mm": op30_actual},
         }
         setpoints = {
             "OP-TACT-10": {"dome_thickness_mm": 0.10},
@@ -1295,17 +1307,19 @@ def seed_process_twin(
                 },
             )
 
-    # 정상 3 Lot (C1/C2 혼재) + Cavity 편차·윈도우 이탈 Lot 1 (§2.1)
+    # 정상 3 Lot (C1/C2 혼재) + Cavity 편차·윈도우 이탈 Lot 1 (§2.1). plunger/
+    # assembly columns give OP-TACT-20/30 the same kind of small in-window
+    # lot-to-lot variation OP-TACT-10 already had (see _runs_for_lot note).
     lot_specs = [
-        ("LOT-TACT-A-01", "CAV-TACT-01", "MAT-SUS304-0912", "ok", 0.10, 324.0),
-        ("LOT-TACT-A-02", "CAV-TACT-02", "MAT-SUS304-0912", "ok", 0.11, 318.0),
-        ("LOT-TACT-A-03", "CAV-TACT-01", "MAT-SUS304-0912", "ok", 0.09, 331.0),
+        ("LOT-TACT-A-01", "CAV-TACT-01", "MAT-SUS304-0912", "ok", 0.10, 324.0, 2.58, 2.93),
+        ("LOT-TACT-A-02", "CAV-TACT-02", "MAT-SUS304-0912", "ok", 0.11, 318.0, 2.61, 2.96),
+        ("LOT-TACT-A-03", "CAV-TACT-01", "MAT-SUS304-0912", "ok", 0.09, 331.0, 2.59, 2.94),
         # 이상 Lot: 돔 두께 0.145mm(윈도우 0.07–0.13 이탈) → 피크 365mN(규격 360 초과)
-        ("LOT-TACT-A-04", "CAV-TACT-02", "MAT-SUS304-0919", "quarantine", 0.145, 365.0),
+        ("LOT-TACT-A-04", "CAV-TACT-02", "MAT-SUS304-0919", "quarantine", 0.145, 365.0, 2.63, 2.99),
     ]
     plan = client.get(f"/api/v1/variants/{variant_a}/test-plans").json()
     test_plan_id = plan[0]["id"] if plan else None
-    for lot_bid, cav_bid, material, disposition, op10_actual, peak in lot_specs:
+    for lot_bid, cav_bid, material, disposition, op10_actual, peak, op20_actual, op30_actual in lot_specs:
         lot = post(
             client,
             "/api/v1/lots",
@@ -1323,7 +1337,7 @@ def seed_process_twin(
                 "notes": "데모 합성 Lot (source: synthetic)",
             },
         )
-        _runs_for_lot(lot["id"], lot_bid, op10_actual)
+        _runs_for_lot(lot["id"], lot_bid, op10_actual, op20_actual, op30_actual)
         # Lot별 F–S 검사 (검사는 test_run으로, lot_id로 계보 연결)
         if test_plan_id:
             tr = post(
@@ -1591,16 +1605,20 @@ def seed_process_monitoring(
     plan = client.get(f"/api/v1/variants/{variant_a}/test-plans").json()
     test_plan_id = plan[0]["id"] if plan else None
 
-    # (lot, cavity, material, dome_thickness, peak_mN, produced_at, op10_started_at)
+    # (lot, cavity, material, dome_thickness, peak_mN, produced_at, op10_started_at,
+    # plunger_diameter_mm, assembly_height_mm) — the last two used to be hardcoded
+    # constants across every lot here and in seed_process_twin, which left AN-04's
+    # response-surface fit with zero variance (always 422 "충분한지 확인하세요")
+    # for those two of the three selectable parameters. See _runs_for_lot note.
     lot_specs = [
-        ("LOT-TACT-A-05", "CAV-TACT-01", "MAT-SUS304-0912", 0.105, 328.0, "2026-09-09T09:00:00Z", "2026-09-09T09:05:00Z"),
-        ("LOT-TACT-A-06", "CAV-TACT-02", "MAT-SUS304-0912", 0.095, 322.0, "2026-09-09T13:00:00Z", "2026-09-09T13:05:00Z"),
-        ("LOT-TACT-A-07", "CAV-TACT-01", "MAT-SUS304-0916", 0.115, 335.0, "2026-09-10T09:00:00Z", "2026-09-10T09:05:00Z"),
-        ("LOT-TACT-A-08", "CAV-TACT-02", "MAT-SUS304-0916", 0.100, 326.0, "2026-09-10T13:00:00Z", "2026-09-10T13:05:00Z"),
-        ("LOT-TACT-A-09", "CAV-TACT-01", "MAT-SUS304-0916", 0.095, 319.0, "2026-09-11T09:00:00Z", "2026-09-11T09:05:00Z"),
-        ("LOT-TACT-A-10", "CAV-TACT-02", "MAT-SUS304-0912", 0.105, 324.0, "2026-09-11T13:00:00Z", "2026-09-11T13:05:00Z"),
+        ("LOT-TACT-A-05", "CAV-TACT-01", "MAT-SUS304-0912", 0.105, 328.0, "2026-09-09T09:00:00Z", "2026-09-09T09:05:00Z", 2.60, 2.95),
+        ("LOT-TACT-A-06", "CAV-TACT-02", "MAT-SUS304-0912", 0.095, 322.0, "2026-09-09T13:00:00Z", "2026-09-09T13:05:00Z", 2.57, 2.92),
+        ("LOT-TACT-A-07", "CAV-TACT-01", "MAT-SUS304-0916", 0.115, 335.0, "2026-09-10T09:00:00Z", "2026-09-10T09:05:00Z", 2.62, 2.98),
+        ("LOT-TACT-A-08", "CAV-TACT-02", "MAT-SUS304-0916", 0.100, 326.0, "2026-09-10T13:00:00Z", "2026-09-10T13:05:00Z", 2.59, 2.95),
+        ("LOT-TACT-A-09", "CAV-TACT-01", "MAT-SUS304-0916", 0.095, 319.0, "2026-09-11T09:00:00Z", "2026-09-11T09:05:00Z", 2.61, 2.93),
+        ("LOT-TACT-A-10", "CAV-TACT-02", "MAT-SUS304-0912", 0.105, 324.0, "2026-09-11T13:00:00Z", "2026-09-11T13:05:00Z", 2.58, 2.97),
     ]
-    for lot_bid, cav_bid, material, dome, peak, produced_at, started_at in lot_specs:
+    for lot_bid, cav_bid, material, dome, peak, produced_at, started_at, plunger, assembly in lot_specs:
         lot = post(
             client,
             "/api/v1/lots",
@@ -1620,8 +1638,8 @@ def seed_process_monitoring(
         )
         actuals = {
             "10": {"dome_thickness_mm": dome},
-            "20": {"plunger_diameter_mm": 2.60},
-            "30": {"assembly_height_mm": 2.95},
+            "20": {"plunger_diameter_mm": plunger},
+            "30": {"assembly_height_mm": assembly},
         }
         setpoints = {
             "10": {"dome_thickness_mm": 0.10},
