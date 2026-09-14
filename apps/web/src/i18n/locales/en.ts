@@ -371,6 +371,43 @@ const en = {
     disclaimer:
       "Process/quality signals are investigation priorities, not cause determinations or accept decisions. No equipment control or MES/QMS ledger writes originate from this screen.",
   },
+  doe: {
+    title: "DOE / optimization — response surface (AN-04)",
+    runButton: "Run DOE analysis",
+    loading: "Running…",
+    runError: "Could not run the DOE analysis — check that enough process runs and inspections exist for this parameter.",
+    empty: "No DOE study yet for this variant — pick a process parameter above and run one.",
+    fit: {
+      summary: "{{parameter}} → CTQ sensitivity: {{sign}}{{slope}} {{yUnit}}/{{xUnit}} (R²={{r2}}, n={{n}})",
+      direction: {
+        increasing: "increasing",
+        decreasing: "decreasing",
+        flat: "flat",
+      },
+    },
+    targetNote: "target band {{min}}–{{max}} {{unit}} ({{source}})",
+    violations: {
+      title: "Constraint violations (observed runs outside the approved window)",
+      none: "No out-of-window observations among the regression data.",
+    },
+    candidates: {
+      title: "Candidate comparison",
+      rank: "#",
+      parameter: "Parameter value",
+      predicted: "Predicted CTQ",
+      inWindow: "In window",
+      meetsTarget: "Meets target",
+      sourceHeader: "Source",
+      source: {
+        observed: "observed",
+        grid: "grid",
+      },
+    },
+    chart: {
+      observed: "Observed",
+      fitted: "Fitted trend",
+    },
+  },
 };
 
 export type Resources = typeof en;

@@ -2,7 +2,7 @@
 
 > **이 문서의 목적**: 이 저장소에서 개발 세션(사람 또는 Claude)이 맥락 없이
 > 병렬로 작업을 이어받을 수 있도록 현재 상태·실행 방법·규칙·남은 작업을 한
-> 문서에 정리한다. 최종 갱신: 2026-09-14 (M9 + TACT P1 완료 시점).
+> 문서에 정리한다. 최종 갱신: 2026-09-14 (M9 + TACT P1 + AN-04 완료 시점).
 
 ---
 
@@ -51,7 +51,7 @@ cd apps/web && npm run dev
 ## 3. 검증 루틴 (커밋/보고 전 필수)
 
 ```bash
-cd apps/api && .venv/bin/python -m pytest            # 67 tests (M9 56 + P1 11)
+cd apps/api && .venv/bin/python -m pytest            # 80 tests (M9 56 + P1 11 + AN-04 13)
 cd apps/web && npx tsc -b && npx vite build && npx oxlint
 ```
 
@@ -72,16 +72,20 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
 | M8 | 모델 캔버스, 임팩트 패스, 모델 카드, 벤치 F–S 커서 |
 | M9 | Port Contracts(unit_dimension·check_link_units), Model Review(규칙 기반 findings), UQ lite(Monte-Carlo 밴드), Gap 분석 |
 | **TACT P1** | **공정 트윈**: 금형 1식·Cavity 2개, 공정 라우트(Setpoint/Actual 분리·윈도우), Lot 계보, Lot별 F–S 검사, 불량, Cavity 비교(AN-02/03, MAD 강건 통계), 근거형 원인 후보(AI-01), 신규 웹 탭 "공정 트윈 (TS03~05)" |
+| **AN-04** | **DOE·최적화**: `ProcessRun.actual`(기존 P1 데이터) 재사용 선형 반응표면 회귀(sensitivity), 승인 윈도우 기반 제약 위반 표시, 관측값+그리드 후보안 순위 비교, `doe_studies` 신규 엔티티(감사 가능 결과 저장), `proc` 탭 내 DOE 패널 |
 
-마이그레이션 head: `b8f2e4a6c7d1` (33 테이블). 테스트 67개 전부 통과.
-최종 시드: `process-twin: mold=MOLD-TACT-01 cavities=2 operations=3 lots=4`.
+마이그레이션 head: `f361e9578062` (34 테이블). 테스트 80개 전부 통과 (67 기존 + 13 AN-04).
+최종 시드: `process-twin: mold=MOLD-TACT-01 cavities=2 operations=3 lots=4` +
+`doe: DOE-TACT-A-OP10-dome_thickness (dome_thickness_mm vs F-S peak, 4 observations)`.
 
 ## 5. TACT 지시서 남은 작업 (병렬 작업 후보)
 
 §12 16주 일정 기준, P1이 "3~9주 + AI/품질의 일부"에 해당. 남은 것:
 
-1. **AN-04 DOE·최적화** — 공정 인자(dome_thickness 등) → CTQ 반응표면,
-   P1의 process_runs/검사 데이터를 재사용 가능.
+1. ~~**AN-04 DOE·최적화**~~ — **완료** (branch `feature/an04-doe-optimization`):
+   공정 인자(dome_thickness_mm) → CTQ(F–S peak) 선형 반응표면 회귀 + 후보안
+   비교, `doe_studies` 신규 엔티티, `proc` 탭에 패널 추가. 상세는 §4 표와
+   AGENTS.md "AN-04 DOE / optimization" 절 참조.
 2. **AI-02 변경 영향분석** — 설계/공정 변경이 CTQ·요구사항에 미치는 영향
    전파(모델 캔버스 임팩트 패스와 연계).
 3. **AI-03 공정·품질 이상 설명** — 원인 후보를 Ollama로 설명 생성(단,
@@ -142,6 +146,12 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
 - 웹: 중앙 탭은 App.tsx의 h3 배열, 로케일 타입은 en.ts가 정의
   (`Resources = typeof en`) — ko/ja에 키 추가 시 en에도.
 - oxlint: effect 안 동기 setState 금지 → `key` 기반 remount로 해결.
+- **병렬 worktree가 같은 `alps_twin_test`에 서로 모르는 테이블을 추가하면**
+  `conftest.py`의 세션 단위 `drop_all()`이 `DependentObjectsStillExist`로
+  깨질 수 있다(예: AN-04 작업 중 다른 브랜치의 CAPA 테이블과 충돌). 상대
+  브랜치 테이블을 지우지 말 것 — 자신의(추적 안 되는) `.env`에서
+  `POSTGRES_APP_DB`를 임시로 다른 이름으로 바꿔 격리된 테스트 DB를 쓰는 것이
+  안전하다. 상세: AGENTS.md "AN-04 DOE / optimization" 절.
 
 ## 9. git 운영
 

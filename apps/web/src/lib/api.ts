@@ -427,6 +427,69 @@ export interface RootCauseHypothesis {
   disclaimer: string;
 }
 
+// -- AN-04 DOE / optimization (response surface + candidate comparison) -------
+
+export interface ProcessOperationDto {
+  id: string;
+  business_id: string;
+  name: string;
+  seq_no: number;
+  equipment: string | null;
+  window: { parameter: string; unit: string | null; min: number; max: number }[] | null;
+}
+
+export interface DoeTargetBand {
+  min: number;
+  max: number;
+  unit: string | null;
+  source: string;
+}
+
+export interface DoeObservation {
+  lot_business_id: string;
+  process_run_business_id: string;
+  parameter_value: number;
+  ctq_value: number;
+  out_of_window: boolean;
+  window_findings: Record<string, unknown>[] | null;
+}
+
+export interface DoeFit {
+  slope: number;
+  intercept: number;
+  r_squared: number;
+  direction: "increasing" | "decreasing" | "flat";
+  n_observations: number;
+}
+
+export interface DoeCandidate {
+  parameter_value: number;
+  predicted_ctq: number;
+  in_window: boolean;
+  meets_target: boolean | null;
+  distance_to_target_center: number | null;
+  rank: number | null;
+  source: "observed" | "grid";
+}
+
+export interface DoeStudy {
+  id: string;
+  business_id: string;
+  variant_id: string;
+  operation_id: string;
+  parameter: string;
+  parameter_unit: string | null;
+  metric: string;
+  metric_unit: string | null;
+  target_band: DoeTargetBand | null;
+  observations: DoeObservation[];
+  fit: DoeFit;
+  candidates: DoeCandidate[];
+  constraint_violations: DoeObservation[];
+  disclaimer: string;
+  created_at: string;
+}
+
 export const api = {
   listProducts: () => request<Product[]>("/api/v1/products"),
   listVariants: (productId: string) => request<Variant[]>(`/api/v1/products/${productId}/variants`),
@@ -457,6 +520,22 @@ export const api = {
     request<RootCauseHypothesis>("/api/v1/ai/root-cause-hypotheses", {
       method: "POST",
       body: JSON.stringify({ lot_id: lotId }),
+    }),
+  listProcessOperations: () => request<ProcessOperationDto[]>("/api/v1/process-operations"),
+  listDoeStudies: (variantId: string) => request<DoeStudy[]>(`/api/v1/twins/${variantId}/doe-studies`),
+  runDoeStudy: (body: {
+    business_id: string;
+    variant_id: string;
+    operation_id: string;
+    parameter: string;
+    metric?: "peak" | "mean";
+    target_band?: { min: number; max: number; unit?: string };
+    candidate_grid_size?: number;
+  }) =>
+    request<DoeStudy>("/api/v1/doe-studies", {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "Idempotency-Key": body.business_id },
     }),
   listSimulationRuns: (variantId: string) =>
     request<SimulationRun[]>(`/api/v1/variants/${variantId}/simulation-runs`),

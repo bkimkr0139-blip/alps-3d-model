@@ -754,6 +754,116 @@ Per `docs/AlpsAlpine_TACT_Switch_Product_Process_Twin_고도화_개발지시서_
   button). Demo spec band 260–360 mN is a module const applied only for
   PROD-TACT-SWITCH and labelled 데모 사양·합성 데이터.
 
+## AN-04 DOE / optimization
+
+Per `docs/AlpsAlpine_TACT_Switch_Product_Process_Twin_고도화_개발지시서_v1.0.md`
+§7 AN-04 (extends base-spec FR-06). 80 pytest (67 old + 13 in
+`apps/api/tests/test_doe.py`), migration `f361e9578062` (34 tables), new
+"DOE / optimization" panel inside the existing `proc` tab (below the lot
+table, not a new center tab).
+
+- **Decision: no `ProcessRun.parameters` column was added.** P1's
+  `ProcessRun.actual` JSONB (`{parameter: value}`, keyed by process
+  parameter name) already IS per-run structured process-parameter data —
+  AN-04 regresses directly against it via a new `_gather_observations()` in
+  `app/routers/doe.py`, joining `ProcessRun.actual[parameter]` (x) to the
+  lot's own `TestRun`/`Measurement` CTQ value (y, via `_ctq_value` **imported
+  from** `app.routers.process_twin` — deliberately not duplicated, and
+  `process_twin.py` itself was not touched, to keep this diff's overlap with
+  concurrent process-twin work near zero). A lot with more than one
+  inspection run averages its CTQ values (still real data).
+- **The P1 seed data itself has real parameter variance** (dome_thickness_mm
+  actual: 0.09/0.10/0.11/0.145 mm across the 4 TACT-A lots, one of them
+  already out-of-window) — no synthetic DOE grid had to be invented on top
+  of it. The regression is real but **noisy**: three "normal" lots trend
+  slightly *down* (thicker dome → lower peak) while the one out-of-window
+  anomaly lot swings sharply up, so the fitted linear sensitivity
+  (slope≈+723 mN/mm, intercept≈254, **R²≈0.68**) is dominated by that single
+  point. This is disclosed as-is (real n=4 fit), not smoothed or hidden —
+  §7 bans fabricating a *better-looking* number as much as fabricating one
+  from nothing. Don't "fix" this by adjusting seed peak values to make R²
+  prettier; a mediocre R² on n=4 production lots is itself a realistic AN-04
+  demo story (small-sample DOE sensitivity is exactly this shaky in practice).
+- **Compute is pure and DB-free** (`app/doe.py`: `fit_response_surface`,
+  `predict`, `candidate_grid`, `rank_candidates`) — same split as
+  `app/correlation.py`, and the reason the regression/ranking math has real
+  unit tests against a *known* synthetic linear relationship (not just an
+  endpoint-returns-200 check). Degree-1 (linear) fit only — FR-06 marks
+  Bayesian Optimization optional and P1's per-parameter sample sizes (single
+  digits) don't support a higher-order polynomial. `np.polyfit(x, y, 1)`,
+  same primitive `app/routers/correlations.py`'s gap-analysis already uses
+  for its residual-trend slope.
+- **Persisted as `DoeStudy`** (`app/models/doe.py`, `doe_studies` table) —
+  same precedent as `CorrelationRecord`/`UQAnalysis`: cheap synchronous
+  compute (§8.3 PoC 과설계 방지, no Temporal workflow) but the *result* is a
+  durable, re-fetchable evidence row (`observations`, `fit`, `candidates`,
+  `constraint_violations` all JSONB). `POST /api/v1/doe-studies` uses
+  `idempotent_write` + `record_audit` like every other write endpoint;
+  `GET /api/v1/doe-studies/{id}` and `GET /api/v1/twins/{variant_id}/doe-studies`
+  are open reads (no auth), consistent with every other read endpoint in
+  this repo (see "Known gaps" below).
+- **RBAC**: `require_role("manufacturing_engineer", "mechanical_engineer",
+  "system_architect")` — the first use of the `manufacturing_engineer` role
+  anywhere in this codebase (it existed in the Keycloak realm/§4 table since
+  M1 but nothing had used it until now). Kept as its own constant in
+  `app/routers/doe.py` rather than importing `process_twin.py`'s
+  `CAN_MANAGE_PROCESS` — same "minimize overlap with concurrent work" reason
+  as not touching `_ctq_value`'s home module.
+- **Candidates = observed x's (real data) ∪ an evenly spaced grid across the
+  operation's approved window** (falls back to the observed x-range if the
+  parameter has no declared window bound). Grid points are hypothetical
+  *inputs* to the disclosed linear model, not fabricated *outputs* — §7 only
+  bans invented result numbers. Ranking (`rank_candidates`) sorts
+  (in-window first, meets-target first, closest to target center) — a sort
+  over already-computed numbers, never a solver picking one "optimal"
+  answer (AN-04: "AI가 단일 해를 임의 확정하지 않는다"). An out-of-window
+  observed candidate (like the seeded 0.145 mm lot) can still "meet target"
+  on predicted CTQ alone — the ranking deliberately still puts in-window
+  candidates ahead of it; see `test_rank_candidates_prefers_in_window_and_on_target`.
+- **Scope cuts vs. full FR-06** (documented on `DoeStudy`'s docstring too):
+  no Grid/Random/Latin-Hypercube *experiment design* generation — the
+  regression runs over process data that already exists, real production
+  runs ARE the design points. No Bayesian Optimization (explicitly optional
+  per FR-06). No multi-objective Pareto front — the available process-twin
+  data has exactly one CTQ per study; revisit if a second CTQ metric per lot
+  becomes available.
+- **Shared-infra pytest collision (new gotcha, not this repo's bug)**: a
+  concurrent worktree's Defect/FA/CAPA work had already added `capas`/
+  `capa_events`/`failure_analyses` tables directly to the shared
+  `alps_twin_test` Postgres database. Since `conftest.py`'s session-scoped
+  `Base.metadata.drop_all()` only knows about tables imported into *this*
+  worktree's `app.models`, it failed with `DependentObjectsStillExist`
+  trying to drop `test_runs` (which `capas` has an FK into) — this is a
+  structural limitation of two branches sharing one non-namespaced test DB
+  via `drop_all`/`create_all`, not something either branch did wrong. Fixed
+  locally for this session by pointing this worktree's own (gitignored,
+  untracked) `.env` at an isolated `POSTGRES_APP_DB=alps_twin_an04` (so
+  pytest's `{postgres_app_db}_test` no longer collides with the shared
+  `alps_twin_test`) rather than dropping the other branch's tables. Whoever
+  merges both branches to `main` will hit the same drop_all clash on the
+  real shared `alps_twin_test` the first time after merge — resolves itself
+  once both branches' models are imported together in the same `app.models`
+  tree (drop_all then sees every table and orders drops correctly).
+- Web: new `DoeStudyPanel.tsx`, mounted inside `ProcessTwin.tsx` below the
+  lot table (not a new center tab) — a select for (operation, parameter)
+  pairs built from `GET /api/v1/process-operations`'s `window` bounds, a
+  "run" button, an ECharts scatter (real observations) + dashed line
+  (fitted trend, drawn from the two x-extremes only — this IS a straight
+  line, so no need for a sampled polyline), the constraint-violations list,
+  and the ranked candidate table. `defaultTargetBand` reuses `ProcessTwin`'s
+  existing `TACT_SPEC_BAND` (260–360 mN) for `PROD-TACT-SWITCH`, still
+  labelled `데모 사양·합성 데이터` end to end (schema default → seed →
+  UI note).
+- Seed: `seed_process_twin()` in `scripts/seed_golden_dataset.py` posts one
+  more idempotent call at the end (`seed-DOE-TACT-A-OP10-dome_thickness`) —
+  dome_thickness_mm (OP-TACT-10) vs. F–S peak over the same 4 already-seeded
+  TACT-A lots. Not executed against the live dev stack in this session (the
+  shared `uvicorn` on :8000 wasn't restarted, per the parallel-work rule —
+  old code there doesn't have this router yet); verified instead end-to-end
+  via `TestClient` against an isolated scratch DB, reproducing the exact
+  fit/candidates shown above. Browser verification is deferred to whoever
+  restarts the API with this branch merged in.
+
 ## Known gaps / deliberately deferred
 
 - **Read endpoints have no auth.** There is no router-level/global auth
