@@ -53,7 +53,7 @@ cd apps/web && npm run dev
 ## 3. 검증 루틴 (커밋/보고 전 필수)
 
 ```bash
-cd apps/api && .venv/bin/python -m pytest            # 80 tests (M9 56 + P1 11 + AN-04 13)
+cd apps/api && .venv/bin/python -m pytest            # 95 tests (M9 56 + P1 11 + FA/CAPA 8 + AN-04 13 + AirInput 7)
 cd apps/web && npx tsc -b && npx vite build && npx oxlint
 ```
 
@@ -78,9 +78,12 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
 | **AN-04** | **DOE·최적화**: `ProcessRun.actual`(기존 P1 데이터) 재사용 선형 반응표면 회귀(sensitivity), 승인 윈도우 기반 제약 위반 표시, 관측값+그리드 후보안 순위 비교, `doe_studies` 신규 엔티티(감사 가능 결과 저장), `proc` 탭 내 DOE 패널 |
 | **AirInput P1** | **AirInput 감지 체인 vertical slice**: 4번째 제품군(PROD-AIRINPUT-SENSOR, Electrode Layout A/B), `model_type=proximity_capacitance`로 ΔC(d) 정전용량 근사 + ASIC 카운트/임계값 판정 요약 지표(`max_reliable_distance_mm`)까지 기존 mech-model 분석 dispatch에 4번째로 추가. 신규 3D 감지공간·ASIC/Algorithm 엔터티·SPICE·Gate는 의도적으로 미구현(AGENTS.md 참조) |
 
-마이그레이션 head: 병렬 작업 3건 중 FA/CAPA(`8aaac1ba4a8b`)와 AN-04(`f361e9578062`)가 둘 다 `b8f2e4a6c7d1` 위에서 분기해 병합 직후 head가 2개였다 — `alembic merge heads`로 병합 리비전을 추가해 단일 head로 정리함(정확한 리비전 ID는 `alembic heads` 실행 결과 참고, AirInput은 신규 테이블 없음).
-테스트 전부 통과 (정확한 개수는 병합 직후 `pytest` 재실행 결과 참고 — 3개 브랜치 합산 기준 67(P1까지)+8(FA/CAPA)+13(AN-04)+7(AirInput)).
-최종 시드: `process-twin: mold=MOLD-TACT-01 cavities=2 operations=3 lots=4` + FA 1건·CAPA 2건(1건 종결+효과검증, 1건 승인 상태) + `doe: DOE-TACT-A-OP10-dome_thickness (dome_thickness_mm vs F-S peak, 4 observations)` + `PROD-AIRINPUT-SENSOR` Variant A/B — 병합 직후 공유 개발 서버에 라이브 재시드 예정(병렬 작업 격리 규칙, §6에 따라 각 브랜치에서는 보류했었음).
+마이그레이션 head: `a9f9769ac53e` (FA/CAPA `8aaac1ba4a8b`와 AN-04 `f361e9578062`가
+둘 다 `b8f2e4a6c7d1` 위에서 분기해 병합 직후 head가 2개였다 — `alembic merge`로
+병합 리비전을 추가해 단일 head로 정리함; AirInput은 신규 테이블 없음).
+테스트 **95개 전부 통과** (67 기존 + 8 FA/CAPA + 13 AN-04 + 7 AirInput), `tsc -b`/
+`vite build`/`oxlint` 전부 clean — 3건 병합 후 재검증 완료.
+최종 시드: `process-twin: mold=MOLD-TACT-01 cavities=2 operations=3 lots=4` + FA 1건·CAPA 2건(1건 종결+효과검증, 1건 승인 상태) + `doe: DOE-TACT-A-OP10-dome_thickness (dome_thickness_mm vs F-S peak, 4 observations)` + `PROD-AIRINPUT-SENSOR` Variant A/B.
 
 ## 5. TACT 지시서 남은 작업 (병렬 작업 후보)
 
