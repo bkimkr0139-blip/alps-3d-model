@@ -426,6 +426,43 @@ const ja: Resources = {
     disclaimer:
       "工程・品質シグナルは調査優先度の表示であり、原因の確定や合格判定ではありません。設備制御や MES/QMS 台帳への書き込みはこの画面から発生しません。",
   },
+  doe: {
+    title: "DOE・最適化 — 応答曲面（AN-04）",
+    runButton: "DOE 分析を実行",
+    loading: "実行中…",
+    runError: "DOE 分析を実行できません — このパラメータの工程実行・検査データが十分にあるか確認してください。",
+    empty: "このバリアントにはまだ DOE 分析結果がありません — 上で工程パラメータを選択して実行してください。",
+    fit: {
+      summary: "{{parameter}} → CTQ 感度: {{sign}}{{slope}} {{yUnit}}/{{xUnit}}（R²={{r2}}, n={{n}}）",
+      direction: {
+        increasing: "増加",
+        decreasing: "減少",
+        flat: "横ばい",
+      },
+    },
+    targetNote: "目標バンド {{min}}–{{max}} {{unit}}（{{source}}）",
+    violations: {
+      title: "制約違反（承認ウィンドウ外の実測工程実行）",
+      none: "回帰データにウィンドウ外の実測値はありません。",
+    },
+    candidates: {
+      title: "候補案比較",
+      rank: "順位",
+      parameter: "パラメータ値",
+      predicted: "予測 CTQ",
+      inWindow: "ウィンドウ内",
+      meetsTarget: "目標達成",
+      sourceHeader: "出典",
+      source: {
+        observed: "実測",
+        grid: "グリッド",
+      },
+    },
+    chart: {
+      observed: "実測値",
+      fitted: "近似トレンド線",
+    },
+  },
 };
 
 export default ja;

@@ -1380,6 +1380,27 @@ def seed_process_twin(
         "fa=1 capa=2 [1 closed w/ verified retest, 1 approved])"
     )
 
+    # AN-04 DOE / optimization (지시서 §7 AN-04): response-surface regression
+    # of dome_thickness_mm (OP-TACT-10 actual) vs. F–S peak over the 4 lots
+    # just seeded above (real persisted ProcessRun+TestRun data — no
+    # fabricated coefficients, §7). Target band mirrors the demo spec band
+    # already shown in ProcessTwin.tsx (260–360 mN, labelled 데모 사양·합성 데이터).
+    post(
+        client,
+        "/api/v1/doe-studies",
+        idem_key="seed-DOE-TACT-A-OP10-dome_thickness",
+        body={
+            "business_id": "DOE-TACT-A-OP10-dome_thickness",
+            "variant_id": variant_a,
+            "operation_id": operations["OP-TACT-10"]["id"],
+            "parameter": "dome_thickness_mm",
+            "metric": "peak",
+            "target_band": {"min": 260, "max": 360, "unit": "mN"},
+            "candidate_grid_size": 5,
+        },
+    )
+    print("doe: DOE-TACT-A-OP10-dome_thickness (dome_thickness_mm vs F-S peak, 4 observations)")
+
 
 def seed_fa_capa(
     client: httpx.Client,

@@ -12,6 +12,7 @@ import {
   type LotGenealogy,
   type RootCauseHypothesis,
 } from "../lib/api";
+import { DoeStudyPanel } from "./DoeStudyPanel";
 
 const inputStyle: React.CSSProperties = {
   background: "#0f172a",
@@ -658,6 +659,12 @@ export function ProcessTwin({
       )}
 
       {selectedLot && <LotDetail key={selectedLot.id} lot={selectedLot} />}
+
+      <DoeStudyPanel
+        key={variantId}
+        variantId={variantId}
+        defaultTargetBand={specBand ? { min: specBand.lsl, max: specBand.usl, unit: "mN" } : undefined}
+      />
 
       <div style={{ marginTop: 12, fontSize: 11, opacity: 0.55 }}>{t("proc.disclaimer")}</div>
     </div>

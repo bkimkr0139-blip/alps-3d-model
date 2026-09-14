@@ -426,6 +426,43 @@ const ko: Resources = {
     disclaimer:
       "공정·품질 신호는 조사 우선순위 표시이며 원인 확정·합격 판정이 아닙니다. 실제 설비 제어 및 MES/QMS 원장 쓰기는 이 화면에서 발생하지 않습니다.",
   },
+  doe: {
+    title: "DOE·최적화 — 반응표면 (AN-04)",
+    runButton: "DOE 분석 실행",
+    loading: "실행 중…",
+    runError: "DOE 분석을 실행할 수 없습니다 — 이 파라미터에 대한 공정 실행·검사 데이터가 충분한지 확인하세요.",
+    empty: "이 Variant에는 아직 DOE 분석 결과가 없습니다 — 위에서 공정 파라미터를 선택하고 실행하세요.",
+    fit: {
+      summary: "{{parameter}} → CTQ 민감도: {{sign}}{{slope}} {{yUnit}}/{{xUnit}} (R²={{r2}}, n={{n}})",
+      direction: {
+        increasing: "증가",
+        decreasing: "감소",
+        flat: "평탄",
+      },
+    },
+    targetNote: "목표 밴드 {{min}}–{{max}} {{unit}} ({{source}})",
+    violations: {
+      title: "제약 위반 (승인 윈도우를 벗어난 실측 공정 실행)",
+      none: "회귀 데이터 중 윈도우 이탈 실측값이 없습니다.",
+    },
+    candidates: {
+      title: "후보안 비교",
+      rank: "순위",
+      parameter: "파라미터 값",
+      predicted: "예측 CTQ",
+      inWindow: "윈도우 내",
+      meetsTarget: "목표 충족",
+      sourceHeader: "출처",
+      source: {
+        observed: "실측",
+        grid: "그리드",
+      },
+    },
+    chart: {
+      observed: "실측값",
+      fitted: "적합 추세선",
+    },
+  },
 };
 
 export default ko;
