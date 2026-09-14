@@ -1216,6 +1216,7 @@ def seed_airinput_product(client: httpx.Client, test_client: httpx.Client) -> No
 def seed_process_twin(
     client: httpx.Client,
     test_client: httpx.Client,
+    approver_client: httpx.Client,
     variant_ids: dict[str, str],
 ) -> None:
     """TACT Product–Process Twin vertical slice (지시서 §13 첫 Vertical Slice,
@@ -1716,7 +1717,7 @@ def main() -> None:
             # Process-Twin vertical slice targets the TACT family only (§2.1
             # 권장 대상: TACT Switch 제품군 1개).
             if product_spec["business_id"] == "PROD-TACT-SWITCH":
-                seed_process_twin(client, test_client, variant_ids)
+                seed_process_twin(client, test_client, approver_client, variant_ids)
                 seed_process_monitoring(client, test_client, variant_ids)
 
         # AirInput vertical slice: 4th product family, mech-model→correlation
