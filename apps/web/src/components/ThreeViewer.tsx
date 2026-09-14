@@ -120,11 +120,16 @@ function useAssemblyModels(components: ComponentDto[]): Record<string, AssemblyE
   return entries;
 }
 
+// Body/housing-only "X-ray" opacity — an outer-shell part kind per
+// partKindOf(), never the internal mechanism (dome, plunger, contact, …).
+const BODY_KINDS = new Set(["housing", "package"]);
+
 function AssemblyModel({ scene }: { scene: Group }) {
   const selectedComponentId = useTwinStore((s) => s.selectedComponentId);
   const setSelected = useTwinStore((s) => s.setSelectedComponentId);
   const actuated = useTwinStore((s) => s.actuated);
   const setActuated = useTwinStore((s) => s.setActuated);
+  const bodyOpacity = useTwinStore((s) => s.bodyOpacity);
 
   // Safe precisely because prepareAssemblyScene cloned every material: only
   // the clicked part's own material instance gets the emissive tint.
@@ -141,6 +146,27 @@ function AssemblyModel({ scene }: { scene: Group }) {
       }
     });
   }, [selectedComponentId, scene]);
+
+  // Slide the body below 1.0 and it goes translucent so the mechanism
+  // mated inside it is visible — the same depthWrite/FrontSide guard as
+  // the epoxy cap's BLEND fix, applied dynamically instead of baked into
+  // the GLB, since here transparency is a viewer choice, not fixed data.
+  useEffect(() => {
+    scene.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh || !BODY_KINDS.has(mesh.userData.partKind)) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        const std = material as THREE.MeshStandardMaterial;
+        const wantsTransparent = bodyOpacity < 0.999;
+        std.transparent = wantsTransparent;
+        std.opacity = bodyOpacity;
+        std.depthWrite = true;
+        std.side = THREE.FrontSide;
+        std.needsUpdate = true;
+      }
+    });
+  }, [bodyOpacity, scene]);
 
   return (
     <primitive
@@ -344,7 +370,15 @@ export function ThreeViewer({ components }: { components: ComponentDto[] }) {
     <ViewerErrorBoundary>
       <Canvas
         dpr={[1, 2]}
-        camera={{ position: [8, 6, 8], fov: 40 }}
+        // Elevation matters more than it looks: [8,6,8] sits at only ~28°
+        // above the horizon, so a switch's top-facing button (or an
+        // encoder's top shaft) reads mostly as a sliver on the side of the
+        // body instead of the recognizable face. [6,11,8] raises that to
+        // ~50° — enough to read the top face clearly on first load while
+        // still keeping a 3D perspective (not a flat top-down orthographic
+        // look). Bounds `fit` only rescales distance along this direction,
+        // it never changes the angle, so this is the actual default view.
+        camera={{ position: [6, 11, 8], fov: 40 }}
         onPointerMissed={() => setSelected(null)}
         gl={{ antialias: true }}
         style={{ background: "#0f172a", borderRadius: 8 }}

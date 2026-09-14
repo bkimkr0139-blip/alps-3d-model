@@ -10,12 +10,18 @@ interface TwinStore {
   actuated: boolean;
   vibration: boolean;
   cycles: number;
+  // 0..1 opacity applied to the outer body/housing mesh only (an "X-ray"
+  // control for seeing the parts mated inside it) — a viewer display
+  // preference, not twin state, so it deliberately survives a variant
+  // switch instead of resetting with the rest of the block below.
+  bodyOpacity: number;
   setVariantId: (id: string) => void;
   setSelectedComponentId: (id: string | null) => void;
   setSelectedRequirementId: (id: string | null) => void;
   setActuated: (on: boolean) => void;
   setVibration: (on: boolean) => void;
   setCycles: (n: number) => void;
+  setBodyOpacity: (v: number) => void;
 }
 
 // Cross-panel sync per §6.2: selecting a part in any panel highlights it in
@@ -27,6 +33,7 @@ export const useTwinStore = create<TwinStore>((set) => ({
   actuated: false,
   vibration: false,
   cycles: 0,
+  bodyOpacity: 1,
   // Switching variant swaps in a different physical product — its twin state
   // (a pressed switch, accumulated cycles) must not leak into the new one.
   setVariantId: (id) =>
@@ -43,6 +50,7 @@ export const useTwinStore = create<TwinStore>((set) => ({
   setActuated: (on) => set({ actuated: on }),
   setVibration: (on) => set({ vibration: on }),
   setCycles: (n) => set({ cycles: n }),
+  setBodyOpacity: (v) => set({ bodyOpacity: v }),
 }));
 
 // Bench-local DUT state (encoder rotation). Lives here rather than in

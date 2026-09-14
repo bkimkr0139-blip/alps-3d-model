@@ -24,7 +24,7 @@ from OCP.BRepPrimAPI import (
     BRepPrimAPI_MakeCylinder,
     BRepPrimAPI_MakeSphere,
 )
-from OCP.GeomAbs import GeomAbs_Line
+from OCP.GeomAbs import GeomAbs_Circle, GeomAbs_Line
 from OCP.IFSelect import IFSelect_RetDone
 from OCP.STEPCAFControl import STEPCAFControl_Writer
 from OCP.TCollection import TCollection_ExtendedString
@@ -47,7 +47,13 @@ POCKET_FLOOR = HOUSING_TOP - 1.0  # z = 2.0
 def _fillet_edges(shape, radius: float, predicate) -> object:
     """Fillet every edge matching predicate; fall back to the unfilleted
     solid on any failure — fillets are cosmetic and must never block
-    fixture generation."""
+    fixture generation.
+
+    This OCP binding does not build lazily on Add()/IsDone() the way older
+    OCCT wrappers do — IsDone() silently reads as False (and Shape() would
+    raise) until Build() is called explicitly. Without this, EVERY fillet in
+    this file was a no-op (verified: _build_housing() produced the same
+    unfilleted 8-face box-with-hole before and after this fix)."""
     try:
         fillet = BRepFilletAPI_MakeFillet(shape)
         added = 0
@@ -59,8 +65,10 @@ def _fillet_edges(shape, radius: float, predicate) -> object:
                 fillet.Add(radius, edge)
                 added += 1
             explorer.Next()
-        if added and fillet.IsDone():
-            return fillet.Shape()
+        if added:
+            fillet.Build()
+            if fillet.IsDone():
+                return fillet.Shape()
     except Exception:
         pass
     return shape
@@ -68,6 +76,21 @@ def _fillet_edges(shape, radius: float, predicate) -> object:
 
 def _vertical_edges(curve: BRepAdaptor_Curve) -> bool:
     return curve.GetType() == GeomAbs_Line and abs(curve.Line().Direction().Z()) > 0.999
+
+
+def _circular_edge_at_z(z: float):
+    """Matches the pocket-floor-to-wall edge for filleting. A real molded
+    part always rounds this reentrant corner — sharp internal corners
+    concentrate stress and cause sink marks / mold-release problems; leaving
+    it sharp is a modeling shortcut, not an industry-standard representation
+    of how this part would actually be made."""
+
+    def check(curve: BRepAdaptor_Curve) -> bool:
+        if curve.GetType() != GeomAbs_Circle:
+            return False
+        return abs(curve.Circle().Location().Z() - z) < 1e-6
+
+    return check
 
 
 def _horizontal_edge_above(z: float):
@@ -91,6 +114,7 @@ def _build_housing():
         gp_Ax2(gp_Pnt(0, 0, POCKET_FLOOR), gp_Dir(0, 0, 1)), POCKET_RADIUS, 1.0
     ).Shape()
     housing = BRepAlgoAPI_Cut(housing, pocket).Shape()
+    housing = _fillet_edges(housing, 0.15, _circular_edge_at_z(POCKET_FLOOR))
     return _fillet_edges(housing, 0.3, _vertical_edges)
 
 
@@ -137,14 +161,23 @@ def _build_epoxy_seal():
 
 
 def _build_terminal(side: int):
-    """L-profile SMD terminal at the base of one side wall (`side` = -1/+1)."""
-    wing = BRepPrimAPI_MakeBox(
-        gp_Pnt(side * 2.55, -0.6, 0.0), gp_Pnt(side * 2.25, 0.6, 0.25)
+    """L-profile SMD gull-wing terminal at the base of one side wall
+    (`side` = -1/+1). Both segments stay at |x| >= HOUSING_HALF, touching
+    the housing's outer wall face but never crossing into its interior —
+    an earlier version had the inner "leg" running from the wall inward to
+    x=1.85, 0.4 mm inside the solid housing box. That's invisible with an
+    opaque housing but shows up as a plainly-wrong interpenetration the
+    moment the housing is rendered translucent (see ThreeViewer's body-
+    opacity control) — a real SMD gull-wing lead sits entirely outside the
+    package, foot flat on the PCB and a short riser flush against the
+    package wall, which is what this now models."""
+    foot = BRepPrimAPI_MakeBox(
+        gp_Pnt(side * 2.55, -0.6, 0.0), gp_Pnt(side * HOUSING_HALF, 0.6, 0.25)
     ).Shape()
-    leg = BRepPrimAPI_MakeBox(
-        gp_Pnt(side * 2.25, -0.6, 0.0), gp_Pnt(side * 1.85, 0.6, 0.25)
+    riser = BRepPrimAPI_MakeBox(
+        gp_Pnt(side * HOUSING_HALF, -0.6, 0.0), gp_Pnt(side * (HOUSING_HALF + 0.05), 0.6, 0.9)
     ).Shape()
-    return BRepAlgoAPI_Fuse(wing, leg).Shape()
+    return BRepAlgoAPI_Fuse(foot, riser).Shape()
 
 
 def build_assembly_parts() -> list[tuple[str, object]]:

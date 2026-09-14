@@ -1135,6 +1135,90 @@ parallel branches).
   Cavities have no GET list endpoint — re-POST with the seed_process_twin
   idem keys returns the existing rows (idempotent_write).
 
+## S04 viewer fixes — camera angle, transparency-on-rotation, body X-ray, fillets (DONE, synthetic-render verified)
+
+Fixed four issues reported against the S04 3D 설계 검토 screen for TACT Switch,
+in an isolated worktree (`/tmp/alps-s04-fix`, branch `fix/s04-viewer-issues`)
+to avoid a concurrently-dirty main checkout. `convert.py` is shared by every
+product, so the winding fix below applies to Encoder/MEMS/AirInput too, not
+just TACT.
+
+- **Default camera angle didn't show the button** (`ThreeViewer.tsx`): the
+  fixed `camera={{position:[8,6,8]}}` sits at only ~28° elevation
+  (`atan(6/√(8²+8²))`). `<Bounds fit clip observe>` only rescales *distance*
+  along the existing direction — it never changes the angle — so this fixed
+  vector was the real default view for every product. A top-mounted button
+  (or an encoder's top shaft) reads as a sliver on the body's side at 28°.
+  Changed to `[6, 11, 8]` (~48° elevation) — confirmed by re-rendering the
+  actual converted GLB with a matplotlib camera matched to this exact vector
+  (`vertical_axis='y'`, since three.js is Y-up and matplotlib defaults to
+  Z-up — mismatching those silently rotates the whole render 90° with no
+  error): the button is clearly on top and readable, not a side sliver.
+- **Body went transparent on rotation, for every product** (`convert.py`
+  `_tessellate_to_trimesh`): `Poly_Triangulation` (from
+  `BRep_Tool.Triangulation_s`) stores raw triangle indices with no regard for
+  `TopoDS_Face.Orientation()`. A face left `TopAbs_REVERSED` by a boolean
+  Cut/Fuse — routine, e.g. the housing's pocket wall — keeps its surface's
+  natural winding, now backwards relative to the solid's outward normal.
+  Three.js's default backface culling then makes that triangle invisible
+  from outside and visible only from inside; at some rotation angles the
+  camera ray grazes straight through it, reading as "the body went
+  see-through." Fix: swap two of the three indices when
+  `face.Orientation() == TopAbs_REVERSED`. Diagnosed via
+  `trimesh`'s signed volume as a cheap oracle (a REVERSED, unflipped part
+  reports **negative** volume) — Terminal 1 (a mirrored duplicate of
+  Terminal 2) was -1.32 before the fix, matching Terminal 2's +1.32 after;
+  Switch Housing went 10.16 → 50.59 (was mostly inverted-normal). Re-verified
+  after the fillet fix below (which adds many new faces) — all 7 TACT parts
+  still `is_winding_consistent=True` with positive volume. Also re-rendered
+  the housing alone with backface culling simulated in matplotlib
+  (`(normals @ cam_dir) > 0`) across a 360° sweep in 60° steps — solid walls
+  stay solid at every angle, only the genuinely-open pocket shows through.
+- **Body opacity is now a viewer control, not fixed data**: `store.ts` gained
+  `bodyOpacity` (0..1, default 1, deliberately *not* reset by `setVariantId`
+  — it's a display preference, not twin state). `ThreeViewer.tsx`'s
+  `AssemblyModel` applies it only to `BODY_KINDS = {housing, package}` meshes
+  (never the internal mechanism), using the same
+  `depthWrite=true`/`side=FrontSide` guard as the pre-existing epoxy
+  BLEND fix, so translucent-body rendering doesn't get the same depth-sort
+  ghosting the epoxy fix was written to avoid. New slider in
+  `TwinControls.tsx` (`twin.bodyOpacity` key, en/ko/ja all updated —
+  i18n key parity is `tsc`-enforced in this repo, not just convention).
+- **Terminal leads interpenetrated the housing** (`generate_sample_step.py`
+  `_build_terminal`): the old inner "leg" ran from the wall inward to
+  x=1.85, 0.4mm inside the solid housing box (`HOUSING_HALF=2.25`).
+  Invisible with an opaque housing, but a plain modeling defect the moment
+  the body is rendered translucent via the control above — and not how a
+  real SMD gull-wing lead is shaped (foot flat on the PCB, short riser
+  flush against the *outside* of the package wall, never crossing into it).
+  Rebuilt as `foot` + `riser`, both confined to `|x| >= HOUSING_HALF`;
+  verified both terminals now report identical volume (0.129) with bounds
+  exactly touching, not crossing, the housing wall.
+- **`BRepFilletAPI_MakeFillet` was silently a no-op for every fillet in this
+  file, before this session too**: this OCP binding does not build lazily
+  the way older OCCT wrappers do — `Add()` queues the request but
+  `IsDone()`/`Shape()` read as failed/empty until `Build()` is called
+  explicitly. `_fillet_edges`'s `if added and fillet.IsDone(): return
+  fillet.Shape()` fallback silently swallowed this (fillets are meant to be
+  best-effort), so `_build_housing()` produced the same unfilleted 8-face
+  box-with-hole with or without the vertical-edge fillet call that had
+  already existed before this session. Confirmed with a minimal repro (plain
+  box, one edge, `Add(0.1, edge)` → `IsDone()` False → `Build()` → `IsDone()`
+  True) before touching the real geometry. Fixed by calling `fillet.Build()`
+  before checking `IsDone()`. Also added a new fillet at the pocket
+  floor-to-wall reentrant corner (`_circular_edge_at_z`, r=0.15) — a real
+  molded part always rounds this transition (sharp internal corners
+  concentrate stress / cause sink marks); `_build_housing()` now produces 13
+  faces instead of 8, confirmed applied.
+- **Not yet done**: no live-browser Playwright pass (the synthetic
+  matplotlib renders above substitute for the two highest-risk fixes;
+  the opacity slider and camera change are otherwise verified only by
+  `tsc -b`/`vite build`/`oxlint` passing + matching this file's established
+  UI patterns exactly). Not yet run through the real Temporal
+  conversion pipeline against the seeded golden dataset — only via direct
+  `generate_sample_step.py`/`convert.py` invocation against a scratch STEP
+  file in `/tmp/alps-s04-fix-test`.
+
 ## Known gaps / deliberately deferred
 
 - **Read endpoints have no auth.** There is no router-level/global auth
