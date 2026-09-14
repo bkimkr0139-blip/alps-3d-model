@@ -12,9 +12,11 @@ export function TwinControls() {
   const actuated = useTwinStore((s) => s.actuated);
   const vibration = useTwinStore((s) => s.vibration);
   const cycles = useTwinStore((s) => s.cycles);
+  const bodyOpacity = useTwinStore((s) => s.bodyOpacity);
   const setActuated = useTwinStore((s) => s.setActuated);
   const setVibration = useTwinStore((s) => s.setVibration);
   const setCycles = useTwinStore((s) => s.setCycles);
+  const setBodyOpacity = useTwinStore((s) => s.setBodyOpacity);
 
   const hotspots = rankedStress(Object.keys(CYCLES_TO_SATURATION), cycles, vibration).slice(0, 5);
 
@@ -66,6 +68,20 @@ export function TwinControls() {
           step={1000}
           value={Math.min(cycles, MAX_CYCLES)}
           onChange={(e) => setCycles(Number(e.target.value))}
+          style={{ accentColor: "#f97316" }}
+        />
+      </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span style={{ opacity: 0.8 }}>
+          {t("twin.bodyOpacity")}: {Math.round(bodyOpacity * 100)}%
+        </span>
+        <input
+          type="range"
+          min={0.15}
+          max={1}
+          step={0.05}
+          value={bodyOpacity}
+          onChange={(e) => setBodyOpacity(Number(e.target.value))}
           style={{ accentColor: "#f97316" }}
         />
       </label>

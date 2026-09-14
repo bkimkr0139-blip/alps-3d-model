@@ -22,6 +22,7 @@ const ja: Resources = {
     title: "デジタルツイン",
     actuate: "スイッチを押す",
     actuated: "押下中",
+    bodyOpacity: "ボディ透明度（透視）",
     vibration: "車両振動",
     vibrationAccumulating: "振動 ON — サイクルが進むとはんだ接合部の疲労が速くなります。",
     cycles: "サイクル",

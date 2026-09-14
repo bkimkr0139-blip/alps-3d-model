@@ -23,6 +23,7 @@ const en = {
     title: "Digital twin",
     actuate: "Press switch",
     actuated: "Pressed",
+    bodyOpacity: "Body opacity (X-ray)",
     vibration: "Vehicle vibration",
     vibrationAccumulating: "Vibration ON — cycles accumulate and solder joints fatigue faster.",
     cycles: "Cycles",

@@ -22,6 +22,7 @@ const ko: Resources = {
     title: "디지털 트윈",
     actuate: "스위치 누르기",
     actuated: "눌림",
+    bodyOpacity: "바디 투명도 (투시)",
     vibration: "차량 진동",
     vibrationAccumulating: "진동 ON — 사이클이 증가하며 땜납 접합부 피로가 빨라집니다.",
     cycles: "사이클",

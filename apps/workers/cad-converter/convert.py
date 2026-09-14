@@ -27,7 +27,7 @@ from OCP.collections import Sequence_TDF_Label
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
 from OCP.TDocStd import TDocStd_Document
-from OCP.TopAbs import TopAbs_FACE
+from OCP.TopAbs import TopAbs_FACE, TopAbs_REVERSED
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS
@@ -177,11 +177,24 @@ def _tessellate_to_trimesh(shape) -> trimesh.Trimesh:
                 pnt = triangulation.Node(i).Transformed(transform)
                 verts[i - 1] = (pnt.X(), pnt.Y(), pnt.Z())
 
+            # Poly_Triangulation stores raw indices without regard to the
+            # face's TopAbs_Orientation. A face made REVERSED by a boolean
+            # Cut/Fuse (very common — e.g. the housing's pocket wall) keeps
+            # the underlying surface's natural winding, which is now
+            # backwards relative to the solid's outward normal. Left
+            # uncorrected, three.js's default backface culling makes that
+            # triangle invisible from outside and visible only from inside —
+            # at some rotation angles the camera ray grazes straight through
+            # it, reading as "the body went see-through". Flip two indices
+            # to restore outward winding whenever the face is REVERSED.
+            reversed_face = face.Orientation() == TopAbs_REVERSED
             n_tris = triangulation.NbTriangles()
             faces = np.empty((n_tris, 3), dtype=np.int64)
             for i in range(1, n_tris + 1):
                 tri = triangulation.Triangle(i)
                 a, b, c = tri.Get()
+                if reversed_face:
+                    a, b = b, a
                 faces[i - 1] = (a - 1 + vertex_offset, b - 1 + vertex_offset, c - 1 + vertex_offset)
 
             all_vertices.append(verts)
