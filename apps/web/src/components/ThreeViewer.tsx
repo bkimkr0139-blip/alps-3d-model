@@ -202,14 +202,24 @@ function AssemblyModel({ scene }: { scene: Group }) {
 // the TwinControls overlay (outside the Canvas) and mesh clicks both drive it.
 const PLUNGER_TRAVEL_MM = 0.25;
 const DOME_TRAVEL_MM = 0.12;
-// Vertical-only layer separation for the exploded view: explodeDir is each
-// part's RAW z offset from the assembly's bbox center (x/y stay 0 — parts
-// never drift sideways), so the stack fans out into its natural layers:
-// everything above the center rises, everything below sinks. The factor
-// scales that raw layer offset up to a clearly visible gap without needing
-// a per-product tuned distance (a thin stack's z spread is smaller than its
-// footprint, hence the larger factor than the old radial version had).
-const EXPLODE_FACTOR = 3.2;
+// Vertical-only layer separation for the exploded view (x/y stay 0 — parts
+// never drift sideways). Parts are clustered into horizontal LAYERS by their
+// center z and each layer is offset by (rank − pivot) × gap: an evenly
+// spaced fan in stack order, the way a real exploded diagram reads. RAW z
+// offsets from the bbox center can't do this — on a thin stack like the
+// AirInput module (8 parts across ~5 mm of z, most of them within 1 mm of
+// the center) nearly every raw offset rounds to ~0 and only the topmost
+// part visibly separates.
+const EXPLODE_LAYER_TOL_MM = 0.15; // co-located parts (same mounting plane) share a layer
+const EXPLODE_MAX_SPREAD = 3.2; // total fan ≤ this × assembly height…
+// …and ≤ this fraction of the mount-time visible height. The camera is
+// fitted ONCE to the assembled bbox (<Bounds> at mount — the explode mutates
+// meshes per-frame, so there is no refit), and the fitted view measures
+// ≈ 10 mm + 1.7 × largest bbox dimension (empirical: a 4.5 mm TACT fan of
+// ~19 mm fit with margin while a 25 mm encoder fan of ~55 mm clipped).
+const EXPLODE_VISIBLE_MIN_MM = 10;
+const EXPLODE_VISIBLE_PER_MM = 1.7;
+const EXPLODE_VISIBLE_SAFETY = 0.85;
 // Full assemble → explode → reassemble cycle when playing, seconds. Smooth
 // sinusoidal easing (not a linear triangle wave) so the direction reversal
 // at each end doesn't read as a jolt.
@@ -224,36 +234,67 @@ function TwinAnimator({ scenes }: { scenes: Group[] }) {
   const actRef = useRef(0);
 
   const parts = useMemo(() => {
-    const map: {
+    type PartEntry = {
       mesh: Mesh;
       kind: string;
       basePosition: THREE.Vector3;
       explodeDir: THREE.Vector3;
       baseColor: THREE.Color;
-    }[] = [];
+    };
+    const map: PartEntry[] = [];
     for (const scene of scenes) {
       // BODY_KINDS parts (the housing/package shell) are the exploded
       // view's fixed reference frame — real exploded diagrams keep the
       // enclosure in place and fly the internals out around it, and it
       // pairs naturally with the body-opacity X-ray control right above.
-      const assemblyCenter = new THREE.Box3().setFromObject(scene).getCenter(new THREE.Vector3());
+      const bbox = new THREE.Box3().setFromObject(scene);
+      const size = bbox.getSize(new THREE.Vector3());
+      const height = Math.max(1e-6, size.z);
+
+      const movable: { part: PartEntry; z: number }[] = [];
       scene.traverse((obj) => {
         const mesh = obj as Mesh;
         if (!mesh.isMesh) return;
         const kind = (mesh.userData.partKind as string | undefined) ?? "";
         const material = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial;
-        const meshCenter = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
-        const explodeDir = BODY_KINDS.has(kind)
-          ? new THREE.Vector3()
-          : new THREE.Vector3(0, 0, (meshCenter.z - assemblyCenter.z) * EXPLODE_FACTOR);
-        map.push({
+        const part: PartEntry = {
           mesh,
           kind,
           basePosition: mesh.position.clone(),
-          explodeDir,
+          explodeDir: new THREE.Vector3(),
           baseColor: material.color.clone(),
-        });
+        };
+        map.push(part);
+        if (!BODY_KINDS.has(kind)) {
+          const z = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3()).z;
+          movable.push({ part, z });
+        }
       });
+
+      // Cluster the movable parts into horizontal layers by center z
+      // (z-sorted here): parts mounted on the same plane — the TACT's two
+      // terminals, the encoder's three — share a layer and move together,
+      // so symmetric hardware never fans apart from itself.
+      movable.sort((a, b) => a.z - b.z);
+      const tol = Math.max(EXPLODE_LAYER_TOL_MM, height * 0.02);
+      const layerZ: number[] = [];
+      const layerOf = new Map<{ part: PartEntry; z: number }, number>();
+      for (const m of movable) {
+        const last = layerZ.length - 1;
+        layerOf.set(m, last >= 0 && m.z - layerZ[last] <= tol ? last : layerZ.push(m.z) - 1);
+      }
+      // Even fan in stack order, centered on the assembly's mid-height so
+      // the exploded stack stays framed like the assembled one. The total
+      // fan is capped twice: proportionally to the assembly's own height,
+      // and to the mount-time visible height (see the constants above) —
+      // an over-eager fan on a tall part stack flies clean out of frame.
+      const layers = Math.max(1, layerZ.length);
+      const visible =
+        (EXPLODE_VISIBLE_MIN_MM + EXPLODE_VISIBLE_PER_MM * Math.max(size.x, size.y, size.z)) *
+        EXPLODE_VISIBLE_SAFETY;
+      const spread = Math.min(height * EXPLODE_MAX_SPREAD, Math.max(0, visible - height));
+      const gap = spread / Math.max(1, layers - 1);
+      for (const m of movable) m.part.explodeDir.set(0, 0, (layerOf.get(m)! - (layers - 1) / 2) * gap);
     }
     return map;
   }, [scenes]);

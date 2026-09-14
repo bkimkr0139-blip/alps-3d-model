@@ -1012,10 +1012,27 @@ AIRINPUT_REQUIREMENTS = [
         "safety_class": "QM",
     },
 ]
+# Full CAD bill of materials — names must exactly match the part names in
+# generate_airinput_step.py: the S04 viewer matches GLB node names to
+# components by normalized name, so a missing/renamed row leaves a CAD part
+# unclickable and untraceable (the old 2-row list did exactly that — 6 of
+# the 8 CAD parts had no Component row on S04).
 AIRINPUT_COMPONENTS = [
+    {"suffix": "CMP-HOUSING", "name": "AirInput Housing"},
     {"suffix": "CMP-ELECTRODE", "name": "Capacitive Electrode PCB"},
+    {"suffix": "CMP-ASIC", "name": "Capacitive Sensing ASIC"},
+    {"suffix": "CMP-RESISTOR", "name": "Filter Resistor"},
+    {"suffix": "CMP-CAPACITOR", "name": "Decoupling Capacitor"},
+    {"suffix": "CMP-FPC", "name": "FPC Connector"},
     {"suffix": "CMP-COVER", "name": "Cover Lens"},
 ]
+# The 8th CAD part's name genuinely differs per variant (solid center pad vs
+# split ring, generate_airinput_step.build_assembly_parts) —
+# seed_airinput_variant appends the matching row per variant.
+AIRINPUT_ELECTRODE_PARTS = {
+    "a": {"suffix": "CMP-ELPAD", "name": "Electrode Pad"},
+    "b": {"suffix": "CMP-ELPAD", "name": "Split-Ring Electrode"},
+}
 
 # Electrode Layout A/B = the spec's two geometry variants (§1.2), expressed
 # as electrode_area_mm2/cover parameters on the proximity_capacitance model.
@@ -1026,6 +1043,7 @@ AIRINPUT_COMPONENTS = [
 AIRINPUT_VARIANTS = [
     {
         "business_id": "VAR-AIR-A",
+        "layout": "a",
         "name": "AirInput Proximity Sensor Variant A (Electrode Layout A — center pad)",
         "mech_parameters": {
             "model_type": "proximity_capacitance",
@@ -1039,6 +1057,7 @@ AIRINPUT_VARIANTS = [
     },
     {
         "business_id": "VAR-AIR-B",
+        "layout": "b",
         "name": "AirInput Proximity Sensor Variant B (Electrode Layout B — larger split-ring)",
         "mech_parameters": {
             "model_type": "proximity_capacitance",
@@ -1085,7 +1104,10 @@ def seed_airinput_variant(
         req_ids.append(requirement["id"])
 
     comp_ids = []
-    for comp in AIRINPUT_COMPONENTS:
+    # Shared BOM + this variant's own electrode part (its CAD name differs
+    # between Layout A and B).
+    comps = [*AIRINPUT_COMPONENTS, AIRINPUT_ELECTRODE_PARTS[spec["layout"]]]
+    for comp in comps:
         business_id = f"{variant_business_id}-{comp['suffix']}"
         component = post(
             client,
@@ -1096,7 +1118,7 @@ def seed_airinput_variant(
         comp_ids.append(component["id"])
 
     for req_id, req in zip(req_ids, AIRINPUT_REQUIREMENTS):
-        for comp_id, comp in zip(comp_ids, AIRINPUT_COMPONENTS):
+        for comp_id, comp in zip(comp_ids, comps):
             link_business_id = f"{variant_business_id}-{req['suffix']}-{comp['suffix']}"
             post(
                 client,
