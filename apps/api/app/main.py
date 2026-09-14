@@ -8,6 +8,7 @@ from app.routers import (
     baselines,
     components,
     correlations,
+    fa_capa,
     gates,
     model_canvas,
     products,
@@ -46,6 +47,7 @@ app.include_router(correlations.router)
 app.include_router(gates.router)
 app.include_router(model_canvas.router)
 app.include_router(process_twin.router)
+app.include_router(fa_capa.router)
 app.include_router(assistant.router)
 
 

@@ -5,6 +5,7 @@ from app.models.artifact import Artifact, ArtifactVersion  # noqa: F401
 from app.models.audit import AuditEvent  # noqa: F401
 from app.models.baseline import Baseline  # noqa: F401
 from app.models.component import Component  # noqa: F401
+from app.models.fa_capa import CAPA, CapaEvent, FailureAnalysis  # noqa: F401
 from app.models.gate import Gate, GateComment, GateDecision  # noqa: F401
 from app.models.idempotency import IdempotencyRecord  # noqa: F401
 from app.models.model_canvas import (  # noqa: F401

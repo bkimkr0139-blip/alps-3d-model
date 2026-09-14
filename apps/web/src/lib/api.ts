@@ -427,6 +427,78 @@ export interface RootCauseHypothesis {
   disclaimer: string;
 }
 
+// -- Defect → FailureAnalysis → CAPA (HANDOFF §5 item 4) -----------------------
+
+export interface Defect {
+  id: string;
+  business_id: string;
+  lot_id: string;
+  defect_class: string;
+  severity: "minor" | "major" | "critical";
+  quantity: number;
+  unit_id: string | null;
+  note: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface FailureAnalysis {
+  id: string;
+  business_id: string;
+  defect_id: string;
+  method: string;
+  findings: string;
+  analyst: string;
+  analyzed_at: string;
+  // Human-entered, evidence-based — never AI-derived (§7). Absent/false is a
+  // legitimate "not confirmed yet" state, not a missing value.
+  root_cause: string | null;
+  root_cause_confirmed: boolean;
+  evidence: { kind: string; business_id: string; note?: string | null }[] | null;
+  created_by: string;
+  created_at: string;
+}
+
+export type CapaStatus =
+  | "draft"
+  | "pending_review"
+  | "approved"
+  | "rejected"
+  | "implemented"
+  | "effectiveness_verified"
+  | "closed";
+
+export interface Capa {
+  id: string;
+  business_id: string;
+  failure_analysis_id: string;
+  title: string;
+  capa_type: "corrective" | "preventive" | "both";
+  description: string;
+  owner: string;
+  due_date: string | null;
+  status: CapaStatus;
+  submitted_by: string | null;
+  submitted_at: string | null;
+  verification_test_run_id: string | null;
+  verification_note: string | null;
+  closed_at: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface CapaEvent {
+  id: string;
+  business_id: string;
+  capa_id: string;
+  event_type: "submitted" | "approved" | "rejected" | "implemented" | "effectiveness_verified" | "closed";
+  actor: string;
+  actor_roles: string[];
+  comment: string | null;
+  evidence: Record<string, unknown> | null;
+  occurred_at: string;
+}
+
 export const api = {
   listProducts: () => request<Product[]>("/api/v1/products"),
   listVariants: (productId: string) => request<Variant[]>(`/api/v1/products/${productId}/variants`),
@@ -457,6 +529,70 @@ export const api = {
     request<RootCauseHypothesis>("/api/v1/ai/root-cause-hypotheses", {
       method: "POST",
       body: JSON.stringify({ lot_id: lotId }),
+    }),
+  listLotDefects: (lotId: string) => request<Defect[]>(`/api/v1/lots/${lotId}/defects`),
+  listFailureAnalyses: (defectId: string) =>
+    request<FailureAnalysis[]>(`/api/v1/defects/${defectId}/failure-analyses`),
+  createFailureAnalysis: (
+    defectId: string,
+    body: {
+      business_id: string;
+      method: string;
+      findings: string;
+      analyst: string;
+      analyzed_at: string;
+      root_cause?: string | null;
+      root_cause_confirmed?: boolean;
+    }
+  ) =>
+    request<FailureAnalysis>(`/api/v1/defects/${defectId}/failure-analyses`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "Idempotency-Key": body.business_id },
+    }),
+  listCapas: (faId: string) => request<Capa[]>(`/api/v1/failure-analyses/${faId}/capas`),
+  createCapa: (
+    faId: string,
+    body: {
+      business_id: string;
+      title: string;
+      capa_type: "corrective" | "preventive" | "both";
+      description: string;
+      owner: string;
+      due_date?: string | null;
+    }
+  ) =>
+    request<Capa>(`/api/v1/failure-analyses/${faId}/capas`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "Idempotency-Key": body.business_id },
+    }),
+  getCapa: (capaId: string) => request<Capa>(`/api/v1/capas/${capaId}`),
+  listCapaEvents: (capaId: string) => request<CapaEvent[]>(`/api/v1/capas/${capaId}/events`),
+  submitCapa: (capaId: string, comment?: string) =>
+    request<Capa>(`/api/v1/capas/${capaId}/submit`, {
+      method: "POST",
+      body: JSON.stringify({ business_id: `${capaId}-submit-${Date.now()}`, comment }),
+    }),
+  decideCapa: (capaId: string, decision: "approved" | "rejected", comment: string) =>
+    request<Capa>(`/api/v1/capas/${capaId}/decisions`, {
+      method: "POST",
+      body: JSON.stringify({ business_id: `${capaId}-decision-${Date.now()}`, decision, comment }),
+    }),
+  implementCapa: (capaId: string, comment?: string) =>
+    request<Capa>(`/api/v1/capas/${capaId}/implement`, {
+      method: "POST",
+      body: JSON.stringify({ business_id: `${capaId}-implement-${Date.now()}`, comment }),
+    }),
+  verifyCapaEffectiveness: (capaId: string, testRunId: string, comment?: string) =>
+    request<Capa>(`/api/v1/capas/${capaId}/verify-effectiveness`, {
+      method: "POST",
+      body: JSON.stringify({ business_id: `${capaId}-verify-${Date.now()}`, test_run_id: testRunId, comment }),
+    }),
+  closeCapa: (capaId: string, comment?: string) =>
+    request<Capa>(`/api/v1/capas/${capaId}/close`, {
+      method: "POST",
+      body: JSON.stringify({ business_id: `${capaId}-close-${Date.now()}`, comment }),
     }),
   listSimulationRuns: (variantId: string) =>
     request<SimulationRun[]>(`/api/v1/variants/${variantId}/simulation-runs`),
