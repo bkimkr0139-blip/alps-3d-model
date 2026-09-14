@@ -31,7 +31,11 @@ class CurrentUser:
 
 def _decode(token: str) -> dict:
     jwks = _get_jwks()
-    unverified_header = jwt.get_unverified_header(token)
+    try:
+        unverified_header = jwt.get_unverified_header(token)
+    except JWTError as exc:
+        # garbage tokens (not even header.payload.sig shaped) get 401, not 500
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"invalid token: {exc}") from exc
     key = next((k for k in jwks["keys"] if k["kid"] == unverified_header["kid"]), None)
     if key is None:
         # key rotated on the Keycloak side — refresh once and retry

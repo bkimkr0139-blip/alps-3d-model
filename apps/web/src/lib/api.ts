@@ -562,6 +562,51 @@ export interface DoeStudy {
   created_at: string;
 }
 
+export interface ProcessParameterInfo {
+  parameter: string;
+  unit: string | null;
+  n_points: number;
+  operation_business_ids: string[];
+}
+
+export interface ControlChartPoint {
+  lot_business_id: string;
+  process_run_business_id: string;
+  operation: string;
+  seq_no: number;
+  cavity_label: string;
+  started_at: string;
+  value: number;
+  excluded_from_limits: boolean;
+  exclusion_reason: string | null;
+  violations: string[];
+}
+
+export interface ControlChart {
+  variant_id: string;
+  parameter: string;
+  unit: string | null;
+  n_points: number;
+  n_basis: number;
+  center_line: number | null;
+  sigma: number | null;
+  lcl: number | null;
+  ucl: number | null;
+  points: ControlChartPoint[];
+  rule_hits: string[];
+  note: string;
+}
+
+export interface AnomalyExplanation {
+  variant_id: string;
+  parameter: string;
+  hypothesis: string;
+  facts_used: string[];
+  model: string;
+  disclaimer: string;
+  generated_at: string;
+}
+
 export const api = {
   listProducts: () => request<Product[]>("/api/v1/products"),
   listVariants: (productId: string) => request<Variant[]>(`/api/v1/products/${productId}/variants`),
@@ -672,6 +717,17 @@ export const api = {
     request<Capa>(`/api/v1/capas/${capaId}/close`, {
       method: "POST",
       body: JSON.stringify({ business_id: `${capaId}-close-${Date.now()}`, comment }),
+    }),
+  listProcessParameters: (variantId: string) =>
+    request<ProcessParameterInfo[]>(`/api/v1/twins/${variantId}/process-parameters`),
+  controlChart: (variantId: string, parameter: string) =>
+    request<ControlChart>(
+      `/api/v1/twins/${variantId}/control-chart?parameter=${encodeURIComponent(parameter)}`,
+    ),
+  anomalyExplanation: (variantId: string, parameter: string) =>
+    request<AnomalyExplanation>("/api/v1/ai/anomaly-explanation", {
+      method: "POST",
+      body: JSON.stringify({ variant_id: variantId, parameter }),
     }),
   listSimulationRuns: (variantId: string) =>
     request<SimulationRun[]>(`/api/v1/variants/${variantId}/simulation-runs`),

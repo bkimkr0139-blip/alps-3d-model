@@ -1086,6 +1086,54 @@ table, not a new center tab).
   via `TestClient` against an isolated scratch DB, reproducing the exact
   fit/candidates shown above. Browser verification is deferred to whoever
   restarts the API with this branch merged in.
+## TACT P2 — AN-03 control chart + AI-03 anomaly explanation (DONE, browser pass CLEAN)
+
+Slice two of the TACT 지시서, deliberately **migration-free** (read-only
+compute over the immutable P1 rows — no new tables, no writes) so it can't
+collide with a parallel session's alembic head. 10 pytest in
+`apps/api/tests/test_process_monitoring.py` (105 total with the three merged
+parallel branches).
+
+- **Control chart** (`GET /twins/{id}/control-chart?parameter=`, router
+  `app/routers/process_monitoring.py`): one point per process run reporting
+  the parameter in `actual`, chronological. Limits are robust stats of the
+  measured stable process — median ± 3·(1.4826·MAD) — NEVER the spec band
+  (AN-03: 관리한계·규격한계 혼동 금지; the note string says so verbatim and
+  the UI prints it). Rules (each with the M9 `+1e-12` guard):
+  `beyond_3_sigma`, `two_of_three_beyond_2_sigma` (same side),
+  `run_of_7_same_side`. n_basis < 3 → no limits + 표본수 부족 note.
+- **Exclusion design (AN-03 제외 사유 감사 가능)**: points the P1 run stored
+  with `out_of_window=True` AND a matching `window_findings[].parameter` stay
+  ON the chart (still rule-checked — an excluded outlier can fire
+  beyond_3_sigma) but are excluded from the limit basis; the reason
+  `out_of_window` is derived from stored immutable flags, no new writes.
+- **AI-03** (`POST /ai/anomaly-explanation`): Korean fact sheet from real
+  rows (chart summary, per-point violations, cavity medians, material lots)
+  → Ollama; system prompt forbids inventing numbers (AI-04) and demands a
+  조사 가설, never 원인 확정. Response carries `facts_used` so every claim is
+  checkable. LLM client injected via `LlmDep = Annotated[OpenAI,
+  Depends(get_llm_client)]` — calling `get_llm_client()` directly would
+  bypass `dependency_overrides` and tests would hit real Ollama (found the
+  hard way). Unset LLM_BASE_URL → 503; empty completion → 502.
+- **Parallel-session test-DB isolation**: conftest derives the test DB as
+  `{POSTGRES_APP_DB}_test`; the shared `alps_twin_test` was polluted by a
+  parallel worktree's stray tables (their `capas` FK on `test_runs` breaks
+  our `drop_all`). Whenever another session may be running pytest concurrently,
+  use `POSTGRES_APP_DB=alps_twin_pm pytest` (DB `alps_twin_pm_test`, created
+  once). Also hardened `security.py`: garbage tokens (not even
+  header.payload.sig) now 401 instead of 500 (`get_unverified_header` moved
+  inside the JWTError→401 guard).
+- Web: `ProcessMonitoring.tsx` (SVG chart: CL solid, UCL/LCL dashed amber,
+  violations amber filled, excluded hollow red — legend icon+text per §5.1;
+  rule-hit chips; excluded list; AI button → 조사 가설 card with fact chips +
+  disclaimer). Mounted in ProcessTwin.tsx with a 2-line diff (import + one
+  element after the h3) to minimize merge conflict with the parallel
+  fa-capa session's big ProcessTwin.tsx change.
+- Seed: `seed_process_monitoring` appends LOT-TACT-A-05..10 (all in-window,
+  2026-09-09..11, two material lots) — basis n=9, CL 0.10, limits
+  [0.0778, 0.1222], LOT-04's 0.145 the lone excluded+beyond-3σ point.
+  Cavities have no GET list endpoint — re-POST with the seed_process_twin
+  idem keys returns the existing rows (idempotent_write).
 
 ## Known gaps / deliberately deferred
 

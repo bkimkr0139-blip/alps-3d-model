@@ -13,6 +13,7 @@ import {
   type RootCauseHypothesis,
 } from "../lib/api";
 import { DoeStudyPanel } from "./DoeStudyPanel";
+import { ProcessMonitoring } from "./ProcessMonitoring";
 
 const inputStyle: React.CSSProperties = {
   background: "#0f172a",
@@ -603,6 +604,8 @@ export function ProcessTwin({
   return (
     <div style={{ height: "100%", overflowY: "auto", padding: 4 }}>
       <h3 style={{ margin: "0 0 10px", fontSize: 15 }}>{t("proc.title")}</h3>
+
+      <ProcessMonitoring variantId={variantId} />
 
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>
         {t("proc.cavity.title")}

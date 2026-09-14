@@ -17,6 +17,7 @@ Sensor)의 **설계 → 시뮬레이션 → 시험 → 승인 → 공정·품질
 | 시험·상관 | F–S 곡선 CSV 업로드, RMSE/상관계수 산출, 베이스라인 승인, 게이트 워크플로 |
 | 모델 신뢰 | 인과관계 그래프·임팩트 패스(human_approved vs ai_inferred), 모델 캔버스, 모델 카드, 규칙 기반 모델 리뷰, UQ(Monte-Carlo 밴드), Gap 분석 |
 | 공정 트윈 (TACT P1) | 금형·Cavity 맵, 공정 라우트(Setpoint/Actual 분리·윈도우 플래그), Lot 계보, Lot별 F–S 검사, 불량, MAD 강건 Cavity 비교(Cp/Cpk), 근거형 원인 후보(모두 "확인 필요") |
+| 공정 모니터링 (TACT P2) | AN-03 시계열 관리도(강건 관리한계·윈도우 이탈 제외·규칙 위반 3종), AI-03 이상 설명(사실 기반 조사 가설, facts_used 동봉) |
 | AI 어시스턴트 | 로컬 Ollama(`qwen2.5:32b`) — 판정 없는 조사 보조, 최종 판정은 사람 승인 |
 | 플랫폼 | RBAC 5롤(Keycloak), Append-only 감사로그, Idempotency-Key 멱등 쓰기, i18n(ko/en/ja) |
 
@@ -56,7 +57,7 @@ apps/api/.venv/bin/python scripts/seed_golden_dataset.py
 ## 테스트 & 검증
 
 ```bash
-cd apps/api && .venv/bin/python -m pytest            # 67 tests (테스트 DB: alps_twin_test)
+cd apps/api && .venv/bin/python -m pytest            # 77 tests (테스트 DB: {POSTGRES_APP_DB}_test)
 cd apps/web && npx tsc -b && npx vite build && npx oxlint
 ```
 
@@ -98,7 +99,8 @@ AGENTS.md     세션별 구현 사실·기술 함정 전체 기록
 | M8 (모델 캔버스·임팩트 패스·모델 카드) | ✅ 완료 |
 | M9 (Port Contracts·모델 리뷰·UQ·Gap) | ✅ 완료 |
 | TACT P1 (공정 트윈 버티컬 슬라이스) | ✅ 완료 |
-| TACT P2+ (DOE, AI-02/03, FA/CAPA, 게이트 E2E 등) | ⬜ `docs/HANDOFF.md` §5 참조 |
+| TACT P2 (AN-03 관리도 + AI-03 이상 설명) | ✅ 마이그레이션 프리·읽기 전용 컴퓨팅, 브라우저 패스 CLEAN |
+| TACT P2+ (DOE, AI-02, FA/CAPA, 게이트 E2E 등) | ⬜ `docs/HANDOFF.md` §5 참조 (FA/CAPA·AirInput은 병렬 세션 진행 중) |
 | AirInput 3D Interaction Field Twin | ⬜ 미착수 |
 
 ## 보안 노트

@@ -53,7 +53,7 @@ cd apps/web && npm run dev
 ## 3. 검증 루틴 (커밋/보고 전 필수)
 
 ```bash
-cd apps/api && .venv/bin/python -m pytest            # 95 tests (M9 56 + P1 11 + FA/CAPA 8 + AN-04 13 + AirInput 7)
+cd apps/api && .venv/bin/python -m pytest            # 105 tests (95 + P2 관리도/AI-03 10) — 병렬 세션 공유 시 POSTGRES_APP_DB=alps_twin_pm 로 격리
 cd apps/web && npx tsc -b && npx vite build && npx oxlint
 ```
 
@@ -85,6 +85,11 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
 `vite build`/`oxlint` 전부 clean — 3건 병합 후 재검증 완료.
 최종 시드: `process-twin: mold=MOLD-TACT-01 cavities=2 operations=3 lots=4` + FA 1건·CAPA 2건(1건 종결+효과검증, 1건 승인 상태) + `doe: DOE-TACT-A-OP10-dome_thickness (dome_thickness_mm vs F-S peak, 4 observations)` + `PROD-AIRINPUT-SENSOR` Variant A/B.
 
+**P2 추가 (2026-09-14, 이 세션)** — AN-03 관리도 + AI-03 이상 설명 완료.
+마이그레이션 없음(읽기 전용 컴퓨팅). 테스트 105개 전부 통과(95 + P2 10).
+브라우저 패스 CLEAN. 상세: AGENTS.md "TACT P2" 절. 시드에
+`process-monitoring: lots=6 added (LOT-TACT-A-05..10)` 추가.
+
 ## 5. TACT 지시서 남은 작업 (병렬 작업 후보)
 
 §12 16주 일정 기준, P1이 "3~9주 + AI/품질의 일부"에 해당. 남은 것:
@@ -95,8 +100,9 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
    AGENTS.md "AN-04 DOE / optimization" 절 참조.
 2. **AI-02 변경 영향분석** — 설계/공정 변경이 CTQ·요구사항에 미치는 영향
    전파(모델 캔버스 임팩트 패스와 연계).
-3. **AI-03 공정·품질 이상 설명** — 원인 후보를 Ollama로 설명 생성(단,
-   숫자 생성 금지·check_required 유지).
+3. ~~**AI-03 공정·품질 이상 설명**~~ — **완료** (TACT P2, 이 세션):
+   관리도 사실 시트 → Ollama 조사 가설, `facts_used` 동봉, 숫자 생성 금지
+   시스템 프롬프트. AGENTS.md "TACT P2" 절 참조.
 4. ~~**Defect/FA/CAPA 워크플로**~~ — **완료** (`feature/fa-capa-workflow`
    브랜치, 위 §4 표 참고). FailureAnalysis + CAPA 상태기계·승인 흐름·
    append-only 이력 구현됨. 남은 것: 브라우저 CLEAN 검증, 라이브 재시드
@@ -105,7 +111,9 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
 5. **재검증 → Release Gate E2E** — 원인 후보 → 재검증 시험 → 게이트 근거
    연결 (P1은 후보 표시까지만). CAPA 종결 단계의 좁은 범위(TestRun 연결)는
    위 FA/CAPA 항목에서 구현됨 — 이 항목은 Gate 자체와의 전체 연계가 남음.
-6. **관리도(Control chart)** — AN-03의 Cp/Cpk까지만 구현, 시계열 관리도 없음.
+6. ~~**관리도(Control chart)**~~ — **완료** (TACT P2, 이 세션): 강건 관리한계
+   (median ± 3·1.4826·MAD, 규격한계 아님), 윈도우 이탈점 산정 제외(사유
+   감사 가능), 규칙 위반 3종. AGENTS.md "TACT P2" 절 참조.
 7. **AirInput 지시서** — ~~별도 신규 과제, 미착수~~ **P1(vertical slice) 완료**
    (2026-09-14): `model_type=proximity_capacitance` (ΔC(d) 근사 + ASIC 카운트/
    임계값 판정 요약), Product/Variant A·B, 상관 검증까지. 나머지(3D 감지공간/
@@ -120,8 +128,12 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
    `git pull`, 종료 시 커밋→푸시로 짧게 동기화한다.
 2. **DB 마이그레이션**: `db/migrations/versions/` 에 alembic revision 추가.
    head가 2개가 되지 않게 — 작업 직전 `alembic heads` 로 확인.
-3. **테스트 DB**: pytest는 `alps_twin_test` 를 truncate한다. 개발 DB
-   `alps_twin` 을 향하지 않게 conftest를 건드리지 말 것.
+3. **테스트 DB**: pytest는 `{POSTGRES_APP_DB}_test` 를 drop/create한다.
+   개발 DB `alps_twin` 을 향하지 않게 conftest를 건드리지 말 것. **병렬
+   세션이 같은 테스트 DB를 쓰면 스키마가 섞여 drop_all이 실패한다** —
+   이 세션은 `POSTGRES_APP_DB=alps_twin_pm pytest` 로
+   `alps_twin_pm_test` 에 격리해서 돌린다(사례: fa-capa 세션의 capas FK가
+   `alps_twin_test` 의 drop을 막음).
 4. **시드 재실행**: `scripts/seed_golden_dataset.py` 는 멱등(fixed
    Idempotency-Key). 재실행해도 중복 없이 append만. 단, **API가 최신 코드로
    떠 있어야 한다** (구버전 API + 신규 Read 스키마 = 500, 아래 §8 참조).

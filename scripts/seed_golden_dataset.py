@@ -1562,6 +1562,114 @@ def _capa_step(resp: httpx.Response, label: str, fallback_status: str) -> str:
     return resp.json()["status"]
 
 
+def seed_process_monitoring(
+    client: httpx.Client,
+    test_client: httpx.Client,
+    variant_ids: dict[str, str],
+) -> None:
+    """AN-03 관리도용 시계열 보강: VAR-TACT-A에 정상 Lot 6개(LOT-TACT-A-05..10)
+    를 추가한다 — 모두 윈도우 내(0.07–0.13) 값으로, 관리도 한계 산정 기준을
+    채우고 LOT-04의 0.145(윈도우 이탈)가 유일한 이탈점으로 보이는 안정 공정
+    데모를 만든다. Append-only: 고정 idem 키라 재실행 무해."""
+    variant_a = variant_ids.get("VAR-TACT-A")
+    if not variant_a:
+        print("WARNING: VAR-TACT-A missing — process monitoring seed skipped", file=sys.stderr)
+        return
+
+    mold = client.get("/api/v1/molds").json()[0]  # MOLD-TACT-01 from seed_process_twin
+    # cavities have no list endpoint — re-POST with the seed_process_twin idem
+    # keys; idempotent_write returns the existing rows.
+    cavities = {}
+    for bid, no, label in (("CAV-TACT-01", 1, "Cavity 1"), ("CAV-TACT-02", 2, "Cavity 2")):
+        cavities[bid] = post(
+            client,
+            f"/api/v1/molds/{mold['id']}/cavities",
+            idem_key=f"seed-{bid}",
+            body={"business_id": bid, "cavity_no": no, "label": label},
+        )["id"]
+    ops = {o["business_id"]: o["id"] for o in client.get("/api/v1/process-operations").json()}
+    plan = client.get(f"/api/v1/variants/{variant_a}/test-plans").json()
+    test_plan_id = plan[0]["id"] if plan else None
+
+    # (lot, cavity, material, dome_thickness, peak_mN, produced_at, op10_started_at)
+    lot_specs = [
+        ("LOT-TACT-A-05", "CAV-TACT-01", "MAT-SUS304-0912", 0.105, 328.0, "2026-09-09T09:00:00Z", "2026-09-09T09:05:00Z"),
+        ("LOT-TACT-A-06", "CAV-TACT-02", "MAT-SUS304-0912", 0.095, 322.0, "2026-09-09T13:00:00Z", "2026-09-09T13:05:00Z"),
+        ("LOT-TACT-A-07", "CAV-TACT-01", "MAT-SUS304-0916", 0.115, 335.0, "2026-09-10T09:00:00Z", "2026-09-10T09:05:00Z"),
+        ("LOT-TACT-A-08", "CAV-TACT-02", "MAT-SUS304-0916", 0.100, 326.0, "2026-09-10T13:00:00Z", "2026-09-10T13:05:00Z"),
+        ("LOT-TACT-A-09", "CAV-TACT-01", "MAT-SUS304-0916", 0.095, 319.0, "2026-09-11T09:00:00Z", "2026-09-11T09:05:00Z"),
+        ("LOT-TACT-A-10", "CAV-TACT-02", "MAT-SUS304-0912", 0.105, 324.0, "2026-09-11T13:00:00Z", "2026-09-11T13:05:00Z"),
+    ]
+    for lot_bid, cav_bid, material, dome, peak, produced_at, started_at in lot_specs:
+        lot = post(
+            client,
+            "/api/v1/lots",
+            idem_key=f"seed-{lot_bid}",
+            body={
+                "business_id": lot_bid,
+                "variant_id": variant_a,
+                "mold_id": mold["id"],
+                "cavity_id": cavities[cav_bid],
+                "material_lot_id": material,
+                "work_order_id": "WO-TACT-2609",
+                "produced_at": produced_at,
+                "quantity": 5000,
+                "disposition": "ok",
+                "notes": "데모 합성 Lot — 관리도 시계열 보강 (source: synthetic)",
+            },
+        )
+        actuals = {
+            "10": {"dome_thickness_mm": dome},
+            "20": {"plunger_diameter_mm": 2.60},
+            "30": {"assembly_height_mm": 2.95},
+        }
+        setpoints = {
+            "10": {"dome_thickness_mm": 0.10},
+            "20": {"plunger_diameter_mm": 2.60},
+            "30": {"assembly_height_mm": 2.95},
+        }
+        for seq in ("10", "20", "30"):
+            post(
+                client,
+                "/api/v1/process-runs",
+                idem_key=f"seed-{lot_bid}-PR-{seq}",
+                body={
+                    "business_id": f"{lot_bid}-PR-{seq}",
+                    "lot_id": lot["id"],
+                    "operation_id": ops[f"OP-TACT-{seq}"],
+                    "setpoint": setpoints[seq],
+                    "actual": actuals[seq],
+                    "started_at": started_at,
+                    "operator": "cell-3",
+                },
+            )
+        if test_plan_id:
+            tr = post(
+                test_client,
+                "/api/v1/test-runs",
+                idem_key=f"seed-{lot_bid}-TR-01",
+                body={
+                    "business_id": f"{lot_bid}-TR-01",
+                    "test_plan_id": test_plan_id,
+                    "lot_id": lot["id"],
+                    "executed_at": produced_at.replace("T09", "T11").replace("T13", "T15"),
+                    "equipment_id": "FS-TESTER-01",
+                },
+            )
+            upload_csv_measurements(
+                test_client,
+                test_run_id=tr["id"],
+                csv_bytes=_fs_curve_csv(peak),
+                filename=f"{lot_bid}-fs.csv",
+                x_unit="mm",
+                y_unit="mN",
+            )
+    print(
+        "process-monitoring: lots=6 added (LOT-TACT-A-05..10, all in-window) "
+        "— control-chart basis n=9 with LOT-04 as the lone excluded outlier"
+    )
+
+
 def main() -> None:
     token = get_token("demo.architect", "demo1234")
     test_token = get_token("demo.mech_engineer", "demo1234")
@@ -1591,6 +1699,7 @@ def main() -> None:
             # 권장 대상: TACT Switch 제품군 1개).
             if product_spec["business_id"] == "PROD-TACT-SWITCH":
                 seed_process_twin(client, test_client, variant_ids)
+                seed_process_monitoring(client, test_client, variant_ids)
 
         # AirInput vertical slice: 4th product family, mech-model→correlation
         # only (see seed_airinput_product for the scope-cut rationale).
