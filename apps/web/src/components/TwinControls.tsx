@@ -13,10 +13,14 @@ export function TwinControls() {
   const vibration = useTwinStore((s) => s.vibration);
   const cycles = useTwinStore((s) => s.cycles);
   const bodyOpacity = useTwinStore((s) => s.bodyOpacity);
+  const explodeAmount = useTwinStore((s) => s.explodeAmount);
+  const explodePlaying = useTwinStore((s) => s.explodePlaying);
   const setActuated = useTwinStore((s) => s.setActuated);
   const setVibration = useTwinStore((s) => s.setVibration);
   const setCycles = useTwinStore((s) => s.setCycles);
   const setBodyOpacity = useTwinStore((s) => s.setBodyOpacity);
+  const setExplodeAmount = useTwinStore((s) => s.setExplodeAmount);
+  const setExplodePlaying = useTwinStore((s) => s.setExplodePlaying);
 
   const hotspots = rankedStress(Object.keys(CYCLES_TO_SATURATION), cycles, vibration).slice(0, 5);
 
@@ -85,6 +89,34 @@ export function TwinControls() {
           style={{ accentColor: "#f97316" }}
         />
       </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span style={{ opacity: 0.8 }}>
+          {t("twin.explode")}: {Math.round(explodeAmount * 100)}%
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.02}
+          value={explodeAmount}
+          disabled={explodePlaying}
+          onChange={(e) => setExplodeAmount(Number(e.target.value))}
+          style={{ accentColor: "#f97316" }}
+        />
+      </label>
+      <button
+        style={buttonStyle(explodePlaying)}
+        onClick={() => {
+          setExplodePlaying(!explodePlaying);
+          // While playing, TwinAnimator drives the exploded amount itself
+          // off wall-clock time, ignoring this slider entirely. Reset it to
+          // fully assembled on both transitions so it never shows a stale
+          // mid-cycle value once manual control resumes.
+          setExplodeAmount(0);
+        }}
+      >
+        {explodePlaying ? t("twin.explodeStop") : t("twin.explodePlay")}
+      </button>
       {vibration && (
         <div style={{ color: "#fbbf24", fontSize: 11 }}>
           {t("twin.vibrationAccumulating")}
@@ -131,6 +163,8 @@ export function TwinControls() {
             setActuated(false);
             setVibration(false);
             setCycles(0);
+            setExplodePlaying(false);
+            setExplodeAmount(0);
           }}
         >
           {t("twin.reset")}

@@ -15,6 +15,14 @@ interface TwinStore {
   // preference, not twin state, so it deliberately survives a variant
   // switch instead of resetting with the rest of the block below.
   bodyOpacity: number;
+  // Exploded-view: 0 = assembled, 1 = fully separated. Manual scrub value
+  // (used whenever explodePlaying is false); the animated play/reassemble
+  // loop itself runs off a local ref inside TwinAnimator, not through the
+  // store, to avoid a React re-render every frame. Unlike bodyOpacity this
+  // DOES reset on variant switch — a mid-explosion view carried over to a
+  // newly-loaded product reads as broken, not as a kept preference.
+  explodeAmount: number;
+  explodePlaying: boolean;
   setVariantId: (id: string) => void;
   setSelectedComponentId: (id: string | null) => void;
   setSelectedRequirementId: (id: string | null) => void;
@@ -22,6 +30,8 @@ interface TwinStore {
   setVibration: (on: boolean) => void;
   setCycles: (n: number) => void;
   setBodyOpacity: (v: number) => void;
+  setExplodeAmount: (v: number) => void;
+  setExplodePlaying: (on: boolean) => void;
 }
 
 // Cross-panel sync per §6.2: selecting a part in any panel highlights it in
@@ -34,6 +44,8 @@ export const useTwinStore = create<TwinStore>((set) => ({
   vibration: false,
   cycles: 0,
   bodyOpacity: 1,
+  explodeAmount: 0,
+  explodePlaying: false,
   // Switching variant swaps in a different physical product — its twin state
   // (a pressed switch, accumulated cycles) must not leak into the new one.
   setVariantId: (id) =>
@@ -44,6 +56,8 @@ export const useTwinStore = create<TwinStore>((set) => ({
       actuated: false,
       vibration: false,
       cycles: 0,
+      explodeAmount: 0,
+      explodePlaying: false,
     }),
   setSelectedComponentId: (id) => set({ selectedComponentId: id }),
   setSelectedRequirementId: (id) => set({ selectedRequirementId: id }),
@@ -51,6 +65,8 @@ export const useTwinStore = create<TwinStore>((set) => ({
   setVibration: (on) => set({ vibration: on }),
   setCycles: (n) => set({ cycles: n }),
   setBodyOpacity: (v) => set({ bodyOpacity: v }),
+  setExplodeAmount: (v) => set({ explodeAmount: v }),
+  setExplodePlaying: (on) => set({ explodePlaying: on }),
 }));
 
 // Bench-local DUT state (encoder rotation). Lives here rather than in

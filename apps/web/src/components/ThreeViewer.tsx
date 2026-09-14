@@ -28,6 +28,15 @@ function partKindOf(name: string): string | null {
   if (n.includes("housing") || n.includes("frame")) return "housing";
   if (n.includes("base") || n.includes("substrate") || n.includes("die") || n.includes("lid") || n.includes("port"))
     return "package";
+  // AirInput module — internal mechanism kinds, deliberately NOT in
+  // BODY_KINDS: the "case" a user X-rays or explodes parts out of is the
+  // housing shell alone, not the whole PCB assembly riding inside it.
+  if (n.includes("pcb")) return "pcb";
+  if (n.includes("electrode")) return "electrode";
+  if (n.includes("asic")) return "asic";
+  if (n.includes("resistor") || n.includes("capacitor")) return "passive";
+  if (n.includes("connector")) return "connector";
+  if (n.includes("lens")) return "lens";
   return null;
 }
 
@@ -193,23 +202,53 @@ function AssemblyModel({ scene }: { scene: Group }) {
 // the TwinControls overlay (outside the Canvas) and mesh clicks both drive it.
 const PLUNGER_TRAVEL_MM = 0.25;
 const DOME_TRAVEL_MM = 0.12;
+// Radial spread multiplier for the exploded view: explodeDir is each part's
+// RAW (unnormalized) offset from the assembly's bbox center, so a part
+// already near the edge of the assembly moves further than one buried near
+// the middle — this factor just scales that natural spread up to a clearly
+// visible separation without needing a per-product tuned distance.
+const EXPLODE_FACTOR = 2.2;
+// Full assemble → explode → reassemble cycle when playing, seconds. Smooth
+// sinusoidal easing (not a linear triangle wave) so the direction reversal
+// at each end doesn't read as a jolt.
+const EXPLODE_PERIOD_S = 6;
+
 function TwinAnimator({ scenes }: { scenes: Group[] }) {
   const actuated = useTwinStore((s) => s.actuated);
   const vibration = useTwinStore((s) => s.vibration);
   const cycles = useTwinStore((s) => s.cycles);
+  const explodeAmount = useTwinStore((s) => s.explodeAmount);
+  const explodePlaying = useTwinStore((s) => s.explodePlaying);
   const actRef = useRef(0);
 
   const parts = useMemo(() => {
-    const map: { mesh: Mesh; kind: string; baseZ: number; baseColor: THREE.Color }[] = [];
+    const map: {
+      mesh: Mesh;
+      kind: string;
+      basePosition: THREE.Vector3;
+      explodeDir: THREE.Vector3;
+      baseColor: THREE.Color;
+    }[] = [];
     for (const scene of scenes) {
+      // BODY_KINDS parts (the housing/package shell) are the exploded
+      // view's fixed reference frame — real exploded diagrams keep the
+      // enclosure in place and fly the internals out around it, and it
+      // pairs naturally with the body-opacity X-ray control right above.
+      const assemblyCenter = new THREE.Box3().setFromObject(scene).getCenter(new THREE.Vector3());
       scene.traverse((obj) => {
         const mesh = obj as Mesh;
-        if (!mesh.isMesh || !mesh.userData.partKind) return;
+        if (!mesh.isMesh) return;
+        const kind = (mesh.userData.partKind as string | undefined) ?? "";
         const material = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial;
+        const meshCenter = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
+        const explodeDir = BODY_KINDS.has(kind)
+          ? new THREE.Vector3()
+          : meshCenter.sub(assemblyCenter).multiplyScalar(EXPLODE_FACTOR);
         map.push({
           mesh,
-          kind: mesh.userData.partKind as string,
-          baseZ: mesh.position.z,
+          kind,
+          basePosition: mesh.position.clone(),
+          explodeDir,
           baseColor: material.color.clone(),
         });
       });
@@ -228,6 +267,15 @@ function TwinAnimator({ scenes }: { scenes: Group[] }) {
     const act = actRef.current;
 
     const t = performance.now() / 1000;
+    // The play loop drives its own phase off wall-clock time rather than a
+    // React state value — round-tripping an animated number through Zustand
+    // every frame would re-render the whole panel tree 60x/sec for no
+    // reason. The manual slider (store.explodeAmount) only takes over when
+    // not playing.
+    const ex = explodePlaying
+      ? (Math.sin((t * 2 * Math.PI) / EXPLODE_PERIOD_S - Math.PI / 2) + 1) / 2
+      : explodeAmount;
+
     for (const scene of scenes) {
       if (vibration) {
         // STEP frame inside the rotated group: x/y are horizontal, z is up.
@@ -245,11 +293,17 @@ function TwinAnimator({ scenes }: { scenes: Group[] }) {
     // immutability rule targets React state, not three.js objects.
     // oxlint-disable react/immutability
     for (const part of parts) {
+      let z = part.basePosition.z + part.explodeDir.z * ex;
       if (part.kind === "plunger" || part.kind === "epoxy") {
-        part.mesh.position.z = part.baseZ - PLUNGER_TRAVEL_MM * act;
+        z = part.basePosition.z - PLUNGER_TRAVEL_MM * act + part.explodeDir.z * ex;
       } else if (part.kind === "dome") {
-        part.mesh.position.z = part.baseZ - DOME_TRAVEL_MM * act;
+        z = part.basePosition.z - DOME_TRAVEL_MM * act + part.explodeDir.z * ex;
       }
+      part.mesh.position.set(
+        part.basePosition.x + part.explodeDir.x * ex,
+        part.basePosition.y + part.explodeDir.y * ex,
+        z
+      );
       const stress = stressOf(part.kind, cycles, vibration);
       const material = (Array.isArray(part.mesh.material) ? part.mesh.material[0] : part.mesh.material) as THREE.MeshStandardMaterial;
       if (stress > 0.001) {

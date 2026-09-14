@@ -1259,6 +1259,60 @@ just TACT.
   `generate_sample_step.py`/`convert.py` invocation against a scratch STEP
   file in `/tmp/alps-s04-fix-test`.
 
+## Stale STEP fixtures + exploded-view assembly simulation (DONE, quantitatively + offline-render verified)
+
+Two things, found and built together off one live user report ("case still
+looks transparent" after the S04/AirInput winding fix was already merged):
+
+- **Root cause of the still-live transparency**: two separate gaps, not one.
+  (1) `scripts/fixtures/tact_switch_asm.step` was never regenerated after
+  the S04 session's `generate_sample_step.py` fixes (fillets, terminal
+  redesign) — those fixes only ever ran against a scratch test file, so the
+  checked-in fixture the seed script actually uploads was still the
+  original 98 KB file from the initial commit. Regenerated it (138 KB).
+  (2) Even with `convert.py`'s winding fix merged and the worker restarted,
+  TACT/Encoder/MEMS's CAD conversions still came out unfixed live, because
+  their `RUN-CAD-02` Idempotency-Key had already been consumed by an
+  earlier reseed *in this same session*, before the fix landed —
+  `idempotent_write` silently replayed the cached pre-fix response instead
+  of re-running (the exact "idempotency cache can silently regress data"
+  gotcha already documented from the Phase 2 reseed, just not front-of-mind
+  for an in-session re-run). Fixed with a full DB truncate+reseed after the
+  fixture swap. Re-verified via the artifact content API + trimesh for all
+  4 products this time (not just the two touched that session): every part,
+  every product, `is_winding_consistent=True` and positive volume.
+- **Exploded-view assembly simulation** (`ThreeViewer.tsx`): a manual 0–100%
+  slider (`store.explodeAmount`) plus a play/stop button that runs a smooth
+  6-second assemble→explode→reassemble loop
+  (`(sin(t·2π/6 − π/2)+1)/2`, not a linear triangle wave — avoids a jolt at
+  each direction reversal). BODY_KINDS parts (the housing/package shell)
+  are the fixed reference frame — real exploded diagrams keep the enclosure
+  in place and fly the internals out around it, and it pairs with the
+  body-opacity X-ray control right above it in the panel. Per-part offset
+  direction is that part's own bbox center minus the whole assembly's bbox
+  center, LEFT UNNORMALIZED and scaled by a single constant
+  (`EXPLODE_FACTOR=2.2`) — parts already near the assembly's edge move
+  further than ones buried near the middle "for free", so one constant
+  works across every product's very different physical scale (TACT ~9 mm,
+  AirInput ~34 mm) without per-product tuning. Playing drives its own phase
+  off wall-clock time in a ref inside `TwinAnimator`, not through Zustand —
+  round-tripping an animated number through the store every frame would
+  re-render the whole control panel 60×/sec for nothing (same reason the
+  existing actuation-press easing (`actRef`) was already ref-local, not
+  store state). `partKindOf()` gained AirInput's new kinds (pcb/electrode/
+  asic/passive/connector/lens) — deliberately NOT added to `BODY_KINDS`,
+  since the "case" a user X-rays or explodes parts out of is the housing
+  shell alone, not the whole PCB assembly riding inside it.
+- Verified: `tsc -b`/`vite build`/`oxlint` clean; explode-offset math
+  (assembly-bbox-center / per-part-bbox-center / BODY_KINDS exclusion)
+  cross-checked offline in Python against the live GLBs for TACT and
+  AirInput — housing offset exactly 0, other parts scale sensibly with
+  their distance from center (TACT: 0.2–0.5 mm for near-center dome/
+  contact up to 6.6 mm for the base-edge terminals; AirInput: 2.7 mm for
+  the near-center PCB/electrode up to ~20–30 mm for the far ASIC/passive/
+  connector cluster). No live-browser pass yet — same caveat as the S04 and
+  AirInput sections above.
+
 ## Known gaps / deliberately deferred
 
 - **Read endpoints have no auth.** There is no router-level/global auth
