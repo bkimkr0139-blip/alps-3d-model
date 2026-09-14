@@ -946,13 +946,53 @@ electrode (160 vs 100 mm²) but a thicker/lower-permittivity cover (1.2 mm /
 k=3.2 vs 1.0 mm / k=4.0) — a deliberate trade-off so neither variant
 strictly dominates, matching §VF-04's "no single variant always wins" point.
 
-**Deliberately NOT built, and why**:
-- **No CAD/STEP assembly, no SPICE run, no Model Canvas/UQ config** for this
-  product — `seed_variant()`/`_FAMILIES` assume all three, and building a
-  new 3D assembly or a SPICE netlist for an ASIC excitation circuit that's
-  explicitly modeled only as a summary-metric behavioral stand-in (not a
-  circuit netlist) would be exactly the scope creep the task and HANDOFF.md
-  §7 warn against. This is why AirInput is NOT in the `PRODUCTS` list.
+**CAD/STEP assembly added later (2026-09-14), scope still cut at SPICE/Model
+Canvas/UQ**: `generate_airinput_step.py` builds a genuinely per-variant 8-part
+puck-style module — AirInput Housing (fillet on the vertical edges, same
+`_fillet_edges`/`.Build()` helper as `generate_sample_step.py`), Capacitive
+Electrode PCB (FR4), an electrode (Variant A: solid center pad, Variant B:
+split-ring guard electrode with a radial notch — a closed conductive loop
+near a sense electrode acts as a shorted turn, so a real guard ring is always
+cut once; this is a genuine topology difference, not just a bigger disc),
+Capacitive Sensing ASIC (QFN), a filter resistor + decoupling capacitor
+(0603), an FPC connector, and a Cover Lens sized/thicknessed per variant. All
+match `AIRINPUT_VARIANTS`' `electrode_area_mm2`/`cover_thickness_mm` exactly
+(100 mm²/1.0 mm vs. 160 mm²/1.2 mm) — this is real geometry, not
+illustrative-only metadata, which is also why (unlike the other three
+products) each variant gets its OWN STEP fixture instead of sharing one.
+Wired into `seed_airinput_variant()` with the same upload/convert/link
+pattern as `seed_variant()`, inlined rather than shared since the per-variant
+fixture breaks that helper's one-fixture-per-product assumption. New
+`convert.py` MATERIAL_BY_KEYWORD entries: `pcb` (checked before `electrode`
+— the PCB's Component-matching name "Capacitive Electrode PCB" contains
+both substrings, and list order, not name substring position, decides the
+match), `electrode`, `asic`, `resistor`, `capacitor`, `connector`, `lens`
+(translucent BLEND, same single-sided near-opaque treatment as `epoxy` to
+avoid three.js depth-sort ghosting). Building this surfaced a real,
+general bug in `_tessellate_to_trimesh` (present since M2, affecting every
+product): it never checked `TopoDS_Face.Orientation()`, so any REVERSED face
+— including, it turns out, 3 of a **plain, non-boolean** `BRepPrimAPI_MakeBox`'s
+6 faces, not just post-boolean faces as first diagnosed during the S04 TACT
+work — kept backwards winding. The PCB/Lens boxes here had it worst: their
+thinness meant the wrong-and-right-facing faces' volume contributions nearly
+cancelled (reported volume ≈0.000, not just negative) — the clearest signal
+yet that this is a shared, general fix, not a TACT-specific one. Every part
+verified by volume-sign/`is_winding_consistent` plus a full pairwise
+bounding-box overlap check across both variants (zero unexpected overlaps —
+same TACT-terminal-interpenetration lesson applied up front this time: PCB/
+lens/electrode/connector footprints all hand-checked against housing inner-
+cavity and each other's bounds before generating). No live-browser pass yet
+— see the S04 fixes section for the same caveat and the reasoning for
+relying on quantitative + synthetic-render verification instead.
+
+**Deliberately still NOT built, and why**:
+- **No SPICE run, no Model Canvas/UQ config** for this product —
+  `seed_variant()`/`_FAMILIES` assume all three, and a SPICE netlist for an
+  ASIC excitation circuit that's explicitly modeled only as a summary-metric
+  behavioral stand-in (not a circuit netlist) would be exactly the scope
+  creep the task and HANDOFF.md §7 warn against. This is why AirInput is
+  still NOT in the `PRODUCTS` list (CAD alone wasn't enough to fold it in —
+  `seed_variant()` also assumes a SPICE run for every product).
 - **No Gate for AirInput variants**: `app/gate_readiness.py`'s
   `spice_analysis_succeeded` check is unconditional per variant (not
   model-type-aware) — without a SPICE run, `POST /gates/{id}/submit` 412s.

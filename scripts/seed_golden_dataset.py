@@ -1016,8 +1016,11 @@ AIRINPUT_COMPONENTS = [
 ]
 
 # Electrode Layout A/B = the spec's two geometry variants (§1.2), expressed
-# as electrode_area_mm2/cover parameters on the proximity_capacitance model
-# — no CAD/STEP assembly behind them for this vertical slice.
+# as electrode_area_mm2/cover parameters on the proximity_capacitance model.
+# step_fixture is genuinely per-variant (unlike the other three products,
+# which share one fixture between A/B) — see generate_airinput_step.py: the
+# electrode shape (solid pad vs. split-ring) and cover-lens thickness are
+# real geometric differences, not just simulation parameters.
 AIRINPUT_VARIANTS = [
     {
         "business_id": "VAR-AIR-A",
@@ -1030,6 +1033,7 @@ AIRINPUT_VARIANTS = [
             "is_glove": False,
         },
         "measured_fixture": "variant_a_proximity_measured.csv",
+        "step_fixture": "airinput_sensor_a.step",
     },
     {
         "business_id": "VAR-AIR-B",
@@ -1042,6 +1046,7 @@ AIRINPUT_VARIANTS = [
             "is_glove": False,
         },
         "measured_fixture": "variant_b_proximity_measured.csv",
+        "step_fixture": "airinput_sensor_b.step",
     },
 ]
 
@@ -1100,6 +1105,42 @@ def seed_airinput_variant(
                     "target_type": "component",
                     "target_id": comp_id,
                 },
+            )
+
+    # CAD: same upload/convert/link pattern as seed_variant() for the other
+    # three products. Unlike them, the STEP fixture genuinely differs per
+    # variant (see AIRINPUT_VARIANTS/generate_airinput_step.py), so this
+    # can't reuse seed_variant() as-is — it's inlined here instead.
+    step_bytes = (FIXTURES_DIR / spec["step_fixture"]).read_bytes()
+    step_version_id = upload_and_promote(
+        client,
+        business_id=f"{variant_business_id}-CAD-ASM",
+        kind="step",
+        filename=spec["step_fixture"],
+        content=step_bytes,
+    )
+    cad_run = run_simulation_and_wait(
+        client,
+        business_id=f"{variant_business_id}-RUN-CAD-01",
+        variant_id=variant_id,
+        run_type="cad_convert",
+        input_artifact_version_id=step_version_id,
+        timeout_s=120.0,
+    )
+    if cad_run["status"] != "succeeded":
+        print(f"WARNING: {variant_business_id} CAD conversion failed: {cad_run.get('error_message')}", file=sys.stderr)
+    all_runs = client.get(f"/api/v1/variants/{variant_id}/simulation-runs").json()
+    cad_succeeded = [
+        r
+        for r in all_runs
+        if r["run_type"] == "cad_convert" and r["status"] == "succeeded" and r.get("output_artifact_version_id")
+    ]
+    link_run = max(cad_succeeded, key=lambda r: r["created_at"]) if cad_succeeded else None
+    if link_run is not None:
+        for comp_id in comp_ids:
+            client.patch(
+                f"/api/v1/components/{comp_id}/link-artifact",
+                json={"artifact_version_id": link_run["output_artifact_version_id"]},
             )
 
     # Bare-finger prediction (FR-05 analytical model), correlated against a
@@ -1189,7 +1230,7 @@ def seed_airinput_variant(
     )
     print(
         f"{variant_business_id}: variant={variant_id} baseline={baseline['id']} "
-        f"mech_bare={bare_run['status']} mech_glove={glove_run['status']} "
+        f"cad={cad_run['status']} mech_bare={bare_run['status']} mech_glove={glove_run['status']} "
         f"correlation=({corr_summary}) gate=not_submitted(no SPICE run — see AGENTS.md)"
     )
     return variant_id

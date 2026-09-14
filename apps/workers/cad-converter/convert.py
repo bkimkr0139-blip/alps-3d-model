@@ -27,7 +27,7 @@ from OCP.collections import Sequence_TDF_Label
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
 from OCP.TDocStd import TDocStd_Document
-from OCP.TopAbs import TopAbs_FACE
+from OCP.TopAbs import TopAbs_FACE, TopAbs_REVERSED
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS
@@ -73,6 +73,27 @@ MATERIAL_BY_KEYWORD: list[tuple[str, PBRMaterial]] = [
     # sided + near-opaque keeps the epoxy look without the ghosting.
     ("epoxy", PBRMaterial(name="epoxy_seal", baseColorFactor=[0.9, 0.92, 0.95, 0.85],
                           metallicFactor=0.0, roughnessFactor=0.25, alphaMode="BLEND")),
+    # AirInput module. "pcb" must be checked before "electrode": the PCB
+    # part's Component-matching name is "Capacitive Electrode PCB", which
+    # contains both substrings — list order (not name substring position)
+    # decides which keyword wins, so "pcb" has to come first or the whole
+    # board would render as bare copper instead of an FR4 substrate.
+    ("pcb", PBRMaterial(name="fr4_green_pcb", baseColorFactor=[0.05, 0.12, 0.08, 1.0],
+                        metallicFactor=0.0, roughnessFactor=0.6)),
+    ("electrode", PBRMaterial(name="copper_electrode", baseColorFactor=[0.80, 0.50, 0.30, 1.0],
+                              metallicFactor=1.0, roughnessFactor=0.35)),
+    ("asic", PBRMaterial(name="mold_compound_black", baseColorFactor=[0.08, 0.08, 0.09, 1.0],
+                         metallicFactor=0.0, roughnessFactor=0.4)),
+    ("resistor", PBRMaterial(name="chip_resistor", baseColorFactor=[0.1, 0.1, 0.11, 1.0],
+                             metallicFactor=0.2, roughnessFactor=0.5)),
+    ("capacitor", PBRMaterial(name="mlcc_ceramic", baseColorFactor=[0.72, 0.62, 0.45, 1.0],
+                              metallicFactor=0.0, roughnessFactor=0.45)),
+    ("connector", PBRMaterial(name="connector_nylon", baseColorFactor=[0.88, 0.87, 0.85, 1.0],
+                              metallicFactor=0.0, roughnessFactor=0.4)),
+    # Same single-sided near-opaque BLEND treatment as "epoxy" above, for the
+    # same reason (avoid three.js depth-sort ghosting on a translucent cap).
+    ("lens", PBRMaterial(name="pc_lens", baseColorFactor=[0.85, 0.9, 0.95, 0.8],
+                         metallicFactor=0.0, roughnessFactor=0.15, alphaMode="BLEND")),
     ("housing", PBRMaterial(name="lcp_black", baseColorFactor=[0.04, 0.04, 0.045, 1.0],
                             metallicFactor=0.0, roughnessFactor=0.55)),
     ("base", PBRMaterial(name="pbt_black", baseColorFactor=[0.06, 0.06, 0.065, 1.0],
@@ -177,11 +198,25 @@ def _tessellate_to_trimesh(shape) -> trimesh.Trimesh:
                 pnt = triangulation.Node(i).Transformed(transform)
                 verts[i - 1] = (pnt.X(), pnt.Y(), pnt.Z())
 
+            # Poly_Triangulation stores raw indices without regard to the
+            # face's TopAbs_Orientation. A face made REVERSED by a boolean
+            # Cut/Fuse (or, as it turns out, just one of a plain
+            # BRepPrimAPI_MakeBox's own six faces — box primitives are not
+            # uniformly FORWARD) keeps the underlying surface's natural
+            # winding, which is backwards relative to the solid's outward
+            # normal. Left uncorrected, three.js's default backface culling
+            # makes that triangle invisible from outside — at some rotation
+            # angles the camera ray grazes straight through it, reading as
+            # "the body went see-through". Flip two indices to restore
+            # outward winding whenever the face is REVERSED.
+            reversed_face = face.Orientation() == TopAbs_REVERSED
             n_tris = triangulation.NbTriangles()
             faces = np.empty((n_tris, 3), dtype=np.int64)
             for i in range(1, n_tris + 1):
                 tri = triangulation.Triangle(i)
                 a, b, c = tri.Get()
+                if reversed_face:
+                    a, b = b, a
                 faces[i - 1] = (a - 1 + vertex_offset, b - 1 + vertex_offset, c - 1 + vertex_offset)
 
             all_vertices.append(verts)
