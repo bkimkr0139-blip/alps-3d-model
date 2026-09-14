@@ -2,9 +2,66 @@
 
 > **이 문서의 목적**: 이 저장소에서 개발 세션(사람 또는 Claude)이 맥락 없이
 > 병렬로 작업을 이어받을 수 있도록 현재 상태·실행 방법·규칙·남은 작업을 한
-> 문서에 정리한다. 최종 갱신: 2026-09-14 (M9 + TACT P1 + FA/CAPA + AN-04 +
-> AirInput P1 병렬 작업 3건 main 병합 완료 시점 — 브라우저 CLEAN 재검증은
-> 병합 직후 중앙에서 진행 예정, 아래 §3 검증 루틴 참고).
+> 문서에 정리한다. 최종 갱신: 2026-09-14 저녁 (S04 뷰어 수정 + AirInput 3D
+> CAD 모델 + 분해도 시뮬레이션 완료 시점 — **브라우저 라이브 검증 미완료,
+> 아래 §0 핸드오프 상태 먼저 읽을 것**).
+
+## 0. 지금 세션 핸드오프 상태 (2026-09-14 저녁, 다음 세션이 먼저 읽을 것)
+
+**로컬 `main`에 9개 커밋 있음, origin에 미push** — 사용자가 직접
+`cd /Users/wizbase/works/alps && git push` 실행해야 함 (Claude Code
+auto-mode classifier가 main push를 계속 차단, 매번 사용자가 직접 실행).
+로그: `git log --oneline origin/main..HEAD`.
+
+이번 세션에 한 일 (전부 로컬 `main`에 병합·라이브 스택에 반영됨, DB
+재시드까지 완료 — 단 **브라우저로 직접 본 적은 한 번도 없음**, 전부
+OCCT 볼륨/와인딩 수치 검증 + matplotlib 오프라인 렌더로만 확인):
+
+1. **S04 뷰어 수정** (branch `fix/s04-viewer-issues`, 병합됨): 기본 카메라
+   각도(버튼이 옆면 슬리버로만 보이던 문제), 회전 시 바디가 투명해지는
+   버그(OCCT `TopAbs_REVERSED` 면 와인딩 미보정 — **모든 제품이 공유하는
+   `convert.py`의 버그**), 바디 투명도 X-ray 슬라이더 신규 추가. 상세:
+   AGENTS.md "S04 viewer fixes" 절.
+2. **누락된 alembic 병합 리비전 복구**: `a9f9769ac53e`가 스크래치
+   워크트리에만 존재하고 실제 커밋된 적이 없어서 head가 2개였음 — 복구·
+   커밋·적용 완료.
+3. **AN-04 시드 데이터 버그 수정**: `plunger_diameter_mm`/
+   `assembly_height_mm`이 모든 랏에서 상수라 DOE 회귀분석이 항상 422 —
+   실제 랏간 편차 부여. `seed_process_twin()`의 `approver_client`
+   NameError도 발견·수정(첫 풀 리시드에서만 드러난 버그).
+4. **AirInput Proximity Sensor 3D CAD 모델 신규 제작** (branch
+   `feature/airinput-3d-model`, 병합됨): 8-part 어셈블리(하우징/PCB/전극
+   [Variant A 솔리드 패드 vs B 스플릿링]/ASIC/저항/커패시터/커넥터/커버
+   렌즈), 변형별로 진짜 다른 지오메트리(다른 3제품과 달리 fixture 공유 안
+   함). 상세: AGENTS.md "AirInput vertical slice" 절.
+5. **스테일 TACT fixture 재생성 + idempotency 캐시로 인한 재변환 누락
+   발견·수정**: `scripts/fixtures/tact_switch_asm.step`이 필렛/단자 수정
+   이후에도 재생성된 적이 없었음 + 같은 세션 내 이전 재시드가 CAD 변환의
+   Idempotency-Key를 이미 소모해서 수정 이후에도 캐시된 버그 있는 변환
+   결과가 계속 재생됨. DB 전체 truncate+재시드로 해결, 4개 제품 전부
+   API로 재검증(모든 파트 winding-consistent + 양의 volume). 상세:
+   AGENTS.md "Stale STEP fixtures + exploded-view" 절.
+6. **분해도(Exploded view) 조립 시뮬레이션 신규 구현**: 0~100% 슬라이더 +
+   재생/정지 버튼(6초 주기 조립↔분해 사인파 애니메이션). 하우징/케이스는
+   고정, 나머지 부품은 조립체 중심 대비 자기 위치에 비례해 방사형으로
+   퍼짐 — 제품마다 스케일이 달라도 상수 하나로 작동.
+
+**다음 세션이 반드시 할 일**:
+- **`git push`** (사용자 직접 실행 필요, 위 참조)
+- **라이브 브라우저 검증** — 이번 세션 전체 작업(S04 카메라/투명도/X-ray
+  슬라이더, AirInput 3D 모델, 분해도 시뮬레이션)에 대해 실제 브라우저로
+  단 한 번도 확인 못 함. `/tmp/alps-browser-pass/*.mjs` 패턴으로 Playwright
+  CLEAN 패스 진행 필요.
+- **미결 질문**: Temporal에 완료 안 되고 계속 재시도만 하는 워크플로우가
+  107개 쌓여 있음(대부분 이 세션 이전부터, `mech-model.log`가 초당
+  ~20줄씩 계속 증가 중) — 정리(terminate) 여부를 사용자에게 물었지만
+  아직 답 없음. `docker exec alps-twin-temporal-1 temporal workflow list
+  --address 172.22.0.10:7233 --namespace default --query
+  "ExecutionStatus='Running'"` 로 확인 가능(컨테이너 내부에서 주소가
+  `172.22.0.10:7233`이지 `localhost`가 아님에 주의).
+- DB 백업 2개 남겨둠(재시드 전): `/tmp/alps-logs/backups/
+  alps_twin_pre_reseed_*.sql`, `alps_twin_pre_reseed2_*.sql` — 세션 종료
+  후 임시 디렉터리라 사라질 수 있음, 필요하면 옮겨둘 것.
 
 ---
 
@@ -90,6 +147,16 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
 브라우저 패스 CLEAN. 상세: AGENTS.md "TACT P2" 절. 시드에
 `process-monitoring: lots=6 added (LOT-TACT-A-05..10)` 추가.
 
+**S04 뷰어 수정 + AirInput 3D CAD + 분해도 시뮬레이션 (2026-09-14 저녁,
+이 세션, 로컬 main만·미push — 위 §0 참조)** — 카메라 각도/회전 시 투명화
+버그(전 제품 공유 버그)/바디 X-ray 슬라이더, AirInput 8-part 3D 모델
+신규 제작(변형별 진짜 다른 지오메트리), 분해도 조립 시뮬레이션 신규
+기능, 스테일 TACT fixture + idempotency 캐시로 인한 재변환 누락 발견·
+수정. 마이그레이션 없음. pytest 105 전부 통과, tsc/vite/oxlint clean —
+**브라우저 라이브 검증은 아직 없음**. 상세: AGENTS.md "S04 viewer
+fixes", "AirInput vertical slice", "Stale STEP fixtures + exploded-view"
+절.
+
 ## 5. TACT 지시서 남은 작업 (병렬 작업 후보)
 
 §12 16주 일정 기준, P1이 "3~9주 + AI/품질의 일부"에 해당. 남은 것:
@@ -116,10 +183,12 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
    감사 가능), 규칙 위반 3종. AGENTS.md "TACT P2" 절 참조.
 7. **AirInput 지시서** — ~~별도 신규 과제, 미착수~~ **P1(vertical slice) 완료**
    (2026-09-14): `model_type=proximity_capacitance` (ΔC(d) 근사 + ASIC 카운트/
-   임계값 판정 요약), Product/Variant A·B, 상관 검증까지. 나머지(3D 감지공간/
-   Dead Zone/Trajectory Replay, ASIC/Algorithm 엔터티, Robot scan import,
-   AI01–AI12 화면, Gate)는 여전히 미구현 — AGENTS.md "AirInput vertical
-   slice" 절 참조.
+   임계값 판정 요약), Product/Variant A·B, 상관 검증까지. **3D CAD 모델도
+   같은 날 저녁 세션에 추가 완료**(8-part 어셈블리, 변형별 진짜 다른
+   지오메트리 — 위 §4 "S04 뷰어 수정 + AirInput 3D CAD" 참조). 나머지(Dead
+   Zone/Trajectory Replay, ASIC/Algorithm 엔터티, Robot scan import,
+   AI01–AI12 화면, SPICE, Gate)는 여전히 미구현 — AGENTS.md "AirInput
+   vertical slice" 절 참조.
 8. **성능·보안·복구·일본어 QA, KPI 실증** — §12 15~16주.
 
 ## 6. 병렬 작업 규칙 (반드시 준수)
