@@ -26,7 +26,7 @@ export type EdaBox = {
 export type EdaLegendEntry = { key: string; label: string; color: RGB; count: number };
 
 export type EdaScene = {
-  mode: "synthesis" | "layout" | "process";
+  mode: "synthesis" | "layout" | "process" | "package";
   boxes: EdaBox[];
   legend: EdaLegendEntry[];
   /** process mode only — ordered step keys for the build-up slider */

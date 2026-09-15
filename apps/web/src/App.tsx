@@ -11,6 +11,7 @@ import { SystemModelView } from "./components/SystemModel";
 import { ProcessTwin } from "./components/ProcessTwin";
 import { AirInputStudio } from "./components/air/AirInputStudio";
 import { EdaTraining } from "./components/eda/EdaTraining";
+import { AsicProgram } from "./components/asic/AsicProgram";
 import { RequirementsPanel } from "./components/RequirementsPanel";
 import { SimulationPanel } from "./components/SimulationPanel";
 import { SweepChart } from "./components/SweepChart";
@@ -18,7 +19,7 @@ import { TestCorrelationPanel } from "./components/TestCorrelationPanel";
 import { GatePanel } from "./components/GatePanel";
 import { AssistantPanel } from "./components/AssistantPanel";
 
-type CenterTab = "model" | "bench" | "sysmodel" | "proc" | "air" | "eda";
+type CenterTab = "model" | "bench" | "sysmodel" | "proc" | "air" | "eda" | "asic";
 
 // Per-tab color identity so the bar reads at a glance instead of needing the
 // label text parsed — same "icon (shape) + text together, never colour
@@ -34,7 +35,10 @@ const PRODUCT_TWIN_TABS: { tab: CenterTab; color: string }[] = [
   { tab: "proc", color: "#4ade80" },
   { tab: "air", color: "#22d3ee" },
 ];
-const STANDALONE_TABS: { tab: CenterTab; color: string }[] = [{ tab: "eda", color: "#f97316" }];
+const STANDALONE_TABS: { tab: CenterTab; color: string }[] = [
+  { tab: "eda", color: "#f97316" },
+  { tab: "asic", color: "#e879f9" },
+];
 
 function tabLabel(tab: CenterTab, t: (key: string) => string): string {
   switch (tab) {
@@ -50,6 +54,8 @@ function tabLabel(tab: CenterTab, t: (key: string) => string): string {
       return t("panels.air");
     case "eda":
       return t("panels.eda");
+    case "asic":
+      return t("panels.asic");
   }
 }
 
@@ -186,9 +192,10 @@ function Workbench() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedComponentId, graph]);
 
-  // EDA 교육 탭은 제품/변량 데이터와 무관한 자립 훈련 모듈이므로 좌우 사이드
-  // 패널·하단 비교/상관/게이트 프레임·어시스턴트를 접어 중앙에 전폭을 내준다.
-  const edaMode = centerTab === "eda";
+  // EDA 교육 탭과 ASIC 9단계 작업 센터는 제품/변량 데이터와 무관한 자립
+  // 모듈이므로 좌우 사이드 패널·하단 비교/상관/게이트 프레임·어시스턴트를
+  // 접어 중앙에 전폭을 내준다.
+  const edaMode = centerTab === "eda" || centerTab === "asic";
 
   return (
     <div style={{ minHeight: "100vh", background: "#020617", color: "#e2e8f0", padding: 20, fontFamily: "system-ui, sans-serif" }}>
@@ -268,8 +275,9 @@ function Workbench() {
               />
             ))}
             {/* Divider: everything left of it is a view onto the selected
-                product/variant; everything right of it (currently just EDA
-                training) is a standalone module that ignores both. */}
+                product/variant; everything right of it (EDA training + ASIC
+                9-stage work center) is a standalone module that ignores
+                both. */}
             <div style={{ width: 1, alignSelf: "stretch", background: "#334155", margin: "2px 4px" }} />
             {STANDALONE_TABS.map(({ tab, color }) => (
               <TabButton
@@ -292,6 +300,8 @@ function Workbench() {
               <AirInputStudio key={variantId ?? "none"} variantId={variantId} runs={runs} />
             ) : centerTab === "eda" ? (
               <EdaTraining />
+            ) : centerTab === "asic" ? (
+              <AsicProgram />
             ) : (
               <ProcessTwin
                 key={variantId ?? "none"}
