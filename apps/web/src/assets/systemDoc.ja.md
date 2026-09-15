@@ -107,6 +107,16 @@
 - ステージコックピット: 進行段階n/9、次ゲート、カバレッジ、良品率、R²を一目で。
 - ゲートJSONがブロッカー(`MOCK_RESULT_PRESENT`、`EVIDENCE_APPROVALS`等)と`decision_required`を誠実に出力 — **リリースは偽って押されない**。
 
+**v1.1拡張 (バックエンド連携 — 仕様書v1.1 §4/§7/§8、電流センサーASIC PoC)**
+
+- **信号チェーンリビジョン (EPIC A)**: r1→r2の昇格は修正ではなく新リビジョン生成+旧リビジョンのsupersede(不変ルール)。ブロック別エラーバジェット表とcontent_hashを②③段階に表示。
+- **Corner/MC解析 (EPIC A)**: シード固定のエラーバジェット伝搬モンテカルロ → P50/P95/P99・規格逸脱率+**実サンプル24-binヒストグラム**。試験温度が校正範囲外ならMODEL OODバッジ。同一シード=同一結果(再現性 §12)。
+- **設備実測インポート (EPIC E)**: テスターCSVの生バイトをパース前にsha256アーティファクトへ昇格。**同じファイルが2つのランになることはない**(409)。部分ファイル・時間逆転・重複ブロックはfindingsとして記録(無音修正禁止 §7)。校正期限はデータとして保存され、ゲートブロッカーになる。
+- **信頼性マトリクス+閉ループ (EPIC F・G)**: AEC-Q100はグループごとに最新行で判定。不合格行はFAケースで処分 — RCA承認は**人間専任ロールのみ**で、観察事実+確認エビデンスがなければ422。ECOはリグレッションエビデンス+検証測定ランなしで終了すると412。終了時にFAはverifiedへ移り閉ループ。
+- **機能安全トレース**: SG→FSR→TSR→HWツリー+FMEDA(分布・DC・FIT・ソースハッシュ)+故障注入(期待/観察)を⑦段階に描画。
+- **ゲートポリシー `alps-asic-v1.1`**: 新ブロッカー `CALIBRATION_EXPIRED`・`MODEL_OOD`・`MIXED_REVISION_EVIDENCE`・`QUAL_FAILURE_OPEN`・`WAIVER_EXPIRED` + 不変の`MOCK_RESULT_PRESENT`。Readiness Ladder 6段階(education_only→…→controlled_pilotまで到達可、production_candidate/releasedは未到達)。**ゲートレポートはサーバー値をそのまま描画** — UIがブロッカーを生成しない。
+- 書き込みはすべてロールゲート(インポート=試験、RCA=ASIC/品質エンジニア、ECO終了=アーキテクト/承認者)。バックエンドの韓国語デモ文字列は描画時のl10nオーバーレイでen/ja表示。
+
 ### 3.10 結果比較・相関・ゲート (下部フレーム)
 
 - **SPICE Resistance Sweep — Variant Compare (S08)**: バリアント2つ以上を同一軸・同一単位で重畳比較(§12.2)。

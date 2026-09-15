@@ -553,12 +553,16 @@ export function makeEvidence(tpl: AsicTemplate, maskRev: string, testProgRev: nu
   ];
 }
 
-// Readiness ladder (§10.3) — education mode caps at engineering_review_ready:
-// synthetic results can never become signoff_candidate or released (§0.1).
+// Readiness ladder v1.1 (지시서 §8 개편) — six rungs from education to release.
+// The backend gate report (asic_gate_policy.py) picks the rung from DATABASE
+// evidence depth; production_candidate/released stay unreachable from
+// synthetic evidence — real, attested measurements are the only way up
+// (§15: this twin never substitutes a certification body).
 export const READINESS_LEVELS = [
   { key: "education_only", reachable: true },
-  { key: "prototype_evidence", reachable: true },
-  { key: "engineering_review_ready", reachable: true },
-  { key: "signoff_candidate", reachable: false },
+  { key: "connected_nonvalidated", reachable: true },
+  { key: "validated_shadow", reachable: true },
+  { key: "controlled_pilot", reachable: true },
+  { key: "production_candidate", reachable: false },
   { key: "released", reachable: false },
 ] as const;

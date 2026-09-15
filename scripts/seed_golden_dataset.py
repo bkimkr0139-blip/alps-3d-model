@@ -1958,6 +1958,303 @@ def seed_process_monitoring(
     )
 
 
+# ── ASIC Twin v1.1 R1 (지시서 §17 PoC: 전류 센서 ASIC) ──────────────────────
+
+ASIC_CS_TEMPLATE = "current_sensor"
+
+
+def asic_post(
+    cl: httpx.Client, path: str, idem_key: str, body: dict, *, list_path: str | None = None,
+    match_bid: str | None = None,
+) -> dict:
+    """POST with a fixed Idempotency-Key. Status guards (RCA already approved,
+    ECO already analyzed/closed…) live OUTSIDE idempotent_write, so a re-run
+    gets a plain 409 instead of a cached replay — on 409 return the current
+    row fetched from list_path so the seed stays idempotent."""
+    r = cl.post(path, json=body, headers={"Idempotency-Key": idem_key})
+    if r.status_code in (200, 201):
+        return r.json()
+    if r.status_code == 409 and list_path:
+        for row in cl.get(list_path).json():
+            if row["business_id"] == match_bid:
+                return row
+        raise RuntimeError(f"409 on {path} but {match_bid} not found in {list_path}")
+    print(f"FAILED {path}: {r.status_code} {r.text}", file=sys.stderr)
+    r.raise_for_status()
+
+
+def _asic_sensor_csv(sens_by_site: dict[int, float], *, executed_hour: int = 2) -> bytes:
+    """Synthetic T2000 electrical-test CSV: sensitivity + offset per site."""
+    lines = ["name,value,unit,raw_value,raw_unit,site,temperature_c,ts"]
+    for i, (site, sens) in enumerate(sorted(sens_by_site.items())):
+        lines.append(
+            f"sensitivity,{sens:.3f},mA/A,{sens * 1000:.1f},mA,{site},25.0,"
+            f"2026-09-10T{executed_hour:02d}:0{i}:00Z"
+        )
+    lines.append(
+        f"offset_uv,{-11.2 - len(sens_by_site) * 0.1:.2f},uV,-11.2,uV,1,25.0,"
+        f"2026-09-10T{executed_hour:02d}:10:00Z"
+    )
+    return ("\n".join(lines) + "\n").encode()
+
+
+def asic_import_run(
+    temc_client: httpx.Client, *, bid: str, csv_bytes: bytes, calibration_expires_at: str,
+    executed_at: str, lot_ref: str,
+) -> dict:
+    r = temc_client.post(
+        "/api/v1/asic/measurement-runs/import",
+        files={"file": (f"{bid}.csv", csv_bytes, "text/csv")},
+        data={
+            "business_id": bid, "template_id": ASIC_CS_TEMPLATE,
+            "equipment_id": "T2000-KR-02", "equipment_type": "sem_tester",
+            "equipment_model": "Advantest T2000", "firmware": "5.1.2",
+            "calibration_expires_at": calibration_expires_at,
+            "program_revision": "TP-CS-2026-09", "operator": "demo.test_engineer",
+            "executed_at": executed_at, "lot_ref": lot_ref,
+        },
+        headers={"Idempotency-Key": f"seed-asic-{bid}"},
+    )
+    if r.status_code == 201:
+        return r.json()
+    if r.status_code == 409:  # same bytes re-seeded after an idem-record wipe
+        runs = temc_client.get(f"/api/v1/asic/templates/{ASIC_CS_TEMPLATE}/measurement-runs").json()
+        for row in runs:
+            if row["business_id"] == bid:
+                return row
+    print(f"FAILED import {bid}: {r.status_code} {r.text}", file=sys.stderr)
+    r.raise_for_status()
+
+
+def seed_asic_twin(client: httpx.Client, temc_client: httpx.Client, asic_client: httpx.Client) -> None:
+    """전류 센서 ASIC 폐루프 데모 (지시서 §17 PoC, EPIC A·E·F·G R1).
+
+    한 판의 이야기: 신호체인 r1→r2 승격 → Corner/MC(교육용 오류예산 모델,
+    SYNTHETIC) → T2000 전기 시험 3건(그 중 HTSL 후 측정 1건이 교정 만료 —
+    CALIBRATION_EXPIRED 블로커의 씨앗) → AEC-Q100 G1 매트릭스에서 HTSL 1건
+    실패 → FA 케이스(RCA 승인은 인간 전담) → ECO A0→A1 → 회귀+재검증으로
+    종결 → 재시험 pass. 최종 게이트는 MOCK_RESULT_PRESENT + CALIBRATION_EXPIRED
+    만 남는다(§15: 플랫폼은 출시 판정을 대체하지 않는다).
+    """
+    t = ASIC_CS_TEMPLATE
+
+    # ── EPIC A: 신호체인 r1 → r2 (r2 생성 시 r1 자동 supersede) ─────────────
+    base_blocks = [
+        {"key": "shunt", "kind": "sensor", "label": "Shunt 저항 1 mΩ",
+         "params": {"nominal": 100.0, "calib_min": -40.0, "calib_max": 125.0},
+         "error_budget": {"offset": 0.08, "noise": 0.25, "drift": 0.012},
+         "requirement_ids": ["REQ-CS-SENS"]},
+        {"key": "afe", "kind": "analog", "label": "차동 증폭기 (G=50)",
+         "params": {"gain": 50.0},
+         "error_budget": {"offset": 0.06, "gain_error": 0.12, "drift": 0.008, "noise": 0.1},
+         "requirement_ids": ["REQ-CS-AFE"]},
+        {"key": "adc", "kind": "mixed", "label": "16-bit SAR ADC",
+         "params": {"bits": 16}, "error_budget": {"inl": 0.15, "dnl": 0.05, "noise": 0.08},
+         "requirement_ids": ["REQ-CS-ADC"]},
+        {"key": "dsp", "kind": "digital", "label": "온도 보정 DSP",
+         "params": {"fw": "1.2.0"}, "error_budget": {}},
+    ]
+    chain_r1 = asic_post(client, "/api/v1/asic/signal-chains", "seed-asic-chain-r1", {
+        "business_id": "ASIC-CS-CHAIN-R1", "template_id": t, "blocks": base_blocks,
+        "note": "초기 테이프아웃안 — A0 마스크",
+    }, list_path=f"/api/v1/asic/templates/{t}/signal-chains", match_bid="ASIC-CS-CHAIN-R1")
+    chain_r2 = asic_post(client, "/api/v1/asic/signal-chains", "seed-asic-chain-r2", {
+        "business_id": "ASIC-CS-CHAIN-R2", "template_id": t, "blocks": base_blocks,
+        "note": "r1 보정계수 갱신 + DSP FW 1.2.0 (ECO-001 반영 전 기준선)",
+    }, list_path=f"/api/v1/asic/templates/{t}/signal-chains", match_bid="ASIC-CS-CHAIN-R2")
+
+    spec_full = [
+        {"output": "sensitivity", "nominal": 100.0, "min": 98.5, "max": 101.5, "unit": "mA/A"},
+        {"output": "offset_uv", "nominal": 0.0, "min": -25.0, "max": 25.0, "unit": "uV"},
+        {"output": "inl_lsb", "nominal": 1.0, "max": 1.5, "unit": "LSB"},
+    ]
+    mc1 = asic_post(client, "/api/v1/asic/corner-studies", "seed-asic-mc-001", {
+        "business_id": "ASIC-CS-MC-001", "signal_chain_id": chain_r2["id"], "kind": "monte_carlo",
+        "n_draws": 2000, "spec": spec_full,
+    }, list_path=f"/api/v1/asic/templates/{t}/corner-studies", match_bid="ASIC-CS-MC-001")
+    print(f"asic: chain r1/r2 + MC-001 (seed={mc1['seed']}, OOD={mc1['result']['model_ood']})")
+
+    # ── EPIC E: T2000 전기 시험 3건 ─────────────────────────────────────────
+    run_pre = asic_import_run(temc_client, bid="ASIC-CS-EL-PRE",
+                              csv_bytes=_asic_sensor_csv({1: 99.98, 2: 100.02, 3: 100.01, 4: 99.97, 5: 100.05}),
+                              calibration_expires_at="2027-06-30T00:00:00Z",
+                              executed_at="2026-06-10T02:00:00Z", lot_ref="CURR-LOT-2609A")
+    run_post = asic_import_run(temc_client, bid="ASIC-CS-EL-HTSL-POST",
+                               csv_bytes=_asic_sensor_csv({1: 99.9, 2: 99.85, 3: 96.42, 4: 99.9, 5: 99.88},
+                                                          executed_hour=5),
+                               calibration_expires_at="2026-03-01T00:00:00Z",  # HTSL 후 측정 시 이미 만료
+                               executed_at="2026-08-20T05:00:00Z", lot_ref="CURR-LOT-2609A")
+    run_verify = asic_import_run(temc_client, bid="ASIC-CS-EL-VERIFY",
+                                 csv_bytes=_asic_sensor_csv({1: 99.97, 2: 100.01, 3: 99.99, 4: 100.02, 5: 100.0},
+                                                            executed_hour=8),
+                                 calibration_expires_at="2027-06-30T00:00:00Z",
+                                 executed_at="2026-09-12T08:00:00Z", lot_ref="CURR-LOT-2609B")
+
+    # ── EPIC G(전반): FA 케이스 → 가설 → RCA 승인(인간) ────────────────────
+    fa_case = asic_post(asic_client, "/api/v1/asic/fa-cases", "seed-asic-fa-001", {
+        "business_id": "ASIC-CS-FA-001", "template_id": t, "scope": "lot",
+        "lot_ref": "CURR-LOT-2609A",
+        "symptom": "HTSL 1000h 후 site 3 감도 드리프트 -3.6% (규격 하한 98.5 mA/A 이탈)",
+        "repro_condition": "HTSL 125°C/1000h 바이어스 인가 후 상온 전기 시험에서 재현",
+        "observations": [
+            {"fact": "site 3 감도 96.42 mA/A — 규격 하한 98.5 이탈, 타 site는 규격 내",
+             "source": "ASIC-CS-EL-HTSL-POST"},
+            {"fact": "CSAM 분석에서 site 3의 2번 본드 패드 주변 층간 박리 확인",
+             "source": "CSAM (Sonoscan D9500)"},
+            {"fact": "HTSL 이전 측정(pre-stress)에서는 5 site 모두 규격 내",
+             "source": "ASIC-CS-EL-PRE"},
+        ],
+        "location": {"ref": "die/bond-pad-2", "x": 812, "y": 340, "note": "site 3 다이 좌표계"},
+    }, list_path=f"/api/v1/asic/templates/{t}/fa-cases", match_bid="ASIC-CS-FA-001")
+    asic_client.patch(
+        f"/api/v1/asic/fa-cases/{fa_case['id']}",
+        json={"hypotheses": [
+            {"text": "2번 본드 패드 히트싱크 응력 집중에 의한 와이어 본드 피로",
+             "confirm_tests": ["CSAM 층간 박리 확인", "드리프트 곡선 온도 의존성 재현"], "excluded": False},
+            {"text": "몰드 컴파운드 수분 흡수에 의한 접속 부식",
+             "confirm_tests": ["HAST 재시험 비교"], "excluded": True,
+             "exclusion_basis": "HAST 통과 로트(CURR-LOT-2608C)에서는 동일 드리프트가 없음"},
+            {"text": "측정 시스템(테스터) 보정 이상",
+             "confirm_tests": ["교정 만료 여부 및 타 장비 교차 확인"], "excluded": True,
+             "exclusion_basis": "교차 측정에서도 site 3 드리프트 동일 재현 — 기기 원인 아님"},
+        ], "status": "analyzing"},
+    )
+
+    # ── EPIC F: AEC-Q100 G1 매트릭스 ────────────────────────────────────────
+    plan = asic_post(client, "/api/v1/asic/qualification-plans", "seed-asic-qual-plan", {
+        "business_id": "ASIC-CS-QUAL-G1", "template_id": t, "grade": "G1",
+        "standard_version": "AEC-Q100 Rev-H",
+        "note": "전류 센서 ASIC 자동차용 G1 인증 매트릭스 (데모용 축소판: TC·TH·HTSL)",
+    }, list_path=f"/api/v1/asic/templates/{t}/qualification-plans", match_bid="ASIC-CS-QUAL-G1")
+
+    def qual_row(bid: str, grp: str, method: str, condition: dict, status: str, idem: str,
+                 *, post_run=None, failed_param=None, fa_case_id=None) -> dict:
+        return asic_post(client, f"/api/v1/asic/qualification-plans/{plan['id']}/results", idem, {
+            "business_id": bid, "group": grp, "method": method, "condition": condition,
+            "samples": "3 lot × 77", "lots": ["CURR-LOT-2609A", "CURR-LOT-2609B", "CURR-LOT-2609C"],
+            "pre_electrical_run_id": run_pre["id"],
+            **({"post_electrical_run_id": post_run["id"]} if post_run else {}),
+            "status": status,
+            **({"failed_param": failed_param} if failed_param else {}),
+            **({"fa_case_id": fa_case_id} if fa_case_id else {}),
+        })
+
+    qual_row("ASIC-CS-QUAL-TC", "TC", "AEC-Q100 TC (온도 사이클 -40↔125°C, 1000 cycle)",
+             {"temp_min_c": -40, "temp_max_c": 125, "cycles": 1000}, "pass", "seed-asic-qual-tc")
+    qual_row("ASIC-CS-QUAL-TH", "TH", "AEC-Q100 TH (고온·고습 85°C/85%RH, 1000 h)",
+             {"temp_c": 85, "rh": 85, "duration_h": 1000}, "pass", "seed-asic-qual-th")
+    qual_row("ASIC-CS-QUAL-HTSL", "HTSL", "AEC-Q100 HTSL (고온 저장 125°C, 1000 h)",
+             {"temp_c": 125, "duration_h": 1000}, "fail", "seed-asic-qual-htsl",
+             post_run=run_post, failed_param="sensitivity", fa_case_id=fa_case["id"])
+
+    # RCA 승인 (인간 전용 — 관찰 사실 + 확인 증적이 모두 존재한 뒤에야 가능)
+    asic_post(asic_client, f"/api/v1/asic/fa-cases/{fa_case['id']}/root-cause", "seed-asic-rca-001", {
+        "root_cause": "2번 본드 패드의 히트싱크 응력 집중에 의한 와이어 본드 피로 — "
+                      "HTSL 열사이클 중 패드 언더메탈 마이크로크랙이 성장해 접촉저항이 상승 "
+                      "(CSAM 박리 + 드리프트 온도의존성 재현으로 확인)",
+        "cause_class": "package", "comment": "패키지 설계·신뢰성 합의 (2026-09-12 RCA 리뷰)",
+        "evidence_business_ids": ["ASIC-CS-EL-HTSL-POST", "ASIC-CS-QUAL-HTSL"],
+    }, list_path=f"/api/v1/asic/templates/{t}/fa-cases", match_bid="ASIC-CS-FA-001")
+
+    qual_row("ASIC-CS-QUAL-HTSL-RT", "HTSL", "AEC-Q100 HTSL 재시험 (ECO A1 패키지, 1000 h)",
+             {"temp_c": 125, "duration_h": 1000, "note": "ECO-001 효과 검증 재시험"}, "pass",
+             "seed-asic-qual-htsl-rt", post_run=run_verify)
+
+    # ── EPIC G(후반): ECO → 회귀 → 종결 (재검증 없으면 412) ─────────────────
+    eco = asic_post(asic_client, "/api/v1/asic/ecos", "seed-asic-eco-001", {
+        "business_id": "ASIC-CS-ECO-001", "template_id": t, "fa_case_business_id": "ASIC-CS-FA-001",
+        "trigger": "fa_case", "title": "2번 본드 패드 히트싱크 완화 (A0→A1)",
+        "description": "패드 언더메탈 두께 증가 + 와이어 본드 프로파일 변경. "
+                       "테스트 프로그램은 site 3 HTSL 샘플링을 2배로 강화.",
+        "design_rev_from": "A0", "design_rev_to": "A1", "mask_revision": "MASK-A1",
+        "test_program_revision": "TP-CS-2026-09-A1",
+        "impact": [
+            {"area": "package", "detail": "본드 패드 언더메탈 0.8→1.2 µm"},
+            {"area": "process", "detail": "본드 프로파일 파라미터 3건 변경"},
+            {"area": "test_program", "detail": "HTSL 샘플링 강화 (site 3 ×2)"},
+        ],
+    }, list_path=f"/api/v1/asic/templates/{t}/ecos", match_bid="ASIC-CS-ECO-001")
+    eco = asic_post(asic_client, f"/api/v1/asic/ecos/{eco['id']}/analyze", "seed-asic-eco-an", {
+        "design_rev_from": "A0", "design_rev_to": "A1", "mask_revision": "MASK-A1",
+        "test_program_revision": "TP-CS-2026-09-A1",
+        "impact": eco.get("impact") or [],
+    }, list_path=f"/api/v1/asic/templates/{t}/ecos", match_bid="ASIC-CS-ECO-001")
+    mc2 = asic_post(client, "/api/v1/asic/corner-studies", "seed-asic-mc-002", {
+        "business_id": "ASIC-CS-MC-002", "signal_chain_id": chain_r2["id"], "kind": "monte_carlo",
+        "n_draws": 3000,
+        "spec": [{"output": "sensitivity", "nominal": 100.0, "min": 98.5, "max": 101.5, "unit": "mA/A"},
+                 {"output": "offset_uv", "nominal": 0.0, "min": -25.0, "max": 25.0, "unit": "uV"}],
+    }, list_path=f"/api/v1/asic/templates/{t}/corner-studies", match_bid="ASIC-CS-MC-002")
+    eco = asic_post(asic_client, f"/api/v1/asic/ecos/{eco['id']}/regression", "seed-asic-eco-reg", {
+        "regression_run_ids": [mc2["business_id"], run_verify["business_id"]],
+        "comment": "패키지 변경 회귀: MC-002(신뢰성 여유) + A1 패키지 전기 시험",
+    }, list_path=f"/api/v1/asic/templates/{t}/ecos", match_bid="ASIC-CS-ECO-001")
+    eco = asic_post(client, f"/api/v1/asic/ecos/{eco['id']}/close", "seed-asic-eco-close", {
+        "verification_run_business_id": "ASIC-CS-EL-VERIFY",
+        "verification_note": "site 3 재측정 99.99 mA/A — HTSL 재시험 3 lot 모두 규격 내 복원 확인",
+        "comment": "RCA 리뷰 패널 승인 (2026-09-14)",
+    }, list_path=f"/api/v1/asic/templates/{t}/ecos", match_bid="ASIC-CS-ECO-001")
+
+    # ── EPIC F: 기능안전 트레이스 SG→FSR→TSR→HW + FMEDA + 고장주입 ──────────
+    sg = asic_post(client, "/api/v1/asic/safety-items", "seed-asic-sg-1", {
+        "business_id": "ASIC-CS-SG-1", "template_id": t, "level": "safety_goal",
+        "title": "과전류를 정상 전류로 보고해서는 안 된다 (ASIL B)",
+        "asil": "B", "safe_state": "출력 클램프 + /FAULT low",
+    }, list_path=f"/api/v1/asic/templates/{t}/safety-items", match_bid="ASIC-CS-SG-1")
+    fsr = asic_post(client, "/api/v1/asic/safety-items", "seed-asic-fsr-1", {
+        "business_id": "ASIC-CS-FSR-1", "template_id": t, "level": "fsr",
+        "parent_business_id": "ASIC-CS-SG-1",
+        "title": "측정 체인 이상을 200 ms 이내에 감지하여 safe state로 진입할 것",
+        "asil": "B", "safety_mechanism": "범위·경향 감시 (DSP 워치독 + 플라우저리 한정자)",
+        "response_time_ms": 200.0,
+    }, list_path=f"/api/v1/asic/templates/{t}/safety-items", match_bid="ASIC-CS-FSR-1")
+    tsr = asic_post(client, "/api/v1/asic/safety-items", "seed-asic-tsr-1", {
+        "business_id": "ASIC-CS-TSR-1", "template_id": t, "level": "tsr",
+        "parent_business_id": "ASIC-CS-FSR-1",
+        "title": "ADC 출력 범위검사 + 션트 개락 감지 (TSR)",
+        "asil": "B", "safety_mechanism": "이중 범위 한정자 + 기준전원 이중화 비교",
+        "diagnostic_coverage_pct": 90.0, "response_time_ms": 100.0,
+    }, list_path=f"/api/v1/asic/templates/{t}/safety-items", match_bid="ASIC-CS-TSR-1")
+    asic_post(client, "/api/v1/asic/safety-items", "seed-asic-hw-1", {
+        "business_id": "ASIC-CS-HW-1", "template_id": t, "level": "hw_req",
+        "parent_business_id": "ASIC-CS-TSR-1",
+        "title": "션트 개락 감지 회로: 전류원 바이어스 + 컴퍼레이터 임계 0.9×FS",
+        "asil": "B", "safety_mechanism": "개락 감지 컴퍼레이터",
+        "diagnostic_coverage_pct": 95.0, "response_time_ms": 10.0,
+    }, list_path=f"/api/v1/asic/templates/{t}/safety-items", match_bid="ASIC-CS-HW-1")
+
+    fmeda_source = b"FMEDA workbook (synthetic demo) - current sensor A1"
+    fmeda_hash = hashlib.sha256(fmeda_source).hexdigest()
+    for i, (bid, mode, dist, dc, fit) in enumerate((
+        ("ASIC-CS-FMEDA-1", "션트 개락 (Open shunt)", 30.0, 95.0, 8.0),
+        ("ASIC-CS-FMEDA-2", "ADC 출력 고정 (Stuck output)", 25.0, 90.0, 12.0),
+        ("ASIC-CS-FMEDA-3", "기준전원 드리프트 (Reference drift)", 15.0, 70.0, 5.0),
+    )):
+        asic_post(client, "/api/v1/asic/fmeda-items", f"seed-asic-fmeda-{i + 1}", {
+            "business_id": bid, "safety_item_business_id": "ASIC-CS-TSR-1",
+            "failure_mode": mode, "distribution_pct": dist, "dc_pct": dc, "fit_rate": fit,
+            "source_ref": "FMEDA_WS_CS_A1.xlsx#TSR", "source_hash": fmeda_hash,
+            "formula_version": "SN29500-2024 + IEC 62380:2004",
+            "note": "수치는 교육용 합성값입니다 (SYNTHETIC)",
+        })
+    asic_post(client, "/api/v1/asic/fault-injections", "seed-asic-fi-001", {
+        "business_id": "ASIC-CS-FI-001", "safety_item_business_id": "ASIC-CS-TSR-1",
+        "method": "HIL 전류 스텝 주입", "stimulus": "150 A 과전류 스텝 (정격 100 A, 500 ms 유지)",
+        "expected": "100 ms 이내 /FAULT low + 출력 클램프 (safe state 진입)",
+        "observed": "87 ms 내 /FAULT low + 클램프 확인 (5회 반복 모두 통과)",
+        "status": "pass", "executed_by": "demo.architect", "executed_at": "2026-09-13T04:00:00Z",
+    })
+
+    # ── 최종 게이트 리포트 확인 ─────────────────────────────────────────────
+    report = client.get(f"/api/v1/asic/gate-report/{t}").json()
+    codes = sorted(b["code"] for b in report["blockers"])
+    print(
+        "asic: 전류 센서 폐루프 시드 완료 — chains r1/r2, MC×2, runs×3, qual×4(HTSL fail→재시험 pass), "
+        f"FA→RCA→ECO-001 종결, safety SG→FSR→TSR→HW+FMEDA×3+FI×1 | "
+        f"gate={report['status']} blockers={codes} readiness={report['readiness']}"
+    )
+
+
 class RefreshingAuth(httpx.Auth):
     """Password-grant login, refreshed transparently on 401.
 
@@ -1991,6 +2288,8 @@ def main() -> None:
         httpx.Client(base_url=API_URL, auth=RefreshingAuth("demo.architect", "demo1234")) as client,
         httpx.Client(base_url=API_URL, auth=RefreshingAuth("demo.mech_engineer", "demo1234")) as test_client,
         httpx.Client(base_url=API_URL, auth=RefreshingAuth("demo.approver", "demo1234")) as approver_client,
+        httpx.Client(base_url=API_URL, auth=RefreshingAuth("demo.test_engineer", "demo1234")) as temc_client,
+        httpx.Client(base_url=API_URL, auth=RefreshingAuth("demo.asic_engineer", "demo1234")) as asic_client,
     ):
         for product_spec in PRODUCTS:
             product = post(
@@ -2020,6 +2319,9 @@ def main() -> None:
         # AirInput 3D Interaction Field Twin: FD solver + surrogate + GOLD
         # replays on the same two variants (§6.2 two-tier, §11.2 scenarios).
         seed_airinput_field_twin(client, test_client)
+
+        # ASIC Twin v1.1 R1: 전류 센서 폐루프 PoC (§17) — EPIC A·E·F·G.
+        seed_asic_twin(client, temc_client, asic_client)
 
 
 if __name__ == "__main__":

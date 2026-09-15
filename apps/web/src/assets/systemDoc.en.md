@@ -107,6 +107,16 @@ All 3D scenes (part geometry, wave propagation and waveforms, package cross-sect
 - Stage cockpit: current stage n/9, next gate, coverage, qualification rate and R² at a glance.
 - The gate JSON honestly reports blockers (`MOCK_RESULT_PRESENT`, `EVIDENCE_APPROVALS`, …) and `decision_required` — **a release is never rubber-stamped**.
 
+**v1.1 enhancement (backend-connected — spec v1.1 §4/§7/§8, current-sensor ASIC PoC)**
+
+- **Signal-chain revisions (EPIC A)**: r1→r2 promotion creates a NEW revision and supersedes the old one (immutability rule); per-block error budgets and content_hash shown in stages ②③.
+- **Corner/MC analysis (EPIC A)**: seeded error-budget Monte-Carlo → P50/P95/P99, violation rate and the **real 24-bin sample histogram**; a corner temperature outside the calibrated range raises a MODEL OOD badge; same seed = identical result (reproducibility §12).
+- **Equipment measurement import (EPIC E)**: raw tester CSV bytes are promoted to a sha256 artifact BEFORE parsing. **The same file can never become two runs** (409). Partial files, time reversals and duplicate blocks are recorded as findings (no silent fixes, §7). Calibration expiry is stored as data and turns into a gate blocker.
+- **Qualification matrix + closed loop (EPIC F·G)**: AEC-Q100 verdicts read the latest row per group. A failed row is dispositioned through an FA case — RCA approval is **a human-dedicated role** and refuses (422) without observed facts + check evidence. ECO close refuses (412) without regression evidence + a verification measurement run; closing moves the FA case to verified, closing the loop.
+- **Functional-safety trace**: SG→FSR→TSR→HW tree + FMEDA (distribution, DC, FIT, source hash) + fault injection (expected/observed) rendered in stage ⑦.
+- **Gate policy `alps-asic-v1.1`**: new blockers `CALIBRATION_EXPIRED`, `MODEL_OOD`, `MIXED_REVISION_EVIDENCE`, `QUAL_FAILURE_OPEN`, `WAIVER_EXPIRED` plus the unconditional `MOCK_RESULT_PRESENT`. Six-step Readiness Ladder (education_only→…→controlled_pilot reachable; production_candidate/released unreachable). **The gate report renders the server value verbatim** — the UI never invents blockers.
+- Every write is role-gated (import=test, RCA=ASIC/quality engineer, ECO close=architect/approver). Korean demo strings coming from the backend are localized at render time for en/ja.
+
 ### 3.10 Result compare · correlation · gate (bottom frame)
 
 - **SPICE Resistance Sweep — Variant Compare (S08)**: overlay-compare two or more variants on identical axes and units (§12.2).

@@ -433,6 +433,214 @@ const EXACT: Record<string, LStr> = {
       "Regression and candidate comparison are check-required information; AI/optimization never finalizes a single solution on its own. Candidate runs proceed after the responsible engineer's approval.",
       "回帰・候補比較は確認要の情報であり、AI/最適化が最終解を独自に確定することはありません。候補の実行は担当エンジニアの承認後に進めてください。",
     ),
+
+  // ── ASIC twin (seed_asic_twin + asic_gate_policy/asic_signal) ──
+  // gate blockers (asic_gate_policy.py)
+  "이 워크벤치의 ASIC 증적은 교육용 합성 데이터입니다. 실측 근거 없이는 출시 승인 게이트를 통과할 수 없습니다. (지시서 §15)": L(
+    "이 워크벤치의 ASIC 증적은 교육용 합성 데이터입니다. 실측 근거 없이는 출시 승인 게이트를 통과할 수 없습니다. (지시서 §15)",
+    "This workbench's ASIC evidence is educational synthetic data. Without measured backing it cannot pass the release-approval gate (spec §15).",
+    "このワークベンチのASICエビデンスは教育用合成データです。実測の根拠がないまま出荷承認ゲートを通過することはできません (仕様書 §15)。",
+  ),
+  "보정 모델이 학습 데이터 범위를 벗어난 Corner/MC 결과가 있습니다. OOD 검토가 필요합니다.": L(
+    "보정 모델이 학습 데이터 범위를 벗어난 Corner/MC 결과가 있습니다. OOD 검토가 필요합니다.",
+    "A Corner/MC result falls outside the calibration model's training range — OOD review required.",
+    "校正モデルの学習データ範囲を外れたCorner/MC結果があります。OODレビューが必要です。",
+  ),
+  // corner-study disclosure (asic_signal.py)
+  "교육용 오류예산 전파 모델 (SYNTHETIC) — SPICE/TCAD 대체 아님": L(
+    "교육용 오류예산 전파 모델 (SYNTHETIC) — SPICE/TCAD 대체 아님",
+    "Educational error-budget propagation model (SYNTHETIC) — not a SPICE/TCAD substitute",
+    "教育用エラーバジェット伝搬モデル (SYNTHETIC) — SPICE/TCADの代替ではない",
+  ),
+  // signal-chain blocks + notes (seed)
+  "Shunt 저항 1 mΩ": L("Shunt 저항 1 mΩ", "Shunt resistor 1 mΩ", "シャント抵抗 1 mΩ"),
+  "차동 증폭기 (G=50)": L("차동 증폭기 (G=50)", "Differential amplifier (G=50)", "差動増幅器 (G=50)"),
+  "16-bit SAR ADC": L("16-bit SAR ADC", "16-bit SAR ADC", "16ビットSAR ADC"),
+  "온도 보정 DSP": L("온도 보정 DSP", "Temperature-compensation DSP", "温度補償DSP"),
+  "초기 테이프아웃안 — A0 마스크": L("초기 테이프아웃안 — A0 마스크", "Initial tape-out draft — mask A0", "初期テープアウト案 — マスクA0"),
+  "r1 보정계수 갱신 + DSP FW 1.2.0 (ECO-001 반영 전 기준선)": L(
+    "r1 보정계수 갱신 + DSP FW 1.2.0 (ECO-001 반영 전 기준선)",
+    "r1 calibration-coefficient refresh + DSP FW 1.2.0 (baseline before ECO-001)",
+    "r1較正係数更新 + DSP FW 1.2.0 (ECO-001反映前のベースライン)",
+  ),
+  // FA case (seed)
+  "HTSL 1000h 후 site 3 감도 드리프트 -3.6% (규격 하한 98.5 mA/A 이탈)": L(
+    "HTSL 1000h 후 site 3 감도 드리프트 -3.6% (규격 하한 98.5 mA/A 이탈)",
+    "After 1000 h HTSL, site 3 sensitivity drifted -3.6% (below the 98.5 mA/A spec floor)",
+    "HTSL 1000h後、site 3の感度が-3.6%ドリフト (規格下限98.5 mA/Aを逸脱)",
+  ),
+  "HTSL 125°C/1000h 바이어스 인가 후 상온 전기 시험에서 재현": L(
+    "HTSL 125°C/1000h 바이어스 인가 후 상온 전기 시험에서 재현",
+    "Reproduced in room-temperature electrical test after HTSL 125 °C/1000 h bias",
+    "HTSL 125℃/1000hバイアス印加後の常温電気試験で再現",
+  ),
+  "site 3 감도 96.42 mA/A — 규격 하한 98.5 이탈, 타 site는 규격 내": L(
+    "site 3 감도 96.42 mA/A — 규격 하한 98.5 이탈, 타 site는 규격 내",
+    "Site 3 sensitivity 96.42 mA/A — below the 98.5 spec floor; other sites in spec",
+    "site 3感度96.42 mA/A — 規格下限98.5を逸脱、他siteは規格内",
+  ),
+  "CSAM 분석에서 site 3의 2번 본드 패드 주변 층간 박리 확인": L(
+    "CSAM 분석에서 site 3의 2번 본드 패드 주변 층간 박리 확인",
+    "CSAM shows delamination around bond pad 2 of site 3",
+    "CSAM分析でsite 3のボンドパッド2周辺の層間剥離を確認",
+  ),
+  "HTSL 이전 측정(pre-stress)에서는 5 site 모두 규격 내": L(
+    "HTSL 이전 측정(pre-stress)에서는 5 site 모두 규격 내",
+    "Pre-stress measurement: all 5 sites within spec",
+    "HTSL前の測定(pre-stress)では5siteすべて規格内",
+  ),
+  "2번 본드 패드 히트싱크 응력 집중에 의한 와이어 본드 피로": L(
+    "2번 본드 패드 히트싱크 응력 집중에 의한 와이어 본드 피로",
+    "Wire-bond fatigue from heat-sink stress concentration on bond pad 2",
+    "ボンドパッド2のヒートシンク応力集中によるワイヤボンド疲労",
+  ),
+  "몰드 컴파운드 수분 흡수에 의한 접속 부식": L(
+    "몰드 컴파운드 수분 흡수에 의한 접속 부식",
+    "Interconnect corrosion from moisture uptake of the mold compound",
+    "モールド樹脂の吸湿による接続腐食",
+  ),
+  "HAST 통과 로트(CURR-LOT-2608C)에서는 동일 드리프트가 없음": L(
+    "HAST 통과 로트(CURR-LOT-2608C)에서는 동일 드리프트가 없음",
+    "No such drift in the HAST-passed lot (CURR-LOT-2608C)",
+    "HAST合格ロット(CURR-LOT-2608C)では同じドリフトなし",
+  ),
+  "측정 시스템(테스터) 보정 이상": L("측정 시스템(테스터) 보정 이상", "Measurement-system (tester) calibration fault", "測定システム(テスター)校正異常"),
+  "교차 측정에서도 site 3 드리프트 동일 재현 — 기기 원인 아님": L(
+    "교차 측정에서도 site 3 드리프트 동일 재현 — 기기 원인 아님",
+    "Cross-measurement reproduces the same site 3 drift — not the equipment",
+    "交差測定でもsite 3ドリフトが同じ再現 — 設備起因ではない",
+  ),
+  "2번 본드 패드의 히트싱크 응력 집중에 의한 와이어 본드 피로 — HTSL 열사이클 중 패드 언더메탈 마이크로크랙이 성장해 접촉저항이 상승 (CSAM 박리 + 드리프트 온도의존성 재현으로 확인)": L(
+    "2번 본드 패드의 히트싱크 응력 집중에 의한 와이어 본드 피로 — HTSL 열사이클 중 패드 언더메탈 마이크로크랙이 성장해 접촉저항이 상승 (CSAM 박리 + 드리프트 온도의존성 재현으로 확인)",
+    "Wire-bond fatigue from heat-sink stress concentration on bond pad 2 — during HTSL thermal cycling the pad undermetal microcrack grew and raised contact resistance (confirmed by CSAM delamination + drift temperature dependence)",
+    "ボンドパッド2のヒートシンク応力集中によるワイヤボンド疲労 — HTSL熱サイクル中にパッドアンダーメタルのマイクロクラックが成長し接触抵抗が上昇 (CSAM剥離+ドリフトの温度依存性再現で確認)",
+  ),
+  "패키지 설계·신뢰성 합의 (2026-09-12 RCA 리뷰)": L(
+    "패키지 설계·신뢰성 합의 (2026-09-12 RCA 리뷰)",
+    "Package design + reliability consensus (RCA review 2026-09-12)",
+    "パッケージ設計・信頼性の合意 (2026-09-12 RCAレビュー)",
+  ),
+  // FA confirm tests (rendered in hypothesis brackets)
+  "CSAM 층간 박리 확인": L("CSAM 층간 박리 확인", "CSAM delamination check", "CSAM層間剥離確認"),
+  "드리프트 곡선 온도 의존성 재현": L("드리프트 곡선 온도 의존성 재현", "Reproduce drift-curve temperature dependence", "ドリフト曲線の温度依存性再現"),
+  "HAST 재시험 비교": L("HAST 재시험 비교", "HAST retest comparison", "HAST再試験比較"),
+  "교정 만료 여부 및 타 장비 교차 확인": L("교정 만료 여부 및 타 장비 교차 확인", "Check calibration expiry and cross-check on other equipment", "校正期限と他設備での交差確認"),
+  // ECO (seed)
+  "2번 본드 패드 히트싱크 완화 (A0→A1)": L(
+    "2번 본드 패드 히트싱크 완화 (A0→A1)",
+    "Bond pad 2 heat-sink relief (A0→A1)",
+    "ボンドパッド2ヒートシンク緩和 (A0→A1)",
+  ),
+  "패드 언더메탈 두께 증가 + 와이어 본드 프로파일 변경. 테스트 프로그램은 site 3 HTSL 샘플링을 2배로 강화.": L(
+    "패드 언더메탈 두께 증가 + 와이어 본드 프로파일 변경. 테스트 프로그램은 site 3 HTSL 샘플링을 2배로 강화.",
+    "Thicker pad undermetal + revised wire-bond profile. Test program doubles site 3 HTSL sampling.",
+    "パッドアンダーメタル厚増加+ワイヤボンドプロファイル変更。テストプログラムはsite 3のHTSLサンプリングを2倍に強化。",
+  ),
+  "본드 패드 언더메탈 0.8→1.2 µm": L("본드 패드 언더메탈 0.8→1.2 µm", "Bond pad undermetal 0.8→1.2 µm", "ボンドパッドアンダーメタル 0.8→1.2 µm"),
+  "본드 프로파일 파라미터 3건 변경": L("본드 프로파일 파라미터 3건 변경", "3 bond-profile parameters changed", "ボンドプロファイルパラメータ3件変更"),
+  "HTSL 샘플링 강화 (site 3 ×2)": L("HTSL 샘플링 강화 (site 3 ×2)", "HTSL sampling strengthened (site 3 ×2)", "HTSLサンプリング強化 (site 3 ×2)"),
+  "패키지 변경 회귀: MC-002(신뢰성 여유) + A1 패키지 전기 시험": L(
+    "패키지 변경 회귀: MC-002(신뢰성 여유) + A1 패키지 전기 시험",
+    "Package-change regression: MC-002 (reliability margin) + A1 package electrical test",
+    "パッケージ変更リグレッション: MC-002(信頼性マージン) + A1パッケージ電気試験",
+  ),
+  "site 3 재측정 99.99 mA/A — HTSL 재시험 3 lot 모두 규격 내 복원 확인": L(
+    "site 3 재측정 99.99 mA/A — HTSL 재시험 3 lot 모두 규격 내 복원 확인",
+    "Site 3 re-measured at 99.99 mA/A — all 3 HTSL retest lots restored within spec",
+    "site 3再測定99.99 mA/A — HTSL再試験3ロットすべて規格内復帰を確認",
+  ),
+  "RCA 리뷰 패널 승인 (2026-09-14)": L("RCA 리뷰 패널 승인 (2026-09-14)", "RCA review panel approval (2026-09-14)", "RCAレビューパネル承認 (2026-09-14)"),
+  // qualification plan + methods (seed)
+  "전류 센서 ASIC 자동차용 G1 인증 매트릭스 (데모용 축소판: TC·TH·HTSL)": L(
+    "전류 센서 ASIC 자동차용 G1 인증 매트릭스 (데모용 축소판: TC·TH·HTSL)",
+    "Current-sensor ASIC automotive G1 qualification matrix (demo subset: TC·TH·HTSL)",
+    "電流センサASIC車載G1認証マトリクス (デモ用縮小版: TC・TH・HTSL)",
+  ),
+  "AEC-Q100 TC (온도 사이클 -40↔125°C, 1000 cycle)": L(
+    "AEC-Q100 TC (온도 사이클 -40↔125°C, 1000 cycle)",
+    "AEC-Q100 TC (temperature cycle -40↔125 °C, 1000 cycles)",
+    "AEC-Q100 TC (温度サイクル -40↔125℃、1000サイクル)",
+  ),
+  "AEC-Q100 TH (고온·고습 85°C/85%RH, 1000 h)": L(
+    "AEC-Q100 TH (고온·고습 85°C/85%RH, 1000 h)",
+    "AEC-Q100 TH (85 °C/85 %RH high temp & humidity, 1000 h)",
+    "AEC-Q100 TH (高温高湿 85℃/85%RH、1000h)",
+  ),
+  "AEC-Q100 HTSL (고온 저장 125°C, 1000 h)": L(
+    "AEC-Q100 HTSL (고온 저장 125°C, 1000 h)",
+    "AEC-Q100 HTSL (high-temperature storage 125 °C, 1000 h)",
+    "AEC-Q100 HTSL (高温保存 125℃、1000h)",
+  ),
+  "AEC-Q100 HTSL 재시험 (ECO A1 패키지, 1000 h)": L(
+    "AEC-Q100 HTSL 재시험 (ECO A1 패키지, 1000 h)",
+    "AEC-Q100 HTSL retest (ECO A1 package, 1000 h)",
+    "AEC-Q100 HTSL再試験 (ECO A1パッケージ、1000h)",
+  ),
+  "ECO-001 효과 검증 재시험": L("ECO-001 효과 검증 재시험", "ECO-001 effectiveness-verification retest", "ECO-001効果検証再試験"),
+  // safety trace (seed)
+  "과전류를 정상 전류로 보고해서는 안 된다 (ASIL B)": L(
+    "과전류를 정상 전류로 보고해서는 안 된다 (ASIL B)",
+    "Overcurrent must never be reported as normal current (ASIL B)",
+    "過電流を正常電流として報告してはならない (ASIL B)",
+  ),
+  "출력 클램프 + /FAULT low": L("출력 클램프 + /FAULT low", "Output clamp + /FAULT low", "出力クランプ + /FAULT low"),
+  "측정 체인 이상을 200 ms 이내에 감지하여 safe state로 진입할 것": L(
+    "측정 체인 이상을 200 ms 이내에 감지하여 safe state로 진입할 것",
+    "Detect measurement-chain faults within 200 ms and enter the safe state",
+    "測定チェーン異常を200ms以内に検出しsafe stateへ移行すること",
+  ),
+  "범위·경향 감시 (DSP 워치독 + 플라우저리 한정자)": L(
+    "범위·경향 감시 (DSP 워치독 + 플라우저리 한정자)",
+    "Range/trend monitoring (DSP watchdog + plausibility qualifier)",
+    "範囲・傾向監視 (DSPウォッチドッグ+妥当性修飾子)",
+  ),
+  "ADC 출력 범위검사 + 션트 개락 감지 (TSR)": L(
+    "ADC 출력 범위검사 + 션트 개락 감지 (TSR)",
+    "ADC output range check + shunt open detection (TSR)",
+    "ADC出力範囲検査+シャント断線検出 (TSR)",
+  ),
+  "이중 범위 한정자 + 기준전원 이중화 비교": L(
+    "이중 범위 한정자 + 기준전원 이중화 비교",
+    "Dual-range qualifier + redundant reference-source comparison",
+    "デュアルレンジ修飾子+基準電源二重化比較",
+  ),
+  "션트 개락 감지 회로: 전류원 바이어스 + 컴퍼레이터 임계 0.9×FS": L(
+    "션트 개락 감지 회로: 전류원 바이어스 + 컴퍼레이터 임계 0.9×FS",
+    "Shunt-open detection circuit: current-source bias + comparator threshold 0.9×FS",
+    "シャント断線検出回路: 電流源バイアス+コンパレータしきい値0.9×FS",
+  ),
+  "개락 감지 컴퍼레이터": L("개락 감지 컴퍼레이터", "Open-detection comparator", "断線検出コンパレータ"),
+  // FMEDA + fault injection (seed)
+  "션트 개락 (Open shunt)": L("션트 개락 (Open shunt)", "Shunt open", "シャント断線 (Open shunt)"),
+  "ADC 출력 고정 (Stuck output)": L("ADC 출력 고정 (Stuck output)", "ADC output stuck", "ADC出力固定 (Stuck output)"),
+  "기준전원 드리프트 (Reference drift)": L("기준전원 드리프트 (Reference drift)", "Reference-source drift", "基準電源ドリフト (Reference drift)"),
+  "수치는 교육용 합성값입니다 (SYNTHETIC)": L(
+    "수치는 교육용 합성값입니다 (SYNTHETIC)",
+    "Values are educational synthetic figures (SYNTHETIC)",
+    "数値は教育用合成値です (SYNTHETIC)",
+  ),
+  "HIL 전류 스텝 주입": L("HIL 전류 스텝 주입", "HIL current-step injection", "HIL電流ステップ注入"),
+  "150 A 과전류 스텝 (정격 100 A, 500 ms 유지)": L(
+    "150 A 과전류 스텝 (정격 100 A, 500 ms 유지)",
+    "150 A overcurrent step (rated 100 A, held 500 ms)",
+    "150A過電流ステップ (定格100A、500ms保持)",
+  ),
+  "100 ms 이내 /FAULT low + 출력 클램프 (safe state 진입)": L(
+    "100 ms 이내 /FAULT low + 출력 클램프 (safe state 진입)",
+    "/FAULT low within 100 ms + output clamp (safe-state entry)",
+    "100ms以内に/FAULT low+出力クランプ (safe state移行)",
+  ),
+  "87 ms 내 /FAULT low + 클램프 확인 (5회 반복 모두 통과)": L(
+    "87 ms 내 /FAULT low + 클램프 확인 (5회 반복 모두 통과)",
+    "/FAULT low + clamp confirmed at 87 ms (all 5 repetitions passed)",
+    "87ms以内に/FAULT low+クランプ確認 (5回反復すべて合格)",
+  ),
+  // measurement CSV parser findings (routers/asic.py _parse_measurement_csv)
+  "파일이 행 경계에서 끝나지 않습니다(쓰기 중단 의심)": L(
+    "파일이 행 경계에서 끝나지 않습니다(쓰기 중단 의심)",
+    "File does not end on a row boundary (possible write interruption)",
+    "ファイルが行境界で終わっていません(書き込み中断の疑い)",
+  ),
 };
 
 // Composed backend messages — regex per message with per-language templates.
@@ -539,6 +747,60 @@ const RULES: Rule[] = [
     re: /^(.+)=(.+) 가 유효 범위 \[(.+)\] (.+)을 벗어납니다$/,
     en: (g) => `${g[0]}=${g[1]} is outside the valid range [${g[2]}] ${g[3]}`,
     ja: (g) => `${g[0]}=${g[1]} が有効範囲 [${g[2]}] ${g[3]} を外れています`,
+  },
+
+  // ── ASIC gate blockers (asic_gate_policy.py) — only composed when present ──
+  {
+    re: /^교정 유효기간이 만료된 장비의 측정 (\d+)건이 증적에 포함되어 있습니다\.$/,
+    en: (g) => `Evidence includes ${g[0]} measurement(s) taken on equipment past its calibration expiry.`,
+    ja: (g) => `エビデンスに校正期限切れ設備での測定が${g[0]}件含まれています。`,
+  },
+  {
+    re: /^증적이 여러 설계 리비전\((.+)\)에 걸쳐 있습니다\. 하나의 리비전으로 재증적화해야 합니다\.$/,
+    en: (g) => `Evidence spans multiple design revisions (${g[0]}) — re-evidence on a single revision.`,
+    ja: (g) => `エビデンスが複数の設計リビジョン(${g[0]})にまたがっています。単一リビジョンでの再エビデンス化が必要です。`,
+  },
+  {
+    re: /^신뢰성 시험 실패 (\d+)건의 RCA 승인이 열려 있습니다\.$/,
+    en: (g) => `${g[0]} reliability-test failure(s) still await RCA approval.`,
+    ja: (g) => `信頼性試験不合格${g[0]}件のRCA承認が未完了です。`,
+  },
+  {
+    re: /^유효기간이 지난 웨이버 (\d+)건이 있습니다\.$/,
+    en: (g) => `${g[0]} waiver(s) past their expiry.`,
+    ja: (g) => `期限切れのウェーバーが${g[0]}件あります。`,
+  },
+  {
+    // asic_signal.py OOD reason — "<output>: 시험 온도 T°C 가 보정 범위 [a, b]°C를 벗어납니다"
+    re: /^([A-Za-z0-9_]+): 시험 온도 (.+)°C 가 보정 범위 \[(.+), (.+)\]°C를 벗어납니다$/,
+    en: (g) => `${g[0]}: test temperature ${g[1]}°C is outside the calibration range [${g[2]}, ${g[3]}]°C`,
+    ja: (g) => `${g[0]}: 試験温度${g[1]}℃が校正範囲 [${g[2]}, ${g[3]}]℃を外れています`,
+  },
+  // measurement CSV parser findings (routers/asic.py)
+  {
+    re: /^(\d+)행이 불완전합니다\(부분 파일 의심\)$/,
+    en: (g) => `Row ${g[0]} is incomplete (possible partial file)`,
+    ja: (g) => `${g[0]}行目が不完全です(部分ファイルの疑い)`,
+  },
+  {
+    re: /^value '(.+)'를 숫자로 해석할 수 없습니다$/,
+    en: (g) => `Value '${g[0]}' cannot be parsed as a number`,
+    ja: (g) => `値 '${g[0]}' を数値として解釈できません`,
+  },
+  {
+    re: /^(.+)\/site=(\S+) 조합이 중복됩니다$/,
+    en: (g) => `Duplicate ${g[0]}/site=${g[1]} combination`,
+    ja: (g) => `${g[0]}/site=${g[1]} の組合せが重複しています`,
+  },
+  {
+    re: /^(\d+)행의 타임스탬프가 이전 행보다 과거입니다$/,
+    en: (g) => `Row ${g[0]}'s timestamp is earlier than the previous row`,
+    ja: (g) => `${g[0]}行目のタイムスタンプが前の行より過去です`,
+  },
+  {
+    re: /^temperature_c '(.+)'를 해석할 수 없습니다$/,
+    en: (g) => `Cannot parse temperature_c '${g[0]}'`,
+    ja: (g) => `temperature_c '${g[0]}' を解釈できません`,
   },
 ];
 

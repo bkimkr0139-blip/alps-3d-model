@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import (
     artifacts,
+    asic,
     assistant,
     audit,
     baselines,
@@ -51,6 +52,7 @@ app.include_router(model_canvas.router)
 app.include_router(process_twin.router)
 app.include_router(process_monitoring.router)
 app.include_router(fa_capa.router)
+app.include_router(asic.router)
 app.include_router(doe.router)
 app.include_router(assistant.router)
 

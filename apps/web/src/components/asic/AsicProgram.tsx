@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   DEFAULT_FLOORPLAN,
@@ -36,108 +36,34 @@ import {
 import { Pareto, Scatter, SpcChart, TrendLine } from "./asicCharts";
 import { buildPackageScene } from "./packageScene";
 import { pickL, pickText, L } from "../../lib/lstr";
+import { btn, card, Chip, ConfidenceBadge, GateDot, Kpi, SectionCard, td, th } from "./asicUi";
+import {
+  ChainBudgetPanel,
+  ChainRevisionPanel,
+  CornerStudiesPanel,
+  EMPTY_LIVE,
+  EquipmentRunsPanel,
+  FaStudio,
+  GateReportPanel,
+  BackendQualPanel,
+  SafetyTracePanel,
+  TestProgramTwin,
+  loadLive,
+  type Live,
+  type LiveState,
+} from "./asicLive";
 
 // Alps Alpine ASIC development 9-stage work center — standalone tab next to
-// the EDA training module (docs/AgentIC_AlpsAlpine_ASIC_Turnkey_DigitalTwin_고도화_개발지시서_v1.0.md).
-// Reuses the EDA-training mock runners for stage 4 (design & verification)
-// and the Eda3DViewer for the Package/3D Twin. Everything is client-side and
-// synthetic: result cards carry explicit confidence badges, and the release
-// gate (stage 8) stays honestly blocked by the "mock result present" rule of
-// §10.2 — this twin can reach engineering_review_ready, never sign-off.
+// the EDA training module (docs/AgentIC_AlpsAlpine_ASIC_Turnkey_DigitalTwin_고도화_개발지시서_v1.0.md
+// + v1.1 추가개발 지시서). Stage ②③④⑤⑥⑦⑧⑨ panels gained live golden-dataset
+// views (asicLive.tsx) alongside the interactive fixtures; the stage-8 release
+// gate report is computed SERVER-SIDE (asic_gate_policy.py) and rendered
+// verbatim — the UI never hand-authors a blocker (§6 불변규칙 4). Everything
+// stays explicitly synthetic: this twin can reach controlled_pilot, never
+// production_candidate / released (§15).
 
 type GateStatus = "pass" | "blocked";
 type Gate = { status: GateStatus; blockers: string[] };
-
-const card: React.CSSProperties = {
-  border: "1px solid #1e293b",
-  borderRadius: 8,
-  padding: 12,
-  background: "#0b1220",
-};
-
-const th: React.CSSProperties = {
-  textAlign: "left",
-  fontSize: 10,
-  color: "#64748b",
-  fontWeight: 500,
-  padding: "4px 8px",
-  borderBottom: "1px solid #1e293b",
-  whiteSpace: "nowrap",
-};
-
-const td: React.CSSProperties = {
-  fontSize: 11,
-  padding: "4px 8px",
-  borderBottom: "1px solid #141c2e",
-  verticalAlign: "top",
-};
-
-function Chip({ color, children, title }: { color: string; children: React.ReactNode; title?: string }) {
-  return (
-    <span
-      title={title}
-      style={{
-        fontSize: 10,
-        fontFamily: "monospace",
-        padding: "1px 7px",
-        borderRadius: 9,
-        border: `1px solid ${color}55`,
-        background: `${color}18`,
-        color,
-        whiteSpace: "nowrap",
-        display: "inline-block",
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-// §15.3 — evidence status must never be color alone: icon + wording.
-function ConfidenceBadge({ kind }: { kind: "educational_estimate" | "synthetic_fixture" }) {
-  const { t } = useTranslation();
-  return (
-    <Chip color={kind === "synthetic_fixture" ? "#a78bfa" : "#fbbf24"} title={t("asic.conf.title")}>
-      {kind === "synthetic_fixture" ? "◈ " : "△ "}
-      {t(`asic.conf.${kind}` as never)}
-    </Chip>
-  );
-}
-
-function GateDot({ status }: { status: GateStatus }) {
-  return <span title={status} style={{ width: 9, height: 9, borderRadius: 9, background: status === "pass" ? "#34d399" : "#f87171", display: "inline-block", flexShrink: 0 }} />;
-}
-
-function Kpi({ label, value, color = "#67e8f9" }: { label: string; value: string | number; color?: string }) {
-  return (
-    <div style={{ background: "#0f172a", borderRadius: 6, padding: "5px 9px", minWidth: 84 }}>
-      <div style={{ fontSize: 10, color: "#64748b", whiteSpace: "nowrap" }}>{label}</div>
-      <div style={{ fontSize: 14, fontFamily: "monospace", color }}>{value}</div>
-    </div>
-  );
-}
-
-function SectionCard({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div style={{ ...card, marginBottom: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 13, color: "#e2e8f0" }}>{title}</h3>
-        {right}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-const btn = (active: boolean, color = "#38bdf8"): React.CSSProperties => ({
-  fontSize: 11,
-  padding: "4px 10px",
-  borderRadius: 6,
-  border: `1px solid ${active ? color : "#334155"}`,
-  background: active ? `${color}22` : "#0f172a",
-  color: active ? "#e2e8f0" : "#94a3b8",
-  cursor: "pointer",
-});
 
 // Program state is per-template: switching template remounts the workbench.
 function Workbench({ tpl }: { tpl: AsicTemplate }) {
@@ -179,6 +105,24 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
   const [lots, setLots] = useState<Lot[]>(tpl.lots);
 
   const tempGrade = GRADE_TEMP[tpl.grade];
+
+  // ── v1.1 golden-dataset views (best-effort backend loads — the fixture
+  //    workspace below keeps working when the API is unreachable) ──
+  const [live, setLive] = useState<Live>(EMPTY_LIVE);
+  const [liveState, setLiveState] = useState<LiveState>("loading");
+  useEffect(() => {
+    let on = true;
+    setLiveState("loading");
+    loadLive(tpl.id).then((r) => {
+      if (on) {
+        setLive(r.live);
+        setLiveState(r.state);
+      }
+    });
+    return () => {
+      on = false;
+    };
+  }, [tpl.id]);
 
   // ── Gate evaluation (§2 완료 게이트 / §10 rule style) ──
   const gates = useMemo(() => {
@@ -286,6 +230,13 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
         <Kpi label={t("asic.cockpit.trace")} value={`${tracePct}%`} color={tracePct === 100 ? "#34d399" : "#fbbf24"} />
         <Kpi label={t("asic.cockpit.qual")} value={`${qualPct}%`} color={qualPct === 100 ? "#34d399" : "#fbbf24"} />
         <Kpi label={t("asic.cockpit.r2")} value={corrDone ? round2(corr.perParam[0].stats.r2) : "—"} />
+        {live.gate && (
+          <Kpi
+            label={t("asic.cockpit.readiness")}
+            value={live.gate.readiness}
+            color={live.gate.readiness_reachable ? "#67e8f9" : "#fbbf24"}
+          />
+        )}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginLeft: "auto" }}>
           <ConfidenceBadge kind="educational_estimate" />
           <ConfidenceBadge kind="synthetic_fixture" />
@@ -393,7 +344,9 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
           )}
 
           {stage === "s2" && (
-            <SectionCard title={`${t("asic.stage.s2")} — ${t("asic.s2.options")}`}>
+            <>
+              <ChainRevisionPanel live={live} liveState={liveState} tpl={tpl} />
+              <SectionCard title={`${t("asic.stage.s2")} — ${t("asic.s2.options")}`}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 8 }}>
                 {tpl.options.map((o) => (
                   <div
@@ -448,10 +401,13 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   </tbody>
                 </table>
               </div>
-            </SectionCard>
+              </SectionCard>
+            </>
           )}
 
           {stage === "s3" && (
+            <>
+              <ChainBudgetPanel live={live} liveState={liveState} />
             <SectionCard title={`${t("asic.stage.s3")} — ${t("asic.s3.wbs")}`}>
               <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 12 }}>
                 <tbody>
@@ -504,7 +460,8 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   ))}
                 </tbody>
               </table>
-            </SectionCard>
+              </SectionCard>
+            </>
           )}
 
           {stage === "s4" && (
@@ -600,6 +557,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   </table>
                 </div>
               </SectionCard>
+              <CornerStudiesPanel live={live} liveState={liveState} />
             </>
           )}
 
@@ -662,10 +620,12 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   <div style={{ fontSize: 12, color: "#64748b" }}>{t("asic.s5.corrHint")}</div>
                 )}
               </SectionCard>
+              <EquipmentRunsPanel live={live} liveState={liveState} />
             </>
           )}
 
           {stage === "s6" && (
+            <>
             <SectionCard title={`${t("asic.stage.s6")} — ECO & Test Program`}>
               {ecos.length === 0 && <div style={{ fontSize: 12, color: "#64748b" }}>{t("asic.s6.none")}</div>}
               {ecos.map((e) => (
@@ -696,12 +656,16 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 {t("asic.s6.mask")}: <b style={{ fontFamily: "monospace", color: "#7dd3fc" }}>{maskRev}</b> · {t("asic.s6.testprog")}: <b style={{ fontFamily: "monospace", color: "#7dd3fc" }}>ATE v{testProgRev}</b>
               </div>
             </SectionCard>
+            <TestProgramTwin tpl={tpl} testProgRev={testProgRev} maskRev={maskRev} />
+            </>
           )}
 
           {stage === "s7" && (
+            <>
+            <BackendQualPanel live={live} liveState={liveState} />
             <SectionCard
               title={`${t("asic.stage.s7")} — AEC-Q100 (${tpl.grade} · ${tempGrade[0]}~+${tempGrade[1]} °C)`}
-              right={<Chip color="#38bdf8">policy alps-asic-v1.0</Chip>}
+              right={<Chip color="#38bdf8">{live.gate?.policy_version ?? "policy alps-asic-v1.1"}</Chip>}
             >
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -756,6 +720,8 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
               </div>
               <div style={{ fontSize: 10, color: "#475569", marginTop: 8 }}>{t("asic.s7.note")}</div>
             </SectionCard>
+            <SafetyTracePanel live={live} liveState={liveState} />
+            </>
           )}
 
           {stage === "s8" && (
@@ -804,24 +770,30 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   </table>
                 </div>
               </SectionCard>
-              <SectionCard title={t("asic.s8.readiness")}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-                  {READINESS_LEVELS.map((l) => {
-                    const reached = l.reachable && gates.s8.status === "pass" ? l.key === "engineering_review_ready" : l.key === "education_only";
-                    return (
-                      <Chip key={l.key} color={reached ? "#34d399" : l.reachable ? "#64748b" : "#7f1d1d"}>
-                        {reached ? "● " : l.reachable ? "○ " : "✕ "}
-                        {l.key}
-                      </Chip>
-                    );
-                  })}
-                </div>
-                <pre style={{ margin: 0, padding: 10, background: "#020617", borderRadius: 8, fontSize: 10, fontFamily: "monospace", color: "#94a3b8", overflowX: "auto" }}>
+              {/* gate report computed SERVER-SIDE and rendered verbatim —
+                  the fixture pre below only appears when the API is down */}
+              <GateReportPanel
+                live={live}
+                liveState={liveState}
+                fallback={
+                  <div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                      {READINESS_LEVELS.map((l) => {
+                        const reached = l.reachable && gates.s8.status === "pass" ? l.key === "controlled_pilot" : l.key === "education_only";
+                        return (
+                          <Chip key={l.key} color={reached ? "#34d399" : l.reachable ? "#64748b" : "#7f1d1d"}>
+                            {reached ? "● " : l.reachable ? "○ " : "✕ "}
+                            {l.key}
+                          </Chip>
+                        );
+                      })}
+                    </div>
+                    <pre style={{ margin: 0, padding: 10, background: "#020617", borderRadius: 8, fontSize: 10, fontFamily: "monospace", color: "#94a3b8", overflowX: "auto" }}>
 {JSON.stringify(
   {
     gate_id: "G8_RELEASE",
     status: gates.s8.status === "pass" ? "review_ready" : "blocked",
-    policy_version: "alps-asic-v1.0",
+    policy_version: "alps-asic-v1.1",
     checks: [
       { check_id: "EVIDENCE_APPROVALS", status: gates.s8.status === "pass" ? "pass" : "fail", actual: evidence.filter((e) => e.approved).length, target: evidence.length },
       { check_id: "REQ_TRACE_COVERAGE", status: tracePct === 100 ? "pass" : "fail", actual: tracePct / 100, target: 1.0 },
@@ -832,14 +804,17 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
   null,
   2,
 )}
-                </pre>
-                <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 8 }}>⚠ {t("asic.s8.blockedNote")}</div>
-              </SectionCard>
+                    </pre>
+                    <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 8 }}>⚠ {t("asic.s8.blockedNote")}</div>
+                  </div>
+                }
+              />
             </>
           )}
 
           {stage === "s9" && (
             <>
+              <FaStudio live={live} liveState={liveState} />
               <SectionCard title={`${t("asic.stage.s9")} — ${t("asic.s9.quality")}`} right={<Chip color="#a78bfa">{t("asic.conf.synthetic_fixture")}</Chip>}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
                   <div>

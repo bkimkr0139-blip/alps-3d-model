@@ -21,6 +21,15 @@ APPROVER = CurrentUser(subject="test-approver", username="test.approver", roles=
 MECH_ENGINEER = CurrentUser(
     subject="test-mech", username="test.mech", roles=frozenset({"mechanical_engineer"})
 )
+ASIC_ENGINEER = CurrentUser(
+    subject="test-asic", username="test.asic", roles=frozenset({"electrical_asic_engineer"})
+)
+TEST_ENGINEER = CurrentUser(
+    subject="test-temc", username="test.temc", roles=frozenset({"test_emc_engineer"})
+)
+QUALITY_ENGINEER = CurrentUser(
+    subject="test-quality", username="test.quality", roles=frozenset({"quality_engineer"})
+)
 
 # App code calls db.commit() itself (idempotent_write), so tests can't rely on
 # an outer transaction + rollback — truncate everything between tests instead.
@@ -55,6 +64,18 @@ _TABLES = (
     "simulation_runs",
     "artifact_versions",
     "artifacts",
+    # ASIC Twin v1.1 (EPIC A·E·F·G) — children of variants/artifacts
+    "asic_ecos",
+    "asic_fa_events",
+    "asic_fa_cases",
+    "asic_fault_injections",
+    "asic_fmeda_items",
+    "asic_safety_items",
+    "asic_qual_results",
+    "asic_qual_plans",
+    "asic_measurement_runs",
+    "asic_corner_studies",
+    "asic_signal_chains",
     "variants",
     "products",
 )

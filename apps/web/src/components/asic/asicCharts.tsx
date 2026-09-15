@@ -100,6 +100,64 @@ export function Pareto({ bars, height = 170 }: { bars: { label: string; value: n
   );
 }
 
+// MC/corner sample histogram with spec-limit rails (지시서 v1.1 EPIC A D04).
+// bins/counts come pre-computed by the caller from the raw draw samples — the
+// SVG stays a dumb renderer like the rest of this file.
+export function Histogram({
+  values,
+  specMin,
+  specMax,
+  height = 150,
+}: {
+  values: number[];
+  specMin?: number | null;
+  specMax?: number | null;
+  height?: number;
+}) {
+  const W = 320;
+  const P = 30;
+  if (values.length === 0) return null;
+  let lo = Math.min(...values);
+  let hi = Math.max(...values);
+  if (specMin != null) lo = Math.min(lo, specMin);
+  if (specMax != null) hi = Math.max(hi, specMax);
+  const pad = (hi - lo) * 0.06 || 1;
+  lo -= pad;
+  hi += pad;
+  const nb = 24;
+  const w = (hi - lo) / nb;
+  const counts = new Array(nb).fill(0);
+  for (const v of values) {
+    const b = Math.min(nb - 1, Math.max(0, Math.floor((v - lo) / w)));
+    counts[b] += 1;
+  }
+  const max = Math.max(...counts) || 1;
+  const x = (v: number) => P + ((v - lo) / (hi - lo)) * (W - P - 8);
+  const y = (c: number) => height - 20 - (c / max) * (height - 34);
+  return (
+    <svg width={W} height={height} style={{ display: "block", maxWidth: "100%" }}>
+      <line x1={P} y1={height - 20} x2={W - 8} y2={height - 20} stroke={AX} />
+      {counts.map((c, i) => (
+        <rect key={i} x={x(lo + i * w)} y={y(c)} width={Math.max(1, (W - P - 8) / nb - 1)} height={height - 20 - y(c)} fill="#22d3ee" opacity={0.75} rx={1} />
+      ))}
+      {specMin != null && (
+        <>
+          <line x1={x(specMin)} y1={10} x2={x(specMin)} y2={height - 20} stroke="#f87171" strokeDasharray="4 3" />
+          <text x={x(specMin)} y={9} fill="#f87171" fontSize={8} textAnchor="middle" fontFamily="monospace">min</text>
+        </>
+      )}
+      {specMax != null && (
+        <>
+          <line x1={x(specMax)} y1={10} x2={x(specMax)} y2={height - 20} stroke="#f87171" strokeDasharray="4 3" />
+          <text x={x(specMax)} y={9} fill="#f87171" fontSize={8} textAnchor="middle" fontFamily="monospace">max</text>
+        </>
+      )}
+      <text x={P} y={height - 6} fill={TXT} fontSize={8} fontFamily="monospace">{lo.toFixed(2)}</text>
+      <text x={W - 8} y={height - 6} fill={TXT} fontSize={8} textAnchor="end" fontFamily="monospace">{hi.toFixed(2)}</text>
+    </svg>
+  );
+}
+
 export function SpcChart({
   points,
   ucl,

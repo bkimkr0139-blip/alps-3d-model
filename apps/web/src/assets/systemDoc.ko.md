@@ -107,6 +107,16 @@
 - 스테이지 코트핀: 진행 단계 n/9, 다음 게이트, 커버리지, 양성률, R²를 한눈에.
 - 게이트 JSON이 블로커(`MOCK_RESULT_PRESENT`, `EVIDENCE_APPROVALS` 등)와 `decision_required`를 정직하게 출력 — **릴리즈는 가짜로 찍히지 않는다**.
 
+**v1.1 고도화 (백엔드 연동 — 지시서 v1.1 §4/§7/§8, 전류 센서 ASIC PoC)**
+
+- **신호체인 리비전 (EPIC A)**: r1→r2 승격은 수정이 아니라 새 리비전 생성 + 이전 리비전 supersede(불변규칙). 블록별 오류예산 테이블과 content_hash를 ②③ 단계에 표시.
+- **Corner/MC 해석 (EPIC A)**: 시드 고정된 오류예산 전파 몬테카를로 → P50/P95/P99·규격 이탈률 + **실제 표본 24-bin 히스토그램**. 시험 온도가 보정 범위를 벗어나면 MODEL OOD 배지. 같은 시드 = 동일 결과(재현성 §12).
+- **장비 실측 임포트 (EPIC E)**: 테스터 CSV 원본 바이트를 파싱 전 sha256 아티팩트로 승격. **같은 파일은 절대 두 런을 만들지 않는다**(409). 부분 파일·시간역전·중복 블록은 findings로 기록(무음 수정 금지 §7). 교정 만료는 데이터로 저장되고 게이트에서 블로커가 된다.
+- **양성 매트릭스 + 폐루프 (EPIC F·G)**: AEC-Q100 그룹별 최신 행 판정(latest row per group). 실패 행은 FA 케이스로 처분 — RCA 승인은 **인간 전담 역할만**, 관찰 사실 + 확인 증적 없이면 422. ECO는 회귀 증적 + 검증 측정런 없이 종결 시 412. 종결 시 FA가 verified로 폐루프.
+- **기능안전 트레이스**: SG→FSR→TSR→HW 트리 + FMEDA(분포·DC·FIT·소스 해시) + 고장주입(기대/관찰)을 ⑦ 단계에 렌더링.
+- **게이트 정책 `alps-asic-v1.1`**: 신규 블로커 `CALIBRATION_EXPIRED`·`MODEL_OOD`·`MIXED_REVISION_EVIDENCE`·`QUAL_FAILURE_OPEN`·`WAIVER_EXPIRED` + 불변의 `MOCK_RESULT_PRESENT`. Readiness Ladder 6단계(education_only→…→controlled_pilot 도달, production_candidate/released는 미도달). **게이트 리포트는 서버 값을 그대로 렌더링** — UI가 블로커를 만들어내지 않는다.
+- 쓰기 전부 역할 게이트(임포트=시험, RCA=전력 ASIC/품질, ECO 종결=아키텍트/승인자). 백엔드 한국어 데모 문자열은 렌더 시점 l10n 오버레이로 en/ja 표시.
+
 ### 3.10 결과 비교·상관·게이트 (하단 프레임)
 
 - **SPICE Resistance Sweep — Variant Compare (S08)**: 변량 2개 이상을 동일 축·동일 단위로 중첩 비교(§12.2).

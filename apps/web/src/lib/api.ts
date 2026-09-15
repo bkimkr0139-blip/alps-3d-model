@@ -765,3 +765,256 @@ export const api = {
       (baselines) => baselines.find((b) => b.status === "active") ?? null
     ),
 };
+
+// --- ASIC Twin v1.1 (지시서 v1.1 R1: EPIC A/E/F/G + 게이트 폐루프) ----------
+// The ASIC workbench READS the golden dataset through these endpoints; the
+// gate report is rendered verbatim (blockers are computed server-side and
+// never hand-authored in the UI — asic_gate_policy.py).
+
+export interface AsicChainBlock {
+  key: string;
+  kind: "sensor" | "analog" | "mixed" | "digital" | "io" | "power";
+  label: string;
+  params: Record<string, number | string>;
+  error_budget: Record<string, number>;
+  requirement_ids?: string[];
+}
+
+export interface AsicSignalChain {
+  id: string;
+  business_id: string;
+  template_id: string;
+  revision: number;
+  status: string;
+  blocks: AsicChainBlock[];
+  source_class: string;
+  supersedes_id: string | null;
+  content_hash: string;
+  note: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AsicCornerOutput {
+  output: string;
+  unit: string | null;
+  nominal: number;
+  p50: number;
+  p95: number;
+  p99: number;
+  violation_rate: number;
+  spec_min: number | null;
+  spec_max: number | null;
+  corners: { corner: string; temp_c: number; mean: number }[];
+  hist: { edges: number[]; counts: number[] } | null;
+}
+
+export interface AsicCornerStudy {
+  id: string;
+  business_id: string;
+  signal_chain_id: string;
+  kind: string;
+  n_draws: number;
+  seed: number;
+  spec: { output: string; nominal?: number | null; min?: number | null; max?: number | null; unit?: string | null }[];
+  result: {
+    per_output: AsicCornerOutput[];
+    model_ood: boolean;
+    ood_reason: string[];
+    n_draws_total: number;
+    temperatures_c: number[];
+    disclosure: string;
+  } | null;
+  tool_version: string;
+  source_class: string;
+  status: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AsicMeasurementRun {
+  id: string;
+  business_id: string;
+  template_id: string;
+  equipment_id: string;
+  equipment_type: string;
+  equipment_model: string | null;
+  firmware: string | null;
+  calibration_expires_at: string | null;
+  program_revision: string | null;
+  operator: string | null;
+  executed_at: string | null;
+  file_hash: string;
+  status: string;
+  points: { name: string; value: number; unit?: string | null; raw_value?: number | null; raw_unit?: string | null; site?: number | null; temperature_c?: number | null }[] | null;
+  findings: { code: string; detail?: string }[] | null;
+  lot_ref: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AsicQualResult {
+  id: string;
+  business_id: string;
+  plan_id: string;
+  group: string;
+  method: string;
+  condition: Record<string, unknown>;
+  samples: string;
+  lots: string[] | null;
+  status: "pending" | "pass" | "fail";
+  failed_param: string | null;
+  fa_case_id: string | null;
+  waiver_ref: string | null;
+  waiver_expires_at: string | null;
+  created_at: string;
+}
+
+export interface AsicQualPlan {
+  id: string;
+  business_id: string;
+  template_id: string;
+  grade: string;
+  policy_version: string;
+  standard_version: string | null;
+  status: string;
+  note: string | null;
+  results: AsicQualResult[];
+  created_by: string;
+  created_at: string;
+}
+
+export interface AsicSafetyItem {
+  id: string;
+  business_id: string;
+  template_id: string;
+  level: "safety_goal" | "fsr" | "tsr" | "hw_req";
+  parent_id: string | null;
+  title: string;
+  asil: string | null;
+  safety_mechanism: string | null;
+  diagnostic_coverage_pct: number | null;
+  safe_state: string | null;
+  response_time_ms: number | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AsicFmedaItem {
+  id: string;
+  business_id: string;
+  safety_item_id: string;
+  failure_mode: string;
+  distribution_pct: number;
+  dc_pct: number | null;
+  fit_rate: number | null;
+  source_ref: string | null;
+  source_hash: string | null;
+  formula_version: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface AsicFaultInjection {
+  id: string;
+  business_id: string;
+  safety_item_id: string;
+  method: string;
+  stimulus: string;
+  expected: string;
+  observed: string;
+  status: string;
+  executed_by: string | null;
+  executed_at: string | null;
+  created_at: string;
+}
+
+export interface AsicFaCase {
+  id: string;
+  business_id: string;
+  template_id: string;
+  scope: string;
+  lot_ref: string | null;
+  symptom: string;
+  repro_condition: string | null;
+  status: string;
+  observations: { fact: string; source?: string | null }[] | null;
+  hypotheses: { text: string; confirm_tests?: string[]; excluded?: boolean; exclusion_basis?: string | null }[] | null;
+  root_cause: string | null;
+  root_cause_confirmed: boolean;
+  cause_class: string | null;
+  location: Record<string, unknown> | null;
+  analysts: string[] | null;
+  closed_at: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AsicFaEvent {
+  id: string;
+  business_id: string;
+  case_id: string;
+  event_type: string;
+  actor: string;
+  actor_roles: string[];
+  comment: string | null;
+  occurred_at: string;
+}
+
+export interface AsicEco {
+  id: string;
+  business_id: string;
+  fa_case_id: string | null;
+  template_id: string;
+  trigger: string;
+  title: string;
+  description: string | null;
+  design_rev_from: string | null;
+  design_rev_to: string | null;
+  mask_revision: string | null;
+  test_program_revision: string | null;
+  impact: Record<string, unknown>[] | null;
+  status: string;
+  regression_run_ids: string[] | null;
+  verification_note: string | null;
+  verification_run_id: string | null;
+  closed_at: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AsicGateReport {
+  template_id: string;
+  gate_id: string;
+  policy_version: string;
+  status: "pass" | "blocked";
+  blockers: { code: string; detail: string; evidence: string[] }[];
+  readiness: string;
+  readiness_reachable: boolean;
+  checks: { check_id: string; status: string; actual: unknown; target: unknown; evidence_refs: string[] }[];
+  evaluated_at: string;
+}
+
+export const asicApi = {
+  listSignalChains: (templateId: string) =>
+    request<AsicSignalChain[]>(`/api/v1/asic/templates/${templateId}/signal-chains`),
+  listCornerStudies: (templateId: string) =>
+    request<AsicCornerStudy[]>(`/api/v1/asic/templates/${templateId}/corner-studies`),
+  listMeasurementRuns: (templateId: string) =>
+    request<AsicMeasurementRun[]>(`/api/v1/asic/templates/${templateId}/measurement-runs`),
+  listQualificationPlans: (templateId: string) =>
+    request<AsicQualPlan[]>(`/api/v1/asic/templates/${templateId}/qualification-plans`),
+  listSafetyItems: (templateId: string) =>
+    request<AsicSafetyItem[]>(`/api/v1/asic/templates/${templateId}/safety-items`),
+  listFmedaItems: (templateId: string) =>
+    request<AsicFmedaItem[]>(`/api/v1/asic/templates/${templateId}/fmeda-items`),
+  listFaultInjections: (templateId: string) =>
+    request<AsicFaultInjection[]>(`/api/v1/asic/templates/${templateId}/fault-injections`),
+  listFaCases: (templateId: string) =>
+    request<AsicFaCase[]>(`/api/v1/asic/templates/${templateId}/fa-cases`),
+  listFaEvents: (caseId: string) =>
+    request<AsicFaEvent[]>(`/api/v1/asic/fa-cases/${caseId}/events`),
+  listEcos: (templateId: string) => request<AsicEco[]>(`/api/v1/asic/templates/${templateId}/ecos`),
+  gateReport: (templateId: string) =>
+    request<AsicGateReport>(`/api/v1/asic/gate-report/${templateId}`),
+};
