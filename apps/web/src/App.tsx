@@ -142,6 +142,20 @@ function TabButton({
   );
 }
 
+// Keep the breakpoint in sync with the mobile media query in index.css,
+// which flattens the inline grids — this hook handles what CSS cannot:
+// heights and panel ordering of the top-level layout.
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 820px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 820px)");
+    const onChange = () => setMobile(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return mobile;
+}
+
 function useTwinData(variantId: string | null) {
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [components, setComponents] = useState<ComponentDto[]>([]);
@@ -161,6 +175,7 @@ function useTwinData(variantId: string | null) {
 
 function Workbench() {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const variantId = useTwinStore((s) => s.variantId);
   const setVariantId = useTwinStore((s) => s.setVariantId);
   const setSelectedComponentId = useTwinStore((s) => s.setSelectedComponentId);
@@ -242,10 +257,10 @@ function Workbench() {
   const standaloneMode = centerTab === "eda" || centerTab === "asic" || centerTab === "docs";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#020617", color: "#e2e8f0", padding: 20, fontFamily: "system-ui, sans-serif" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+    <div style={{ minHeight: "100vh", background: "#020617", color: "#e2e8f0", padding: isMobile ? 12 : 20, fontFamily: "system-ui, sans-serif" }}>
+      <header style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 20 }}>{t("app.title")}</h1>
+          <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 20 }}>{t("app.title")}</h1>
           <div style={{ opacity: 0.6, fontSize: 13 }}>{product?.name}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -262,7 +277,7 @@ function Workbench() {
           the center tab bar read as a single hierarchy instead of two
           unrelated widgets. Product/variant dim + disable in standalone
           module mode — honest UI: EDA/ASIC ignore that context entirely. */}
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: isMobile ? 8 : 12, marginBottom: 12 }}>
         <span style={{ opacity: standaloneMode ? 0.45 : 1, transition: "opacity 150ms" }}>
           <Field label={t("nav.product")}>
             <select
@@ -273,7 +288,7 @@ function Workbench() {
                 const p = products.find((x) => x.id === e.target.value);
                 if (p) selectProduct(p);
               }}
-              style={selectStyle}
+              style={isMobile ? { ...selectStyle, maxWidth: "46vw" } : selectStyle}
             >
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -293,7 +308,7 @@ function Workbench() {
                 clearSelection();
                 setVariantId(e.target.value);
               }}
-              style={selectStyle}
+              style={isMobile ? { ...selectStyle, maxWidth: "46vw" } : selectStyle}
             >
               {variants.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -303,7 +318,7 @@ function Workbench() {
             </select>
           </Field>
         </span>
-        <div style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
+        <div className="nav-divider" style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
         <NavGroup label={t("nav.views")}>
           <div role="tablist" aria-label={t("nav.views")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {PRODUCT_TWIN_TABS.map(({ tab, color }) => (
@@ -319,7 +334,7 @@ function Workbench() {
         </NavGroup>
         {/* Everything right of this divider is a standalone module that
             ignores the product/variant context on the left. */}
-        <div style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
+        <div className="nav-divider" style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
         <NavGroup label={t("nav.modules")}>
           <div role="tablist" aria-label={t("nav.modules")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {STANDALONE_TABS.map(({ tab, color }) => (
@@ -335,7 +350,7 @@ function Workbench() {
         </NavGroup>
         {/* Reference material is its own group: readable at any time, still
             independent of the product/variant context. */}
-        <div style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
+        <div className="nav-divider" style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
         <NavGroup label={t("nav.docs")}>
           <div role="tablist" aria-label={t("nav.docs")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {DOCS_TABS.map(({ tab, color }) => (
@@ -376,19 +391,21 @@ function Workbench() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: standaloneMode ? "1fr" : "320px 1fr 340px",
+          gridTemplateColumns: !isMobile && !standaloneMode ? "320px 1fr 340px" : "1fr",
           gap: 16,
           // Tab bar moved up into the nav bar — 62vh keeps the same viewport
-          // share the center column had when it still carried the tabs.
-          height: "62vh",
+          // share the center column had when it still carried the tabs. On
+          // phones the rows stack (CSS flattens the columns) so heights move
+          // onto the children and the page scrolls naturally.
+          height: isMobile ? undefined : "62vh",
         }}
       >
         {!standaloneMode && (
-          <div style={{ overflowY: "auto" }}>
+          <div style={{ overflowY: "auto", ...(isMobile && { height: "42vh", order: 2 }) }}>
             <RequirementsPanel requirements={requirements} onSelect={selectRequirement} />
           </div>
         )}
-        <div style={{ minHeight: 0, overflow: "hidden" }}>
+        <div style={{ minHeight: 0, overflow: "hidden", ...(isMobile && { height: "58vh", order: 1, overflowY: "auto" }) }}>
           {centerTab === "model" ? (
               <ThreeViewer components={components} />
             ) : centerTab === "bench" ? (
@@ -412,7 +429,7 @@ function Workbench() {
             )}
         </div>
         {!standaloneMode && (
-          <div style={{ overflowY: "auto" }}>
+          <div style={{ overflowY: "auto", ...(isMobile && { height: "42vh", order: 3 }) }}>
             <SimulationPanel runs={runs} />
           </div>
         )}

@@ -22,3 +22,24 @@ button {
   color: white;
   border: 1px solid #334155;
 }
+
+/* ── Mobile (breakpoint matches useIsMobile() in App.tsx) ──
+   The workbench is styled inline, and a stylesheet can only beat inline
+   styles with !important — the [style*=…] selector targets every grid the
+   components declare, so fixed columns ("320px 1fr 340px", "1fr 340px",
+   minmax pairs…) all stack into one column on phones. Tables become their
+   own horizontal-scroll containers so wide matrices stay reachable. */
+@media (max-width: 820px) {
+  [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .nav-divider {
+    display: none;
+  }
+}
