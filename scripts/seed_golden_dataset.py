@@ -93,26 +93,54 @@ def run_simulation_and_wait(
     client: httpx.Client, *, business_id: str, variant_id: str, run_type: str,
     input_artifact_version_id: str | None = None,
     parameters: dict | None = None, timeout_s: float = 20.0,
+    max_attempts: int = 3,
 ) -> dict:
-    run = post(
-        client,
-        "/api/v1/simulation-runs",
-        idem_key=f"seed-run-{business_id}",
-        body={
-            "business_id": business_id,
-            "variant_id": variant_id,
-            "run_type": run_type,
-            **({"input_artifact_version_id": input_artifact_version_id} if input_artifact_version_id else {}),
-            **({"parameters": parameters} if parameters else {}),
-        },
-    )
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        run = client.get(f"/api/v1/simulation-runs/{run['id']}").json()
-        if run["status"] in ("succeeded", "failed"):
+    """POST a simulation run and poll it to a terminal state.
+
+    A FAILED run is retried under a fresh ``-fxN`` business_id — which is
+    also a fresh Idempotency-Key. The idempotency ledger caches the original
+    failure response forever, so re-running this seed against a DB that
+    recorded a failure under an old, since-fixed worker silently replays the
+    stale failure and the section quietly degrades (the 2026-09-15 VAR-AIR
+    "Object of type UUID is not JSON serializable" warning was exactly this:
+    the worker fix had shipped, but the unsuffixed keys still replayed the
+    pre-fix FAILED rows). If every attempt fails, raise — never skip a
+    section and leave a half-seeded dataset behind.
+    """
+    last_error = "no attempt made"
+    for attempt in range(1, max_attempts + 1):
+        bid = business_id if attempt == 1 else f"{business_id}-fx{attempt - 1}"
+        if len(bid) > 64:  # result_metrics.business_id is VARCHAR(64)
+            break
+        run = post(
+            client,
+            "/api/v1/simulation-runs",
+            idem_key=f"seed-run-{bid}",
+            body={
+                "business_id": bid,
+                "variant_id": variant_id,
+                "run_type": run_type,
+                **({"input_artifact_version_id": input_artifact_version_id} if input_artifact_version_id else {}),
+                **({"parameters": parameters} if parameters else {}),
+            },
+        )
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            run = client.get(f"/api/v1/simulation-runs/{run['id']}").json()
+            if run["status"] in ("succeeded", "failed"):
+                break
+            time.sleep(0.5)
+        if run["status"] not in ("succeeded", "failed"):
+            raise TimeoutError(f"simulation run {bid} did not finish within {timeout_s}s")
+        if run["status"] == "succeeded":
             return run
-        time.sleep(0.5)
-    raise TimeoutError(f"simulation run {business_id} did not finish within {timeout_s}s")
+        last_error = run.get("error_message") or "failed"
+        print(
+            f"WARNING: {bid} failed ({last_error[:120]})"
+            + ("; retrying fresh" if attempt < max_attempts else ""),
+            file=sys.stderr,
+        )
+    raise RuntimeError(f"simulation run {business_id} failed after retries: {last_error}")
 
 
 def upload_csv_measurements(

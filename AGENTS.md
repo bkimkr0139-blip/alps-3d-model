@@ -538,6 +538,20 @@ Facts that were expensive to learn (do not re-derive):
   succeeded `cad_convert` output (`fix_tact_link.py` was the one-off repair).
   Correlation POSTs that FAIL are not cached — their Idempotency-Keys stay
   free for a retry after fixing the cause.
+  - **Third bite + general cure (2026-09-15)**: `POST /simulation-runs`
+    replay returns the run row's *current* status, so a stale FAILED row
+    (pre-worker-fix) replays as a failure forever — the ASIC v1.1 reseed
+    re-surfaced the Sep-14 `VAR-AIR-*-RUN-FIELD-01` "Object of type UUID is
+    not JSON serializable" rows even though the worker fix had shipped
+    (unsuffixed keys hadn't been recomputed since). `run_simulation_and_wait`
+    now retries a FAILED run under a fresh `-fxN` business_id (= fresh
+    Idempotency-Key, since `result_metrics.business_id` is VARCHAR(64))
+    and RAISES if every attempt fails instead of silently skipping a
+    section; the 15 poisoned rows + their IdempotencyRecords were deleted
+    (backup: `/tmp/alps-logs/backups/alps_twin_pre_uuidfix_*.sql`). To purge
+    a poisoned key yourself: delete BOTH the failed `simulation_runs` row
+    AND its `seed-run-{business_id}` `idempotency_records` row — the ledger
+    alone keeps returning `db.get(SimulationRun, ...)` → null.
 - **API code changes need an uvicorn restart** (exact PID via
   `lsof -nP -iTCP:8000 -sTCP:LISTEN -t`); the Phase 2 seed ran against the
   old process and every new-product correlation failed with the old unit
