@@ -15,7 +15,7 @@ import {
   type SimResult,
   type SynthResult,
 } from "./edaRunner";
-import { buildLayoutScene, buildSynthesisScene } from "./edaScene";
+import { buildLayoutScene, buildProcessScene, buildSynthesisScene } from "./edaScene";
 import { Eda3DViewer } from "./Eda3DViewer";
 import { EdaWaveform } from "./EdaWaveform";
 
@@ -61,7 +61,7 @@ export function EdaTraining() {
   const [synth, setSynth] = useState<SynthResult | null>(null);
   const [pnr, setPnr] = useState<PnrResult | null>(null);
   const [stageState, setStageState] = useState<Record<string, StageState>>({});
-  const [view3d, setView3d] = useState<"synthesis" | "layout">("synthesis");
+  const [view3d, setView3d] = useState<"process" | "synthesis" | "layout">("synthesis");
   const [coach, setCoach] = useState<CoachHint[]>([]);
 
   const stage = (name: string, fn: () => void) => {
@@ -130,7 +130,7 @@ export function EdaTraining() {
       const r = runSynthesis(rtl, mission.topModule, clockPeriod);
       setSynth(r);
       setPnr(null);
-      setView3d("synthesis");
+      setView3d("process"); // the fab-flow view is the default after synthesis
       const hints = rtlIssues(rtl);
       if (r.status === "success") {
         hints.push(
@@ -172,11 +172,12 @@ export function EdaTraining() {
   // 3D scenes — rebuilt only when their inputs change. The layout scene also
   // follows live floorplan-slider moves (the builder is pure + seeded).
   const synthScene = useMemo(() => (synth?.status === "success" ? buildSynthesisScene(synth, mission.slug) : null), [synth, mission.slug]);
+  const procScene = useMemo(() => (synth?.status === "success" ? buildProcessScene(synth, mission.slug) : null), [synth, mission.slug]);
   const layoutScene = useMemo(
     () => (synth?.status === "success" ? buildLayoutScene(mergedFloorplan(fp), pnr?.drcViolations ?? 0, mission.slug) : null),
     [synth, fp, pnr, mission.slug],
   );
-  const scene = view3d === "layout" ? layoutScene : synthScene;
+  const scene = view3d === "layout" ? layoutScene : view3d === "process" ? procScene : synthScene;
 
   const stageDone = (s: StageState | undefined) => s === "ok";
   const stages: { id: string; label: string; run: () => void; state: StageState }[] = [
@@ -436,7 +437,23 @@ export function EdaTraining() {
 
       {/* 3D viewer — the Unity replacement */}
       <div style={{ ...card, padding: 8 }}>
-        <div style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            onClick={() => setView3d("process")}
+            disabled={!procScene}
+            style={{
+              fontSize: 12,
+              padding: "4px 12px",
+              borderRadius: 6,
+              border: `1px solid ${view3d === "process" ? "#34d399" : "#334155"}`,
+              background: view3d === "process" ? "#064e3b" : "#0f172a",
+              color: view3d === "process" ? "#a7f3d0" : "#94a3b8",
+              cursor: procScene ? "pointer" : "not-allowed",
+              opacity: procScene ? 1 : 0.4,
+            }}
+          >
+            {t("eda.view3dProcess")}
+          </button>
           <button
             onClick={() => setView3d("synthesis")}
             disabled={!synthScene}

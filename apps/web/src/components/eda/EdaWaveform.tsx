@@ -71,7 +71,9 @@ export function EdaWaveform({ data }: { data: Waveform | null }) {
           {data.signals.map((s) => (
             <tr key={s.name} style={{ borderTop: "1px solid #1e293b" }}>
               <td style={{ padding: "3px 0", fontFamily: "monospace", color: "#cbd5e1" }}>{s.name}</td>
-              <td style={{ padding: "3px 0", fontFamily: "monospace", color: "#22d3ee" }}>{valueAt(s, cursor)}</td>
+              <td style={{ padding: "3px 0", fontFamily: "monospace", color: "#22d3ee" }}>
+                {s.width > 1 ? prettyBus(valueAt(s, cursor)) : valueAt(s, cursor)}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -124,9 +126,12 @@ function busWave(s: WaveSignal, xOf: (t: number) => number, y: number, tEnd: num
         strokeWidth={1}
       />,
     );
+    // clip the hex label to what the segment can hold (~5.5 px/char at 9 px)
+    const full = prettyBus(v);
+    const label = full.slice(0, Math.max(1, Math.floor((x2 - x1 - 8) / 5.5)));
     segs.push(
       <text key={`t${t1}`} x={(x1 + x2) / 2} y={y + 15} fontSize={9} fill="#e9d5ff" textAnchor="middle" fontFamily="monospace">
-        {prettyBus(v)}
+        {label}
       </text>,
     );
   };

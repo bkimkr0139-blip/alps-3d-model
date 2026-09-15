@@ -20,14 +20,17 @@ export type EdaBox = {
   emissive?: number;
   metalness?: number;
   roughness?: number;
+  opacity?: number;
 };
 
 export type EdaLegendEntry = { key: string; label: string; color: RGB; count: number };
 
 export type EdaScene = {
-  mode: "synthesis" | "layout";
+  mode: "synthesis" | "layout" | "process";
   boxes: EdaBox[];
   legend: EdaLegendEntry[];
+  /** process mode only — ordered step keys for the build-up slider */
+  steps?: string[];
   /** suggested orbit target + camera distance for framing */
   target: [number, number, number];
   distance: number;
@@ -128,16 +131,20 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
     .filter(([, n]) => n > 0)
     .sort((a, b) => (isSeq(a[0]) === isSeq(b[0]) ? b[1] - a[1] : isSeq(a[0]) ? -1 : 1));
 
-  type Block = { type: string; count: number; tw: number; td: number; color: RGB; label: string };
+  type Block = { type: string; count: number; disp: number; tw: number; td: number; color: RGB; label: string };
+  // Render cap per type — a 544-FF core still shows a believable cluster
+  // without 500+ meshes; the true count stays in the label/legend.
+  const CAP = 160;
   const blocks: Block[] = types.map(([type, n]) => ({
     type,
     count: n,
-    tw: Math.max(1, Math.ceil(Math.sqrt(n))),
+    disp: Math.min(n, CAP),
+    tw: Math.max(1, Math.ceil(Math.sqrt(Math.min(n, CAP)))),
     td: 0,
     color: gateColor(type),
     label: shortGateLabel(type),
   }));
-  for (const b of blocks) b.td = Math.max(1, Math.ceil(b.count / b.tw));
+  for (const b of blocks) b.td = Math.max(1, Math.ceil(b.disp / b.tw));
 
   // Strip-pack: left-to-right, wrap when the running width exceeds MAX.
   const spacing = 1.4;
@@ -197,8 +204,8 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
         emissive: 0.25,
       });
       let placed = 0;
-      for (let r = 0; r < b.td && placed < b.count; r++) {
-        for (let c = 0; c < b.tw && placed < b.count; c++) {
+      for (let r = 0; r < b.td && placed < b.disp; r++) {
+        for (let c = 0; c < b.tw && placed < b.disp; c++) {
           const h = 0.45 + perCellArea + rng() * 0.25;
           boxes.push({
             name: `eda_cell_${String(cellIdx).padStart(3, "0")}`,
@@ -518,5 +525,247 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
     legend,
     target: [0, 0.3, 0],
     distance: Math.max(DIE_W, DIE_D) * 1.9 + 3,
+  };
+}
+
+// ── Process scene — the die as a real fab flow ─────────────────────────
+// The gate-cluster view answers "what gates did I get"; this one answers
+// "how does a fab actually build it": wafer → STI → wells → gate stack →
+// LDD/S-D → spacers/silicide/contacts → M1 → via/M2 → upper metals →
+// passivation → bond pads/seal/PCM. Every step carries floor-level detail
+// (alignment keys, ion beam, stepper reticle frames, CMP check bar, die-ID
+// matrix, scribe street, PCM test structures). Step k is a layer key, so
+// the viewer's chips/explode work unchanged and a slider can build the
+// chip up stage by stage.
+type ProcStep = { key: string; label: string; color: RGB };
+
+const PROC_STEPS: ProcStep[] = [
+  { key: "S00 wafer",        label: "wafer",        color: [0.42, 0.46, 0.52] },
+  { key: "S01 STI",          label: "STI/CMP",      color: [0.62, 0.7, 0.62] },
+  { key: "S02 well",         label: "well implant", color: [0.28, 0.48, 0.88] },
+  { key: "S03 gate",         label: "gate ox+poly", color: [0.72, 0.2, 0.3] },
+  { key: "S04 LDD",          label: "LDD/halo",     color: [0.95, 0.62, 0.3] },
+  { key: "S05 spacer+SD",    label: "spacer + S/D", color: [0.5, 0.36, 0.62] },
+  { key: "S06 silicide/CT",  label: "silicide+CT",  color: [0.92, 0.94, 0.98] },
+  { key: "S07 M1",           label: "M1",           color: [0.3, 0.55, 0.95] },
+  { key: "S08 via/M2",       label: "via1 + M2",    color: [0.95, 0.4, 0.4] },
+  { key: "S09 top metal",    label: "M3-M6 mesh",   color: [0.3, 0.85, 0.55] },
+  { key: "S10 passivation",  label: "passivation",  color: [0.36, 0.42, 0.58] },
+  { key: "S11 pad/seal/PCM", label: "pad+seal+PCM", color: [0.96, 0.78, 0.31] },
+];
+
+export function buildProcessScene(report: SynthResult, projectTitle: string): EdaScene {
+  const rng = mulberry32(strSeed(`proc-${projectTitle}`));
+  const boxes: EdaBox[] = [];
+  const stepCount = new Map<string, number>();
+  const put = (step: ProcStep, name: string, pos: [number, number, number], size: [number, number, number], color: RGB, extra: Partial<EdaBox> = {}) => {
+    boxes.push({ name: `${step.key}_${name}`, layer: step.key, pos, size, color, ...extra });
+    stepCount.set(step.key, (stepCount.get(step.key) ?? 0) + 1);
+  };
+  const stepOf = (k: string) => PROC_STEPS.find((s) => s.key === k)!;
+  const gates = Math.max(60, report.gateCount || 60);
+  // Standard-cell row count scales with the gate count (6..12 rows)
+  const ROWS = Math.min(12, Math.max(6, Math.round(4 + Math.sqrt(gates) / 4)));
+  const COLS = 10; // poly gate lines per row span
+  const W = 12.5;
+  const D = 8.5;
+  const rowZ = (r: number) => -D / 2 + 1.0 + ((r + 0.5) * (D - 2.0)) / ROWS;
+  const colX = (c: number) => -W / 2 + 1.2 + ((c + 0.5) * (W - 2.4)) / COLS;
+
+  // corner alignment keys (photo-lithography step detail, reused twice)
+  const alignmentKeys = (s: ProcStep, y: number, size: number) => {
+    for (const [cx, cz] of [[-W / 2 + 0.55, -D / 2 + 0.55], [W / 2 - 0.55, -D / 2 + 0.55], [-W / 2 + 0.55, D / 2 - 0.55], [W / 2 - 0.55, D / 2 - 0.55]] as const) {
+      put(s, "aln_h", [cx, y, cz], [size, 0.04, size * 0.14], [0.95, 0.97, 1], { emissive: 0.55 });
+      put(s, "aln_v", [cx, y, cz], [size * 0.14, 0.04, size], [0.95, 0.97, 1], { emissive: 0.55 });
+    }
+  };
+  // stepper reticle frame: translucent frame + field-split cross above the die
+  const reticleFrame = (s: ProcStep, y: number) => {
+    const t = 0.16;
+    for (const [px, pz, sx, sz] of [
+      [0, -D / 2 - 0.25, W + 1.0, t], [0, D / 2 + 0.25, W + 1.0, t],
+      [-W / 2 - 0.25, 0, t, D + 1.0], [W / 2 + 0.25, 0, t, D + 1.0],
+    ] as const)
+      put(s, "reticle", [px, y, pz], [sx, 0.05, sz], [0.95, 0.95, 0.6], { opacity: 0.32, emissive: 0.25 });
+    put(s, "reticle_div_h", [0, y, 0], [W + 1.0, 0.04, 0.06], [0.95, 0.95, 0.6], { opacity: 0.25 });
+    put(s, "reticle_div_v", [0, y, 0], [0.06, 0.04, D + 1.0], [0.95, 0.95, 0.6], { opacity: 0.25 });
+  };
+
+  // ── S00 wafer: substrate + notch + orientation flat + laser-scribe ID ──
+  {
+    const s = stepOf("S00 wafer");
+    put(s, "substrate", [0, -0.25, 0], [W, 0.5, D], s.color, { metalness: 0.35, roughness: 0.6 });
+    put(s, "notch", [-W / 2 + 0.3, -0.25, D / 2 - 0.3], [0.5, 0.5, 0.5], [0.3, 0.33, 0.38], { cyl: true });
+    put(s, "flat", [W / 2 - 0.12, -0.1, 0], [0.24, 0.3, D - 0.6], [0.3, 0.33, 0.38], { metalness: 0.4 });
+    for (let i = 0; i < 10; i++)
+      put(s, `scribe${i}`, [-3.6 + i * 0.42, 0.005, D / 2 - 0.5], [0.2, 0.02, 0.1], [0.08, 0.09, 0.12]); // laser-scribe serial digits
+  }
+
+  // ── S01 STI: shallow-trench isolation fill + CMP planarity check bar ──
+  {
+    const s = stepOf("S01 STI");
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++) {
+        const h = 0.1 + (rng() - 0.5) * 0.012; // post-CMP dishing jitter
+        put(s, `sti_${r}_${c}`, [colX(c), 0.05 + h / 2, rowZ(r)], [0.92, h, 0.62], s.color, { roughness: 0.7 });
+      }
+    put(s, "cmp_check", [0, 0.14, -D / 2 + 0.28], [W - 1.0, 0.06, 0.16], [0.13, 0.83, 0.93], { emissive: 0.5 });
+  }
+
+  // ── S02 wells: n/p-well slabs + ion beam + first alignment keys ──
+  {
+    const s = stepOf("S02 well");
+    put(s, "nwell_top", [0, 0.16, -D / 2 + 1.6], [W - 1.6, 0.16, 2.4], s.color, { opacity: 0.4 });
+    put(s, "nwell_bot", [0, 0.16, D / 2 - 1.6], [W - 1.6, 0.16, 2.4], s.color, { opacity: 0.4 });
+    put(s, "pwell", [0, 0.16, 0], [W - 1.6, 0.16, D - 5.4], [0.85, 0.5, 0.2], { opacity: 0.4 });
+    put(s, "ion_beam", [0, 1.3, 0], [0.14, 2.0, 0.14], [0.9, 0.95, 1], { cyl: true, opacity: 0.5, emissive: 0.9 }); // implanter beam
+    put(s, "beamline", [-W / 2 - 0.8, 1.3, 0], [0.5, 0.2, 0.2], [0.7, 0.75, 0.85], { emissive: 0.3 }); // beamline stub
+    alignmentKeys(s, 0.26, 0.5);
+  }
+
+  // ── S03 gate stack: gate oxide + poly lines + stepper reticle frame ──
+  {
+    const s = stepOf("S03 gate");
+    for (let r = 0; r < ROWS; r++)
+      put(s, `gox_${r}`, [0, 0.26, rowZ(r)], [W - 1.6, 0.03, 0.56], [0.1, 0.75, 0.75], { emissive: 0.3 });
+    for (let c = 0; c < COLS; c++)
+      put(s, `poly_${c}`, [colX(c), 0.32, 0], [0.34, 0.1, D - 2.0], s.color, { metalness: 0.3, roughness: 0.5 });
+    reticleFrame(s, 1.7);
+  }
+
+  // ── S04 LDD/halo: shallow implants flanking every gate line ──
+  {
+    const s = stepOf("S04 LDD");
+    for (let r = 0; r < ROWS; r++) {
+      const n = r % 2 === 0; // even rows NMOS, odd rows PMOS
+      const col: RGB = n ? [0.95, 0.62, 0.3] : [0.55, 0.6, 0.95];
+      for (let c = 0; c < COLS; c++)
+        for (const side of [-1, 1])
+          put(s, `ldd_${r}_${c}_${side}`, [colX(c) + side * 0.42, 0.28, rowZ(r)], [0.34, 0.05, 0.5], col, { emissive: 0.15 });
+    }
+  }
+
+  // ── S05 sidewall spacers + S/D implants ──
+  {
+    const s = stepOf("S05 spacer+SD");
+    for (let c = 0; c < COLS; c++)
+      for (const side of [-1, 1])
+        put(s, `spacer_${c}_${side}`, [colX(c) + side * 0.26, 0.34, 0], [0.1, 0.16, D - 2.0], s.color, { roughness: 0.55 });
+    for (let r = 0; r < ROWS; r++) {
+      const n = r % 2 === 0;
+      const col: RGB = n ? [0.85, 0.15, 0.25] : [0.3, 0.3, 0.85];
+      for (let c = 0; c < COLS - 1; c++)
+        put(s, `sd_${r}_${c}`, [(colX(c) + colX(c + 1)) / 2, 0.3, rowZ(r)], [0.62, 0.07, 0.56], col);
+    }
+  }
+
+  // ── S06 silicide caps + contact etch → W plugs ──
+  {
+    const s = stepOf("S06 silicide/CT");
+    const metal: Partial<EdaBox> = { metalness: 0.9, roughness: 0.25, emissive: 0.12 };
+    for (let c = 0; c < COLS; c++) put(s, `sil_poly_${c}`, [colX(c), 0.4, 0], [0.24, 0.04, D - 2.0], s.color, metal);
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS - 1; c++) {
+        const x = (colX(c) + colX(c + 1)) / 2;
+        const z = rowZ(r);
+        put(s, `sil_sd_${r}_${c}`, [x, 0.36, z], [0.5, 0.04, 0.44], s.color, metal);
+        put(s, `plug_${r}_${c}`, [x, 0.55, z], [0.2, 0.3, 0.2], [0.55, 0.58, 0.62], { cyl: true, metalness: 0.85, roughness: 0.3 }); // tungsten plug
+      }
+  }
+
+  // ── S07 M1: cell rails + stubs, M1 mask reticle ──
+  {
+    const s = stepOf("S07 M1");
+    for (let r = 0; r <= ROWS; r++)
+      put(s, `rail_${r}`, [0, 0.78, rowZ(r) - (D - 2.0) / ROWS / 2], [W - 1.2, 0.13, 0.26], s.color, { metalness: 0.8, roughness: 0.35 });
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS - 1; c++)
+        put(s, `m1_${r}_${c}`, [(colX(c) + colX(c + 1)) / 2, 0.78, rowZ(r)], [0.22, 0.13, 0.22], s.color, { metalness: 0.8, roughness: 0.35 });
+    reticleFrame(s, 1.9);
+  }
+
+  // ── S08 via1 + M2 ──
+  {
+    const s = stepOf("S08 via/M2");
+    for (let r = 0; r < ROWS; r += 2)
+      for (let c = 0; c < COLS - 1; c += 2)
+        put(s, `via1_${r}_${c}`, [(colX(c) + colX(c + 1)) / 2, 0.98, rowZ(r)], [0.16, 0.22, 0.16], [0.96, 0.85, 0.32], { cyl: true, metalness: 0.85 });
+    for (let c = 0; c < 8; c++)
+      put(s, `m2_${c}`, [-W / 2 + 1.6 + (c * (W - 3.2)) / 7, 1.1, 0], [0.38, 0.13, D - 1.6], s.color, { metalness: 0.8, roughness: 0.35 });
+    reticleFrame(s, 2.05);
+  }
+
+  // ── S09 upper metals: M3/M4 + M5/M6 coarse power mesh ──
+  {
+    const s = stepOf("S09 top metal");
+    for (let r = 0; r < 5; r++)
+      put(s, `m3_${r}`, [0, 1.34, -D / 2 + 1.2 + (r * (D - 2.4)) / 4], [W - 1.0, 0.15, 0.42], [0.3, 0.85, 0.55], { metalness: 0.8, roughness: 0.35 });
+    for (let c = 0; c < 5; c++)
+      put(s, `m4_${c}`, [-W / 2 + 1.8 + (c * (W - 3.6)) / 4, 1.58, 0], [0.5, 0.17, D - 1.2], [0.95, 0.65, 0.25], { metalness: 0.8, roughness: 0.35 });
+    for (const [zz, sx, sz] of [[-D / 2 + 0.7, W - 0.4, 0.75], [D / 2 - 0.7, W - 0.4, 0.75]] as const)
+      put(s, `m5_vdd${zz > 0 ? "p" : "n"}`, [0, 1.84, zz], [sx, 0.2, sz], [0.55, 0.3, 0.85], { metalness: 0.85, roughness: 0.3 });
+    for (const xx of [-W / 2 + 0.8, 0, W / 2 - 0.8])
+      put(s, `m6_${xx < 0 ? "n" : xx > 0 ? "p" : "m"}`, [xx, 2.08, 0], [0.8, 0.22, D - 0.4], [0.85, 0.85, 0.3], { metalness: 0.85, roughness: 0.3 });
+  }
+
+  // ── S10 passivation + die-ID dot matrix (traceability) ──
+  {
+    const s = stepOf("S10 passivation");
+    put(s, "passivation", [0, 2.28, 0], [W - 0.3, 0.08, D - 0.3], s.color, { opacity: 0.45, roughness: 0.4 });
+    for (let iy = 0; iy < 7; iy++)
+      for (let ix = 0; ix < 5; ix++)
+        if (rng() > 0.35)
+          put(s, `dieid_${ix}_${iy}`, [-W / 2 + 0.75 + ix * 0.16, 2.34, D / 2 - 1.15 + iy * 0.16], [0.08, 0.02, 0.08], [0.85, 0.88, 0.95], { emissive: 0.2 });
+  }
+
+  // ── S11 bond pads + seal ring + scribe street + PCM test structures ──
+  {
+    const s = stepOf("S11 pad/seal/PCM");
+    const pad: Partial<EdaBox> = { metalness: 1.0, roughness: 0.28, emissive: 0.08 };
+    // periphery bond pads (two rows top/bottom, one column each side)
+    for (let i = 0; i < 8; i++) {
+      const x = -W / 2 + 1.4 + (i * (W - 2.8)) / 7;
+      put(s, `pad_b${i}`, [x, 2.42, D / 2 - 0.55], [0.55, 0.1, 0.55], s.color, pad);
+      put(s, `pad_t${i}`, [x, 2.42, -D / 2 + 0.55], [0.55, 0.1, 0.55], s.color, pad);
+    }
+    for (const zz of [-1.6, 1.6]) put(s, `pad_s${zz}`, [-W / 2 + 0.55, 2.42, zz], [0.55, 0.1, 0.55], s.color, pad);
+    // seal ring
+    const seal = stepOf("S11 pad/seal/PCM");
+    for (const [px, pz, sx, sz] of [
+      [0, -D / 2 + 0.12, W - 0.1, 0.22], [0, D / 2 - 0.12, W - 0.1, 0.22],
+      [-W / 2 + 0.12, 0, 0.22, D - 0.1], [W / 2 - 0.12, 0, 0.22, D - 0.1],
+    ] as const)
+      put(seal, "seal", [px, 2.36, pz], [sx, 0.16, sz], [0.66, 0.55, 0.22], { metalness: 0.7, roughness: 0.4 });
+    // scribe street crosses between seal and pad ring
+    for (const xx of [-3, 0, 3]) put(s, `street_${xx}`, [xx, 2.37, -D / 2 + 0.32], [0.18, 0.02, 0.18], [0.75, 0.78, 0.82], { emissive: 0.15 });
+    // PCM (process control monitor) test structures in the street corner:
+    // serpentine resistor + comb fingers + cross-bridge + label bar
+    const pcm: Partial<EdaBox> = { emissive: 0.35 };
+    const px0 = W / 2 - 1.9;
+    const pz0 = -D / 2 + 0.75;
+    for (let i = 0; i < 10; i++)
+      put(s, `pcm_serp${i}`, [px0 + (i % 2) * 0.34, 2.4, pz0 + i * 0.13], [i % 2 ? 0.34 : 0.08, 0.03, 0.09], [0.13, 0.83, 0.93], pcm);
+    for (let i = 0; i < 8; i++)
+      put(s, `pcm_comb${i}`, [px0 + 0.9, 2.4, pz0 + i * 0.11], [0.55, 0.03, 0.05], [0.13, 0.83, 0.93], pcm);
+    for (let i = 0; i < 4; i++)
+      put(s, `pcm_xbr${i}`, [px0 + 1.62, 2.4, pz0 + i * 0.15], [0.3 + i * 0.08, 0.03, 0.05], [0.13, 0.83, 0.93], pcm);
+    put(s, "pcm_label", [px0 + 0.85, 2.42, pz0 - 0.28], [1.9, 0.05, 0.12], [0.13, 0.83, 0.93], { emissive: 0.6 });
+    alignmentKeys(s, 2.4, 0.6);
+  }
+
+  const legend: EdaLegendEntry[] = PROC_STEPS.filter((s) => stepCount.get(s.key)).map((s) => ({
+    key: s.key,
+    label: s.label,
+    color: s.color,
+    count: stepCount.get(s.key) ?? 0,
+  }));
+
+  return {
+    mode: "process",
+    boxes,
+    legend,
+    steps: PROC_STEPS.map((s) => s.key),
+    target: [0, 1.2, 0],
+    distance: Math.max(W, D) * 1.75 + 3,
   };
 }

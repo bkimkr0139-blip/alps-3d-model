@@ -57,13 +57,37 @@ export function Eda3DViewer({ scene }: { scene: EdaScene | null }) {
   const [explode, setExplode] = useState(0);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const explodeRef = useRef({ current: 0, target: 0 });
+  // Process-mode build-up: step k shows fab steps 0..k (index into scene.steps)
+  const [step, setStep] = useState(0);
+  const [playing, setPlaying] = useState(false);
 
   // New scene → reset view state (a layout's layers don't carry over)
   useEffect(() => {
     setExplode(0);
     setHidden(new Set());
     explodeRef.current = { current: 0, target: 0 };
+    setPlaying(false);
+    setStep(Math.max(0, (scene?.steps?.length ?? 1) - 1));
   }, [scene]);
+
+  // Auto-play the fab flow: advance a step every 900 ms until the top.
+  const nSteps = scene?.steps?.length ?? 0;
+  useEffect(() => {
+    if (!playing) return;
+    if (step >= nSteps - 1) {
+      setPlaying(false);
+      return;
+    }
+    const id = setTimeout(() => applyStep(step + 1), 900);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, step, nSteps]);
+
+  const applyStep = (k: number) => {
+    const clamped = Math.max(0, Math.min(nSteps - 1, k));
+    setStep(clamped);
+    if (scene?.steps) setHidden(new Set(scene.steps.slice(clamped + 1)));
+  };
 
   const layers = useMemo(() => {
     if (!scene) return [];
@@ -125,6 +149,8 @@ export function Eda3DViewer({ scene }: { scene: EdaScene | null }) {
                       roughness={b.roughness ?? 0.55}
                       emissive={rgbCss(b.color)}
                       emissiveIntensity={b.emissive ?? 0}
+                      transparent={b.opacity !== undefined && b.opacity < 1}
+                      opacity={b.opacity ?? 1}
                     />
                   </mesh>
                 ))}
@@ -150,6 +176,37 @@ export function Eda3DViewer({ scene }: { scene: EdaScene | null }) {
           style={{ width: 130 }}
         />
       </div>
+      {/* Process mode: fab-flow build-up slider + play */}
+      {scene.mode === "process" && scene.steps && (
+        <div style={{ position: "absolute", right: 10, top: 10, display: "flex", alignItems: "center", gap: 8, background: "rgba(2,6,23,0.72)", borderRadius: 6, padding: "4px 10px" }}>
+          <button
+            aria-label="process-play"
+            onClick={() => {
+              if (step >= nSteps - 1) applyStep(0);
+              setPlaying((p) => !p);
+            }}
+            style={{ fontSize: 11, padding: "2px 8px", borderRadius: 5, border: "1px solid #334155", background: playing ? "#164e63" : "#0f172a", color: "#a5f3fc", cursor: "pointer" }}
+          >
+            {playing ? `⏸ ${t("eda.processStop")}` : `▶ ${t("eda.processPlay")}`}
+          </button>
+          <input
+            type="range"
+            aria-label="process-step"
+            min={0}
+            max={Math.max(0, nSteps - 1)}
+            step={1}
+            value={step}
+            onChange={(e) => {
+              setPlaying(false);
+              applyStep(parseInt(e.target.value, 10));
+            }}
+            style={{ width: 150 }}
+          />
+          <span style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace", minWidth: 130 }}>
+            {scene.steps[step]} · {step + 1}/{nSteps}
+          </span>
+        </div>
+      )}
       <div data-eda-layers style={{ position: "absolute", left: 10, bottom: 10, right: 10, display: "flex", flexWrap: "wrap", gap: 4 }}>
         {scene.legend.map((l) => {
           const off = hidden.has(l.key);

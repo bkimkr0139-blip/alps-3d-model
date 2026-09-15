@@ -200,6 +200,100 @@ endmodule
 endmodule
 `,
   },
+  {
+    slug: "risc32",
+    title: "32-bit RISC Core",
+    difficulty: "advanced",
+    topModule: "risc32_core",
+    known: true,
+    starterRtl: `module risc32_core (
+    input  wire        clk,
+    input  wire        rst_n,
+    input  wire [31:0] imem_data,    // instruction word fetched at imem_addr
+    output wire [31:0] imem_addr,    // fetch address (= pc)
+    output wire [31:0] dmem_addr,
+    output wire [31:0] dmem_wdata,
+    output wire        dmem_we,
+    output wire [31:0] dbg_pc,
+    output wire [31:0] dbg_alu_y
+);
+    // Educational single-cycle RV32I subset:
+    //   R-type ADD/SUB/AND/OR/XOR/SLTU, ADDI, LW/SW, BEQ/BNE, JAL
+    //   16-entry register file (x0 hardwired to zero)
+    localparam OP_RTYPE  = 7'b0110011;
+    localparam OP_ALUI   = 7'b0010011;
+    localparam OP_LOAD   = 7'b0000011;
+    localparam OP_STORE  = 7'b0100011;
+    localparam OP_BRANCH = 7'b1100011;
+    localparam OP_JAL    = 7'b1101111;
+
+    reg [31:0] pc;                    // program counter
+    reg [31:0] xreg [0:15];           // register file, x0 = 0
+
+    // -- decode --------------------------------------------------------
+    wire [6:0]  opcode = imem_data[6:0];
+    wire [2:0]  funct3 = imem_data[14:12];
+    wire [4:0]  rd     = imem_data[11:7];
+    wire [4:0]  rs1    = imem_data[19:15];
+    wire [4:0]  rs2    = imem_data[24:20];
+    wire [31:0] imm_i  = {{20{imem_data[31]}}, imem_data[31:20]};
+    wire [31:0] imm_s  = {{20{imem_data[31]}}, imem_data[31:25], imem_data[11:7]};
+    wire [31:0] imm_b  = {{19{imem_data[31]}}, imem_data[31:25], imem_data[11:8], imem_data[7], 1'b0};
+    wire [31:0] imm_j  = {{20{imem_data[31]}}, imem_data[19:12], imem_data[20], imem_data[30:21], 1'b0};
+
+    // -- register read -------------------------------------------------
+    wire [31:0] rs1_v = (rs1 == 5'd0) ? 32'h0 : xreg[rs1];
+    wire [31:0] rs2_v = (rs2 == 5'd0) ? 32'h0 : xreg[rs2];
+
+    // -- ALU -----------------------------------------------------------
+    reg  [31:0] alu_y;
+    reg         alu_eq;
+    always @* begin
+        alu_y  = rs1_v + rs2_v;
+        alu_eq = rs1_v == rs2_v;
+        case (opcode)
+            OP_RTYPE: begin
+                if (funct3 == 3'b000 && imem_data[30]) alu_y = rs1_v - rs2_v; // SUB
+                else if (funct3 == 3'b000)             alu_y = rs1_v + rs2_v; // ADD
+                else if (funct3 == 3'b111)             alu_y = rs1_v & rs2_v; // AND
+                else if (funct3 == 3'b110)             alu_y = rs1_v | rs2_v; // OR
+                else if (funct3 == 3'b100)             alu_y = rs1_v ^ rs2_v; // XOR
+                else                                   alu_y = {31'h0, rs1_v < rs2_v}; // SLTU
+            end
+            OP_ALUI, OP_LOAD, OP_STORE: alu_y = rs1_v + imm_i;   // addr / imm calc
+            OP_BRANCH:                  alu_y = pc + imm_b;      // branch target
+            OP_JAL:                     alu_y = pc + 32'd4;      // link value
+            default:                    alu_y = rs1_v + imm_i;
+        endcase
+    end
+
+    // -- control -------------------------------------------------------
+    wire do_br    = (opcode == OP_BRANCH) && (funct3 == 3'b000 ? alu_eq : !alu_eq);
+    wire do_jal   = (opcode == OP_JAL);
+    wire reg_we   = (opcode == OP_RTYPE) || (opcode == OP_ALUI) || (opcode == OP_LOAD) || do_jal;
+    wire [31:0] wb_v = do_jal ? (pc + 32'd4) : (opcode == OP_LOAD ? 32'hC0DE0000 : alu_y);
+
+    assign imem_addr  = pc;
+    assign dmem_addr  = alu_y;
+    assign dmem_wdata = rs2_v;
+    assign dmem_we    = (opcode == OP_STORE);
+    assign dbg_pc     = pc;
+    assign dbg_alu_y  = alu_y;
+
+    // -- sequential: pc update + write-back ----------------------------
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            pc <= 32'h0;
+        end else begin
+            if (reg_we && rd != 5'd0) xreg[rd] <= wb_v;
+            pc <= do_br ? (pc + imm_b)
+                : do_jal ? (pc + imm_j)
+                : (pc + 32'd4);
+        end
+    end
+endmodule
+`,
+  },
 ];
 
 // ── LINT (port of run_lint) ──
@@ -235,7 +329,11 @@ const SIGNAL_PRESETS: Record<string, [string, number][]> = {
   alu: [["a", 4], ["b", 4], ["op", 2], ["y", 5]],
   fifo: [["clk", 1], ["rst_n", 1], ["wr_en", 1], ["rd_en", 1], ["din", 8], ["dout", 8], ["full", 1], ["empty", 1]],
   uart_tx: [["clk", 1], ["rst_n", 1], ["data", 8], ["send", 1], ["tx", 1], ["busy", 1]],
+  risc32_core: [["clk", 1], ["rst_n", 1], ["pc", 32], ["instr", 32], ["alu_y", 32], ["dmem_we", 1]],
 };
+
+// (1 << 32) is 1 in JS 32-bit bitwise — mask 32-wide buses explicitly.
+const maskOf = (w: number) => (w >= 32 ? 0xffffffff : (1 << w) - 1);
 
 function signalsForTop(top: string, rtl: string): [string, number][] {
   if (SIGNAL_PRESETS[top]) return SIGNAL_PRESETS[top];
@@ -283,25 +381,30 @@ function generateWaveform(top: string, signals: [string, number][], periodNs = 1
       else if (ln === "en" || ln === "enable" || ln === "valid" || ln === "send") v = t >= rstDoneAt ? "1" : "0";
       else if (phase === 1 && afterRst) {
         if (ln === "count" || ln === "counter") {
-          count = (count + 1) & ((1 << w) - 1);
+          count = (count + 1) & maskOf(w);
           v = count.toString(2).padStart(w, "0");
         } else if (ln === "a" || ln === "b" || ln === "op" || ln === "din") {
           // combinational stimulus walk — keeps ALU/FIFO input buses live
           const step = (i - 1) / 2;
           const mult = ln === "b" ? 3 : ln === "op" ? 5 : 1;
-          v = ((step * mult) & ((1 << w) - 1)).toString(2).padStart(w, "0");
-        } else if (ln === "pc") {
-          pc = (pc + 4) & ((1 << w) - 1);
+          v = ((step * mult) & maskOf(w)).toString(2).padStart(w, "0");
+        } else if (ln === "pc" || (ln.startsWith("dbg") && ln.includes("pc"))) {
+          pc = (pc + 4) & maskOf(w);
           v = pc.toString(2).padStart(w, "0");
         } else if (ln.includes("instr")) {
-          const val = instrSeq[instrIdx++ % instrSeq.length] & ((1 << w) - 1);
+          const val = instrSeq[instrIdx++ % instrSeq.length] & maskOf(w);
           v = val.toString(2).padStart(w, "0");
         } else if (ln.includes("addr")) {
-          addr = (addr + 4) & ((1 << w) - 1);
+          addr = (addr + 4) & maskOf(w);
           v = addr.toString(2).padStart(w, "0");
+        } else if (ln.startsWith("alu") || (ln.startsWith("dbg") && ln.includes("alu"))) {
+          // datapath result walk — 32-bit core ALU/dump buses stay live
+          v = ((i * 13 + (i % 5) * 97) & maskOf(w)).toString(2).padStart(w, "0");
+        } else if (ln.endsWith("we") || ln.includes("wr_en") || ln.includes("store")) {
+          v = Math.floor(i / 2) % 4 === 2 ? "1" : "0"; // store strobe pulses
         } else if (ln.includes("data") || ["y", "result", "out", "tx", "dout"].includes(ln)) {
           if (w === 1) v = Math.floor(i / 2) % 3 === 0 ? "1" : "0";
-          else v = ((i * 7) & ((1 << w) - 1)).toString(2).padStart(w, "0");
+          else v = ((i * 7) & maskOf(w)).toString(2).padStart(w, "0");
         } else if (ln === "full" || ln === "busy") {
           v = Math.floor(i / 2) % 8 === 7 ? "1" : "0";
         } else if (ln === "empty") {
@@ -337,6 +440,12 @@ const SCENARIO_PRESETS: Record<string, Scenario[]> = {
   uart_tx: [
     { name: "byte_send", description: "1바이트 송신 후 busy 해제", expected_pass: true },
     { name: "back_to_back", description: "연속 2바이트 송신", expected_pass: true },
+  ],
+  risc32_core: [
+    { name: "reset_fetch", description: "리셋 해제 후 pc=0에서 첫 명령 페치", expected_pass: true },
+    { name: "alu_rtype_seq", description: "ADD/SUB/AND/OR/XOR 연산 + 레지스터 쓰기 검증", expected_pass: true },
+    { name: "sw_lw_roundtrip", description: "SW 저장 → LW 적재 데이터 일치", expected_pass: true },
+    { name: "branch_jal", description: "BEQ/BNE 분기 해제와 JAL 링크 레지스터 확인", expected_pass: true },
   ],
 };
 
@@ -424,6 +533,22 @@ function mockCellsByType(rtl: string, flops: number, luts: number): Record<strin
 
 const round0 = (v: number) => Math.round(v);
 
+// Flop estimate = state-BIT count, not block count: `reg [31:0] pc` is 32
+// FFs, a `reg [31:0] xreg [0:15]` array is 16×32. Only regs assigned with
+// nonblocking `<=` are clocked — combinational `always @*` regs are LUTs.
+// (The old block-count mock reported a 32-bit CPU as "2 FFs".)
+function countStateBits(rtl: string): number {
+  const clean = rtl.replace(/\/\/.*$/gm, "");
+  let bits = 0;
+  for (const m of clean.matchAll(/\breg\b\s*(?:signed\s+)?(?:\[(\d+)\s*:\s*0\])?\s*(\w+)\s*(?:\[\s*0\s*:\s*(\d+)\s*\])?/g)) {
+    const w = m[1] ? parseInt(m[1], 10) + 1 : 1;
+    const depth = m[3] ? parseInt(m[3], 10) + 1 : 1;
+    const clocked = new RegExp(`\\b${m[2]}\\s*(?:\\[[^\\]]*\\])?\\s*<=`).test(clean);
+    if (clocked) bits += w * depth;
+  }
+  return bits;
+}
+
 export function runSynthesis(rtl: string, topModule: string, clockPeriodNs: number): SynthResult {
   const log: string[] = ["Yosys (mock) synthesis started", `read_verilog ${topModule}.sv`, `synth -top ${topModule}`, "stat"];
   if (!/^\s*module\s+\w+/m.test(rtl)) {
@@ -439,7 +564,7 @@ export function runSynthesis(rtl: string, topModule: string, clockPeriodNs: numb
   }
   const lines = rtl.split("\n").length;
   const baseCells = Math.max(8, Math.floor(lines / 2));
-  const flops = (rtl.match(/always_ff/g) ?? []).length + (rtl.match(/always @/g) ?? []).length;
+  const flops = countStateBits(rtl);
   const luts = baseCells * 2 + 4;
   const gateCount = luts + flops * 6;
   const cellsByType = mockCellsByType(rtl, flops, luts);
@@ -509,6 +634,11 @@ function criticalPathsFor(top: string, clockPeriod: number, slack: number): Crit
     fifo: [
       ["din[7]/Q", "dout[7]/D", ["din[7]/Q", "RAM/wr", "RAM/rd", "dout[7]/D"]],
       ["wr_ptr[2]/Q", "full", ["wr_ptr[2]/Q", "CMP/eq", "full"]],
+    ],
+    risc32_core: [
+      ["pc[2]/Q", "xreg[4]/D", ["pc[2]/CLK", "IMEM/dout", "DEC/funct3", "REG/rs1", "ALU32/y", "xreg[4]/D"]],
+      ["rs1_v[31]", "pc[2]/D", ["REG/rs1", "CMP32/eq", "BADD32/sum", "pc[2]/D"]],
+      ["imem_data[24]", "dmem_wdata[24]", ["DEC/rs2", "REG/rd", "dmem_wdata[24]"]],
     ],
   };
   const raw = presets[top] ?? [

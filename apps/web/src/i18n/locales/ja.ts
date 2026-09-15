@@ -575,6 +575,10 @@ const ja: Resources = {
         name: "UART TX ミニ",
         desc: "8N1 シリアル送信機を実装します。ステートマシンと busy ハンドシェイクを練習します。",
       },
+      risc32: {
+        name: "32ビットRISCコア",
+        desc: "シングルサイクルRV32Iサブセット — フェッチ/デコード/実行、16エントリのレジスタファイル。LW/SW・分岐・JALを波形と合成で検証します。",
+      },
     },
     rtl: "RTL コード",
     rtlReset: "スターターコードに戻す",
@@ -614,9 +618,12 @@ const ja: Resources = {
     fpMacros: "マクロ数",
     fpPad: "パッド密度",
     fpHint: "稼働率・配線密度を 0.85 以上に上げると DRC 違反が現れます — 密度と歩留まりのトレードオフを体験してください。",
+    view3dProcess: "プロセス3D (ウェーハ→FEOL→BEOL)",
     view3dSynth: "合成3D (ゲート種別クラスタ)",
     view3dLayout: "レイアウト3D (工程層構造)",
     view3dHint: "合成・P&R 実行後に有効化 — ドラッグで回転、スライダーで層分離、チップクリックでレイヤー表示/非表示。",
+    processPlay: "ステップ再生",
+    processStop: "停止",
     view3d: {
       empty: "合成を実行すると3D回路構造が表示されます。",
     },

@@ -575,6 +575,10 @@ const ko: Resources = {
         name: "UART TX 미니",
         desc: "8N1 직렬 송신기를 구현합니다. 상태머신과 busy 핸드셰이크를 연습합니다.",
       },
+      risc32: {
+        name: "32비트 RISC 코어",
+        desc: "단일 사이클 RV32I 서브셋 — 페치/디코드/실행, 16엔트리 레지스터 파일. LW/SW·분기·JAL을 파형과 합성으로 검증합니다.",
+      },
     },
     rtl: "RTL 코드",
     rtlReset: "스타터 코드로 재설정",
@@ -614,9 +618,12 @@ const ko: Resources = {
     fpMacros: "매크로 수",
     fpPad: "패드 밀도",
     fpHint: "활용률·배선 밀도를 0.85 이상으로 올리면 DRC 위반이 나타납니다 — 수율과 밀도의 트레이드오프를 체험해 보세요.",
+    view3dProcess: "공정 3D (웨이퍼→FEOL→BEOL)",
     view3dSynth: "합성 3D (게이트 타입별 클러스터)",
     view3dLayout: "레이아웃 3D (공정 층 구조)",
     view3dHint: "합성·P&R 실행 후 활성화 — 드래그로 회전, 슬라이더로 층 분리, 칩 클릭으로 레이어 표시/숨김.",
+    processPlay: "단계 재생",
+    processStop: "정지",
     view3d: {
       empty: "합성을 실행하면 3D 회로 구조가 표시됩니다.",
     },
