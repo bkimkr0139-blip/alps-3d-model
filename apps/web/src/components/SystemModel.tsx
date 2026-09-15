@@ -9,6 +9,7 @@ import {
   type UQAnalysisDto,
 } from "../lib/api";
 import { useTwinStore } from "../store";
+import { seedTr } from "../lib/seedL10n";
 
 // Domain palette — one hue per engineering domain (§E02). Fills are the hue
 // at low alpha so blocks stay readable on the dark panel background.
@@ -58,7 +59,9 @@ function canvasBlocks(elements: SystemModel["elements"]): Block[] {
 }
 
 function ModelCanvas({ model }: { model: SystemModel }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Seed-dataset prose (DB-seeded Korean) rendered per ui language.
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const selectedComponentId = useTwinStore((s) => s.selectedComponentId);
   const setSelectedComponentId = useTwinStore((s) => s.setSelectedComponentId);
   const blocks = useMemo(() => canvasBlocks(model.elements), [model]);
@@ -90,7 +93,7 @@ function ModelCanvas({ model }: { model: SystemModel }) {
           const x2 = dst.x;
           const y2 = dst.y + BLOCK_H / 2;
           const mx = (x1 + x2) / 2;
-          const label = link.unit ? `${link.signal} [${link.unit}]` : link.signal;
+          const label = link.unit ? `${tr(link.signal)} [${link.unit}]` : tr(link.signal);
           return (
             <g key={link.id}>
               <path
@@ -120,12 +123,12 @@ function ModelCanvas({ model }: { model: SystemModel }) {
             <g key={`ports-${element.id}`}>
               {inPorts.map((p, i) => (
                 <circle key={p.id} cx={x} cy={y + 14 + i * 16} r={3.5} fill="#38bdf8" stroke="#0b1220" strokeWidth={1}>
-                  <title>{`IN ${p.name} [${p.unit}]`}</title>
+                  <title>{`IN ${tr(p.name)} [${p.unit}]`}</title>
                 </circle>
               ))}
               {outPorts.map((p, i) => (
                 <circle key={p.id} cx={x + BLOCK_W} cy={y + 14 + i * 16} r={3.5} fill="#fbbf24" stroke="#0b1220" strokeWidth={1}>
-                  <title>{`OUT ${p.name} [${p.unit}]`}</title>
+                  <title>{`OUT ${tr(p.name)} [${p.unit}]`}</title>
                 </circle>
               ))}
             </g>
@@ -157,11 +160,14 @@ function ModelCanvas({ model }: { model: SystemModel }) {
               />
               <rect width={BLOCK_W} height={4} rx={2} fill={color} />
               <text x={10} y={22} fontSize={12} fontWeight="bold" fill="#e2e8f0">
-                {element.name}
+                {tr(element.name)}
               </text>
               {element.equation_text && (
                 <text x={10} y={42} fontSize={9.5} fill="#cbd5e1">
-                  {element.equation_text.length > 34 ? element.equation_text.slice(0, 33) + "…" : element.equation_text}
+                  {(() => {
+                    const eq = tr(element.equation_text);
+                    return eq.length > 34 ? eq.slice(0, 33) + "…" : eq;
+                  })()}
                 </text>
               )}
               <text x={10} y={62} fontSize={9.5} fill={color}>
@@ -192,7 +198,8 @@ function ModelCanvas({ model }: { model: SystemModel }) {
 }
 
 function ImpactPathStrip({ paths }: { paths: ImpactPaths }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const [openEdge, setOpenEdge] = useState<string | null>(null);
   if (paths.edges.length === 0) return <div style={{ opacity: 0.6, fontSize: 13 }}>{t("sysmodel.noPaths")}</div>;
   return (
@@ -226,7 +233,7 @@ function ImpactPathStrip({ paths }: { paths: ImpactPaths }) {
                 whiteSpace: "nowrap",
               }}
             >
-              {edge.source}
+              {tr(edge.source)}
             </span>
             <span style={{ color: style.color }}>→</span>
             <span
@@ -239,7 +246,7 @@ function ImpactPathStrip({ paths }: { paths: ImpactPaths }) {
                 whiteSpace: "nowrap",
               }}
             >
-              {edge.target}
+              {tr(edge.target)}
             </span>
             <span style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center", whiteSpace: "nowrap" }}>
               {edge.provenance === "ai_inferred" && (
@@ -252,7 +259,7 @@ function ImpactPathStrip({ paths }: { paths: ImpactPaths }) {
             </span>
             {open && (
               <div style={{ flexBasis: "100%", fontSize: 11.5, opacity: 0.85, padding: "4px 2px 2px" }}>
-                {edge.mechanism && <div>{edge.mechanism}</div>}
+                {edge.mechanism && <div>{tr(edge.mechanism)}</div>}
                 {edge.evidence.length > 0 && (
                   <div style={{ marginTop: 3 }}>
                     {t("sysmodel.evidence")}:{" "}
@@ -276,7 +283,8 @@ function ImpactPathStrip({ paths }: { paths: ImpactPaths }) {
 const TRUST_STEPS = ["draft", "verified", "validated_for_purpose", "approved_for_reuse", "retired"] as const;
 
 function ModelCardDrawer({ card, onClose }: { card: ModelCardDto; onClose: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const stepIndex = TRUST_STEPS.indexOf(card.trust_state);
   return (
     <div
@@ -303,7 +311,7 @@ function ModelCardDrawer({ card, onClose }: { card: ModelCardDto; onClose: () =>
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 8 }}>
-          <h3 style={{ margin: 0, fontSize: 15 }}>{card.title}</h3>
+          <h3 style={{ margin: 0, fontSize: 15 }}>{tr(card.title)}</h3>
           <button onClick={onClose} style={{ padding: "2px 9px", borderRadius: 6 }}>✕</button>
         </div>
         <div style={{ fontFamily: "monospace", fontSize: 11, opacity: 0.6, margin: "4px 0 10px" }}>{card.business_id}</div>
@@ -331,12 +339,12 @@ function ModelCardDrawer({ card, onClose }: { card: ModelCardDto; onClose: () =>
         </div>
 
         <h4 style={{ margin: "10px 0 4px", fontSize: 12, color: "#94a3b8" }}>{t("sysmodel.cardPurpose")}</h4>
-        <p style={{ margin: 0, fontSize: 12.5 }}>{card.purpose}</p>
+        <p style={{ margin: 0, fontSize: 12.5 }}>{tr(card.purpose)}</p>
 
         {card.equation_text && (
           <>
             <h4 style={{ margin: "12px 0 4px", fontSize: 12, color: "#94a3b8" }}>{t("sysmodel.cardEquation")}</h4>
-            <code style={{ fontSize: 12, background: "#1e293b", padding: "6px 8px", borderRadius: 6, display: "block" }}>{card.equation_text}</code>
+            <code style={{ fontSize: 12, background: "#1e293b", padding: "6px 8px", borderRadius: 6, display: "block" }}>{tr(card.equation_text)}</code>
           </>
         )}
 
@@ -345,7 +353,7 @@ function ModelCardDrawer({ card, onClose }: { card: ModelCardDto; onClose: () =>
             <h4 style={{ margin: "12px 0 4px", fontSize: 12, color: "#94a3b8" }}>{t("sysmodel.cardAssumptions")}</h4>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
               {card.assumptions.map((a, i) => (
-                <li key={i} style={{ marginBottom: 2 }}>{a}</li>
+                <li key={i} style={{ marginBottom: 2 }}>{tr(a)}</li>
               ))}
             </ul>
           </>
@@ -362,7 +370,7 @@ function ModelCardDrawer({ card, onClose }: { card: ModelCardDto; onClose: () =>
                 <span style={{ fontFamily: "monospace", background: "#1e293b", padding: "1px 6px", borderRadius: 4 }}>
                   {ev.business_id}
                 </span>
-                {ev.note && <span style={{ opacity: 0.65, fontSize: 11 }}>{ev.note}</span>}
+                {ev.note && <span style={{ opacity: 0.65, fontSize: 11 }}>{tr(ev.note)}</span>}
               </div>
             ))}
           </>
@@ -387,7 +395,7 @@ function ModelCardDrawer({ card, onClose }: { card: ModelCardDto; onClose: () =>
           </>
         )}
 
-        {card.notes && <p style={{ margin: "12px 0 0", fontSize: 11.5, opacity: 0.7 }}>{card.notes}</p>}
+        {card.notes && <p style={{ margin: "12px 0 0", fontSize: 11.5, opacity: 0.7 }}>{tr(card.notes)}</p>}
         <div style={{ fontSize: 11, opacity: 0.5, marginTop: 10 }}>
           {t("sysmodel.cardBy")} {card.created_by}
         </div>
@@ -403,7 +411,8 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 function ReviewSection({ variantId }: { variantId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const [review, setReview] = useState<ReviewRunDto | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -479,12 +488,12 @@ function ReviewSection({ variantId }: { variantId: string }) {
                 >
                   {(t as (k: string) => string)(`review.sev.${f.severity}`)}
                 </span>
-                <span style={{ fontWeight: 600 }}>{f.title}</span>
+                <span style={{ fontWeight: 600 }}>{tr(f.title)}</span>
                 <span style={{ marginLeft: "auto", opacity: 0.45, fontSize: 10.5, fontFamily: "monospace" }}>
                   {f.business_id}
                 </span>
               </div>
-              {f.detail && <div style={{ opacity: 0.8, marginTop: 3, fontSize: 11.5 }}>{f.detail}</div>}
+              {f.detail && <div style={{ opacity: 0.8, marginTop: 3, fontSize: 11.5 }}>{tr(f.detail)}</div>}
               {f.evidence && f.evidence.length > 0 && (
                 <div style={{ marginTop: 4, display: "flex", gap: 5, flexWrap: "wrap" }}>
                   {f.evidence.map((ev, i) => (
@@ -498,7 +507,7 @@ function ReviewSection({ variantId }: { variantId: string }) {
                 </div>
               )}
               {f.resolution && (
-                <div style={{ opacity: 0.6, marginTop: 3, fontSize: 11 }}>→ {f.resolution}</div>
+                <div style={{ opacity: 0.6, marginTop: 3, fontSize: 11 }}>→ {tr(f.resolution)}</div>
               )}
             </div>
           ))}

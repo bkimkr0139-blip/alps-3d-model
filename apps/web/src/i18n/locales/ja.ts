@@ -7,6 +7,12 @@ const ja: Resources = {
     signingIn: "サインイン中…",
     language: "言語",
   },
+  docs: {
+    toc: "目次",
+    copy: "⧉ markdownコピー",
+    copied: "✓ コピー済み",
+    download: ".mdダウンロード",
+  },
   nav: {
     product: "製品",
     variant: "バリアント",
@@ -699,6 +705,13 @@ const ja: Resources = {
       corr: "相関分析未実施",
       unapproved: "承認待ち",
     },
+    cat: {
+      function: "機能",
+      quality: "品質",
+      environment: "環境",
+      interface: "インタフェース",
+      safety: "安全",
+    },
     stale: "変更影響 — 影響する成果物はstale状態です。再実行でエビデンスを再生成してください (§2.1)。",
     s1: {
       matrix: "要求マトリクス",
@@ -717,6 +730,7 @@ const ja: Resources = {
       sod: "役割分離:",
       sodOk: "作成者 ≠ 承認者 ✓",
       sodNote: "作成者と承認者が同一の場合は署名できません (§10.2 segregation-of-duties)。",
+      scope: "範囲",
     },
     s4: {
       design: "設計・検証ラン",

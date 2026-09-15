@@ -8,6 +8,7 @@ import {
   type ControlChartPoint,
   type ProcessParameterInfo,
 } from "../lib/api";
+import { seedTr } from "../lib/seedL10n";
 
 const RULE_KEYS: Record<
   string,
@@ -104,7 +105,10 @@ function ChartSvg({ chart }: { chart: ControlChart }) {
 }
 
 function HypothesisCard({ chart }: { chart: ControlChart }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // facts_used are composed backend f-strings; disclaimer is a seeded string.
+  // (hypo.hypothesis itself is LLM output, already following ui_language.)
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const [hypo, setHypo] = useState<AnomalyExplanation | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -145,13 +149,13 @@ function HypothesisCard({ chart }: { chart: ControlChart }) {
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {hypo.facts_used.map((f, i) => (
               <span key={i} style={{ background: "#1e293b", borderRadius: 4, padding: "1px 6px", fontSize: 10.5 }}>
-                {f}
+                {tr(f)}
               </span>
             ))}
           </div>
         </div>
       )}
-      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 6 }}>{hypo.disclaimer}</div>
+      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 6 }}>{tr(hypo.disclaimer)}</div>
     </div>
   );
 }
@@ -162,7 +166,9 @@ function HypothesisCard({ chart }: { chart: ControlChart }) {
  * on the chart but are excluded from the limit basis, and the AI answer is
  * an investigation hypothesis, never a confirmed cause. */
 export function ProcessMonitoring({ variantId }: { variantId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // chart.note is a composed backend string (control-limit basis note).
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const [params, setParams] = useState<ProcessParameterInfo[]>([]);
   const [parameter, setParameter] = useState<string | null>(null);
   const [chart, setChart] = useState<ControlChart | null>(null);
@@ -235,7 +241,7 @@ export function ProcessMonitoring({ variantId }: { variantId: string }) {
       {chart ? (
         <>
           <ChartSvg chart={chart} />
-          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4, maxWidth: 760 }}>{chart.note}</div>
+          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4, maxWidth: 760 }}>{tr(chart.note)}</div>
           <div style={{ fontSize: 11, marginTop: 6 }}>
             <span style={{ opacity: 0.6 }}>{t("proc.mon.hits")}: </span>
             {chart.rule_hits.length === 0 ? (

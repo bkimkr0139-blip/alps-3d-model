@@ -7,6 +7,12 @@ const ko: Resources = {
     signingIn: "로그인 중…",
     language: "언어",
   },
+  docs: {
+    toc: "목차",
+    copy: "⧉ markdown 복사",
+    copied: "✓ 복사됨",
+    download: ".md 다운로드",
+  },
   nav: {
     product: "제품",
     variant: "변량",
@@ -699,6 +705,13 @@ const ko: Resources = {
       corr: "상관 분석 미실행",
       unapproved: "승인 대기",
     },
+    cat: {
+      function: "기능",
+      quality: "품질",
+      environment: "환경",
+      interface: "인터페이스",
+      safety: "안전",
+    },
     stale: "변경 영향 — 영향 받는 산출물은 stale 상태입니다. 재실행으로 증적을 재생성하세요 (§2.1).",
     s1: {
       matrix: "요구 매트릭스",
@@ -717,6 +730,7 @@ const ko: Resources = {
       sod: "역할분리:",
       sodOk: "작성자 ≠ 승인자 ✓",
       sodNote: "작성자와 승인자가 동일하면 서명할 수 없습니다 (§10.2 segregation-of-duties).",
+      scope: "범위",
     },
     s4: {
       design: "설계·검증 런",

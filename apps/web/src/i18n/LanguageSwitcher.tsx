@@ -23,7 +23,10 @@ export function LanguageSwitcher() {
       value={i18n.resolvedLanguage ?? "en"}
       onChange={(e) => change(e.target.value)}
       aria-label={t("app.language")}
-      style={{ padding: "6px 10px", borderRadius: 6, background: "#1e293b", color: "white", border: "1px solid #334155", fontFamily: "inherit", fontSize: 13 }}
+      // Fixed width: the three autonym labels (한국어/English/日本語) have
+      // different text widths, and an auto-width select made the whole nav
+      // bar reflow left/right on every language switch.
+      style={{ width: 104, padding: "6px 10px", borderRadius: 6, background: "#1e293b", color: "white", border: "1px solid #334155", fontFamily: "inherit", fontSize: 13 }}
     >
       {LANGUAGES.map((l) => (
         <option key={l.code} value={l.code}>

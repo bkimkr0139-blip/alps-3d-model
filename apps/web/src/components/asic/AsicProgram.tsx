@@ -35,6 +35,7 @@ import {
 } from "./asicModel";
 import { Pareto, Scatter, SpcChart, TrendLine } from "./asicCharts";
 import { buildPackageScene } from "./packageScene";
+import { pickL, pickText, L } from "../../lib/lstr";
 
 // Alps Alpine ASIC development 9-stage work center — standalone tab next to
 // the EDA training module (docs/AgentIC_AlpsAlpine_ASIC_Turnkey_DigitalTwin_고도화_개발지시서_v1.0.md).
@@ -140,7 +141,8 @@ const btn = (active: boolean, color = "#38bdf8"): React.CSSProperties => ({
 
 // Program state is per-template: switching template remounts the workbench.
 function Workbench({ tpl }: { tpl: AsicTemplate }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.resolvedLanguage;
   const [stage, setStage] = useState<StageId>("s1");
 
   // S1 — requirements (mutable copy: draft reqs get linked via the AI-suggest action)
@@ -264,7 +266,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
   const qualAction = (group: string, action: "evidence" | "capa" | "waiver") =>
     setQual((qs) =>
       qs.map((r) =>
-        r.group !== group ? r : { ...r, status: action === "waiver" ? "waiver" : "pass", note: action === "capa" ? "CAPA 완료 후 재시험 합격 (synthetic)" : action === "evidence" ? "lab evidence 업로드 (synthetic fixture)" : r.note },
+        r.group !== group ? r : { ...r, status: action === "waiver" ? "waiver" : "pass", note: action === "capa" ? L("CAPA 완료 후 재시험 합격 (synthetic)", "retest passed after CAPA completion (synthetic)", "CAPA完了後の再試験合格(synthetic)") : action === "evidence" ? L("lab evidence 업로드 (synthetic fixture)", "lab evidence uploaded (synthetic fixture)", "ラボエビデンス登録(synthetic fixture)") : r.note },
       ),
     );
 
@@ -355,10 +357,10 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                       <tr key={r.id}>
                         <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{r.id}</td>
                         <td style={td}>
-                          {r.text}
-                          <span style={{ display: "block", fontSize: 9, color: "#475569" }}>{r.source}</span>
+                          {pickText(r.text, lang)}
+                          <span style={{ display: "block", fontSize: 9, color: "#475569" }}>{pickText(r.source, lang)}</span>
                         </td>
-                        <td style={td}>{r.category}</td>
+                        <td style={td}>{t(`asic.cat.${r.category}` as never)}</td>
                         <td style={td}>{r.priority}</td>
                         <td style={td}>
                           <Chip color={r.status === "approved" ? "#34d399" : r.status === "draft" ? "#f87171" : r.status === "provisional" ? "#fbbf24" : "#94a3b8"}>
@@ -440,7 +442,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                           <Chip color={r.sev === "high" ? "#f87171" : r.sev === "medium" ? "#fbbf24" : "#34d399"}>{r.sev}</Chip>
                         </td>
                         <td style={td}>{r.owner}</td>
-                        <td style={td}>{r.text} → {r.mitigation}</td>
+                        <td style={td}>{pickText(r.text, lang)} → {pickText(r.mitigation, lang)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -456,7 +458,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   {tpl.milestones.map((m) => (
                     <tr key={m.id}>
                       <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc", width: 36 }}>{m.id}</td>
-                      <td style={td}>{m.text}</td>
+                      <td style={td}>{pickL(m.text, lang)}</td>
                       <td style={{ ...td, fontFamily: "monospace", color: "#94a3b8", width: 100 }}>{m.due}</td>
                       <td style={td}>
                         <Chip color={m.status === "done" ? "#34d399" : "#64748b"}>{m.status}</Chip>
@@ -490,14 +492,14 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 <thead>
                   <tr>
                     <th style={th}>NRE item</th>
-                    <th style={th}>범위</th>
+                    <th style={th}>{t("asic.s3.scope")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tpl.nre.map((n) => (
-                    <tr key={n.item}>
-                      <td style={td}>{n.item}</td>
-                      <td style={td}>{n.amount}</td>
+                    <tr key={pickText(n.item, "ko")}>
+                      <td style={td}>{pickText(n.item, lang)}</td>
+                      <td style={td}>{pickText(n.amount, lang)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -569,7 +571,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                           <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{v.id}</td>
                           <td style={{ ...td, fontFamily: "monospace" }}>{v.reqId}</td>
                           <td style={td}>{v.method}</td>
-                          <td style={td}>{v.env}</td>
+                          <td style={td}>{pickText(v.env, lang)}</td>
                           <td style={{ ...td, fontFamily: "monospace" }}>{Math.round(v.target * 100)}%</td>
                           <td style={td}>{v.owner}</td>
                           <td style={td}>
@@ -670,7 +672,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 <div key={e.id} style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, marginBottom: 8, background: "#0f172a" }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <b style={{ fontFamily: "monospace", color: "#7dd3fc", fontSize: 12 }}>{e.id}</b>
-                    <span style={{ fontSize: 12, flex: 1 }}>{e.text}</span>
+                    <span style={{ fontSize: 12, flex: 1 }}>{pickL(e.text, lang)}</span>
                     <Chip color={e.status === "closed" ? "#34d399" : e.status === "analyzed" ? "#fbbf24" : "#94a3b8"}>{e.status}</Chip>
                   </div>
                   <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
@@ -719,10 +721,10 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                       <tr key={r.group}>
                         <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{r.group}</td>
                         <td style={td}>
-                          {r.method}
-                          {r.note && <span style={{ display: "block", fontSize: 9, color: r.status === "fail" ? "#f87171" : "#64748b" }}>{r.note}</span>}
+                          {pickText(r.method, lang)}
+                          {r.note && <span style={{ display: "block", fontSize: 9, color: r.status === "fail" ? "#f87171" : "#64748b" }}>{pickL(r.note, lang)}</span>}
                         </td>
-                        <td style={td}>{r.cond}</td>
+                        <td style={td}>{pickText(r.cond, lang)}</td>
                         <td style={{ ...td, fontFamily: "monospace" }}>{r.duration}</td>
                         <td style={{ ...td, fontFamily: "monospace" }}>{r.samples}</td>
                         <td style={td}>
@@ -776,7 +778,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                       {evidence.map((e) => (
                         <tr key={e.id}>
                           <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{e.id}</td>
-                          <td style={td}>{e.kind}</td>
+                          <td style={td}>{pickL(e.kind, lang)}</td>
                           <td style={{ ...td, fontFamily: "monospace" }}>{e.rev}</td>
                           <td style={{ ...td, fontFamily: "monospace", color: "#475569" }}>{eduHash(e.id + e.rev)}…</td>
                           <td style={td}>
@@ -885,7 +887,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                           <td style={{ ...td, fontFamily: "monospace", color: l.yieldPct < 85 ? "#f87171" : "#34d399" }}>{l.yieldPct}%</td>
                           <td style={{ ...td, fontFamily: "monospace" }}>{l.bins.good}/{l.bins.retest}/{l.bins.fail1}/{l.bins.fail2}</td>
                           <td style={td}>
-                            {l.excursion && <div style={{ fontSize: 10, color: "#f87171", maxWidth: 260 }}>⚠ {l.excursion}</div>}
+                            {l.excursion && <div style={{ fontSize: 10, color: "#f87171", maxWidth: 260 }}>⚠ {pickL(l.excursion, lang)}</div>}
                             <Chip color={l.disposition === "released" ? "#34d399" : l.disposition === "held" ? "#f87171" : "#a78bfa"}>{l.disposition}</Chip>
                           </td>
                           <td style={td}>
@@ -913,7 +915,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
 const nextRev = (r: string) => `r${parseInt(r.slice(1), 10) + 1}`;
 
 export function AsicProgram() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [tplId, setTplId] = useState(ASIC_TEMPLATES[0].id);
   const tpl = ASIC_TEMPLATES.find((x) => x.id === tplId)!;
   return (
@@ -925,7 +927,7 @@ export function AsicProgram() {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
         {ASIC_TEMPLATES.map((x) => (
           <button key={x.id} onClick={() => setTplId(x.id)} style={{ ...btn(tplId === x.id, x.color), fontWeight: tplId === x.id ? 600 : 400 }}>
-            {x.name} · {x.grade}
+            {pickL(x.name, i18n.resolvedLanguage)} · {x.grade}
           </button>
         ))}
       </div>

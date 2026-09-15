@@ -7,12 +7,15 @@ import { api, type CorrelationRecord, type GapAnalysisDto, type Measurement, typ
 // (lib/curve.ts mirrors the mech worker's MODEL_METRICS and the API's
 // app/correlation.py CURVE_FAMILIES — keep the three tables in sync).
 import { CURVE_FAMILIES, parseCurveMetric, predictedCurve, type CurveFamily } from "../lib/curve";
+import { seedTr } from "../lib/seedL10n";
 
 /** Residual-cause candidates (§AI-05 lite): read-only view over the stored
  * correlation's residuals. Output is explicitly "check required" hints —
  * never a verdict (§10.2: the AI doesn't finalize engineering judgments). */
 function GapSection({ correlationId }: { correlationId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // candidate title/detail are composed backend f-strings (correlation insights).
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const [gap, setGap] = useState<GapAnalysisDto | null>(null);
 
   useEffect(() => {
@@ -72,12 +75,12 @@ function GapSection({ correlationId }: { correlationId: string }) {
                 <span style={{ background: "#fbbf24", color: "#0b1220", padding: "0 6px", borderRadius: 4, fontWeight: 700, fontSize: 10 }}>
                   {(t as (k: string) => string)(`gap.cause.${c.cause}`)}
                 </span>
-                <span style={{ fontWeight: 600 }}>{c.title}</span>
+                <span style={{ fontWeight: 600 }}>{tr(c.title)}</span>
                 <span style={{ marginLeft: "auto", fontSize: 10, color: "#fbbf24" }}>
                   {(t as (k: string) => string)(`gap.confidence.${c.confidence}`)}
                 </span>
               </div>
-              <div style={{ opacity: 0.8, marginTop: 3, fontSize: 11.5 }}>{c.detail}</div>
+              <div style={{ opacity: 0.8, marginTop: 3, fontSize: 11.5 }}>{tr(c.detail)}</div>
             </div>
           ))}
           <div style={{ fontSize: 11, opacity: 0.55 }}>{t("gap.disclaimer")}</div>

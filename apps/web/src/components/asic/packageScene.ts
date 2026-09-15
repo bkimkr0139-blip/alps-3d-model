@@ -14,18 +14,35 @@ const SUB: RGB = [0.12, 0.1, 0.09];
 const DIE: RGB = [0.35, 0.42, 0.58];
 const MOLD: RGB = [0.16, 0.15, 0.14];
 
-// Stepped bond-wire arc: vertical cylinder chain following a parabola from
-// die pad to substrate finger (boxes/cylinders are axis-aligned, so the arc
-// is approximated with 7 risers — reads as a gold loop at scene scale).
+// Stepped bond-wire arc: short cylinder segments between consecutive samples
+// of a parabola from die pad (yTop) to substrate finger (yEnd). Each segment
+// spans only its own arc slice — drawing whole columns from the PCB instead
+// made the wires read as pins sticking out of the package. The arc peak
+// (≈ yEnd + 0.35 + (yTop−yEnd)) stays under the mold cap (y 2.1), so the
+// wires are fully encapsulated: a normal molded product, with the internals
+// visible only through the layer chips (mold off) or the explode slider.
 function bondWire(x1: number, z1: number, x2: number, z2: number, yTop: number, yEnd: number): EdaBox[] {
   const out: EdaBox[] = [];
   const N = 7;
-  for (let k = 0; k < N; k++) {
-    const t = (k + 0.5) / N;
-    const x = x1 + (x2 - x1) * t;
-    const z = z1 + (z2 - z1) * t;
-    const h = yEnd + Math.sin(Math.PI * t) * 0.9 + (yTop - yEnd) * (1 - t);
-    out.push({ name: `bond${k}`, layer: "bond", pos: [x, h / 2, z], size: [0.16, h, 0.16], color: GOLD, cyl: true, metalness: 0.9, roughness: 0.25 });
+  const at = (t: number) => ({
+    x: x1 + (x2 - x1) * t,
+    z: z1 + (z2 - z1) * t,
+    y: yEnd + Math.sin(Math.PI * t) * 0.35 + (yTop - yEnd) * (1 - t),
+  });
+  let prev = at(0);
+  for (let k = 1; k <= N; k++) {
+    const cur = at(k / N);
+    out.push({
+      name: `bond${k}`,
+      layer: "bond",
+      pos: [(prev.x + cur.x) / 2, (prev.y + cur.y) / 2, (prev.z + cur.z) / 2],
+      size: [0.16, Math.max(0.08, Math.abs(cur.y - prev.y)), 0.16],
+      color: GOLD,
+      cyl: true,
+      metalness: 0.9,
+      roughness: 0.25,
+    });
+    prev = cur;
   }
   return out;
 }
@@ -65,14 +82,17 @@ export function buildPackageScene(tpl: AsicTemplate): EdaScene {
       for (let j = 0; j < 4; j++)
         put({ name: `ball${i}-${j}`, layer: "solder", pos: [-3.75 + i * 1.5, 0.55, -2.25 + j * 1.5], size: [0.55, 0.35, 0.55], color: [0.9, 0.9, 0.92], cyl: true, metalness: 0.85, roughness: 0.3 });
   }
-  // mold cap over the cavity (translucent so die/bonds stay visible)
-  put({ name: "mold", layer: "mold", pos: [0, 1.65, 0], size: [bodyW, 1.0, bodyD], color: MOLD, roughness: 0.75, opacity: 0.42 });
+  // mold cap: real molding compound is opaque — the assembled product shows
+  // only the black body, like an actual packaged chip. The die/bond/MEMS
+  // internals stay inspectable via the layer chips (toggle "mold" off) and
+  // the explode slider. Sits flush on the substrate (y 1.1..2.1), no gap.
+  put({ name: "mold", layer: "mold", pos: [0, 1.6, 0], size: [bodyW, 1.0, bodyD], color: MOLD, roughness: 0.75 });
   // laser mark: die-ID dot matrix on the mold top
   for (let i = 0; i < 5; i++)
     for (let j = 0; j < 3; j++)
-      put({ name: `mark${i}${j}`, layer: "mark", pos: [bodyW / 2 - 2.4 + i * 0.5, 2.18, -bodyD / 2 + 1.0 + j * 0.5], size: [0.16, 0.04, 0.16], color: [0.9, 0.9, 0.85] });
+      put({ name: `mark${i}${j}`, layer: "mark", pos: [bodyW / 2 - 2.4 + i * 0.5, 2.12, -bodyD / 2 + 1.0 + j * 0.5], size: [0.16, 0.04, 0.16], color: [0.9, 0.9, 0.85] });
   // pin-1 chamfer dot
-  put({ name: "pin1", layer: "mark", pos: [-bodyW / 2 + 0.7, 2.18, -bodyD / 2 + 0.7], size: [0.5, 0.05, 0.5], color: [0.95, 0.95, 0.9], cyl: true });
+  put({ name: "pin1", layer: "mark", pos: [-bodyW / 2 + 0.7, 2.12, -bodyD / 2 + 0.7], size: [0.5, 0.05, 0.5], color: [0.95, 0.95, 0.9], cyl: true });
 
   // ── Die (y 1.1..1.5) + pad ring + tiny routing strips ──
   const dieW = 4.2;

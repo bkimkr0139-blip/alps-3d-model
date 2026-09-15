@@ -1,9 +1,12 @@
 import { useTranslation } from "react-i18next";
 import { enumLabel } from "../i18n";
 import type { SimulationRun } from "../lib/api";
+import { seedTr } from "../lib/seedL10n";
 
 export function SimulationPanel({ runs }: { runs: SimulationRun[] }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // error_message is a composed backend validation string — overlaid per ui lang.
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <h3 style={{ margin: 0 }}>{t("panels.simulation")}</h3>
@@ -20,7 +23,7 @@ export function SimulationPanel({ runs }: { runs: SimulationRun[] }) {
             {enumLabel(t, "runType", run.run_type)} · {t("simulation.toolPrefix")} {run.tool_version ?? "—"}
           </div>
           {run.error_message && (
-            <div style={{ color: "#ef4444", fontSize: 12, marginTop: 4 }}>{run.error_message}</div>
+            <div style={{ color: "#ef4444", fontSize: 12, marginTop: 4 }}>{tr(run.error_message)}</div>
           )}
           {run.metrics.length > 0 && (
             <table style={{ width: "100%", marginTop: 6, fontSize: 12 }}>

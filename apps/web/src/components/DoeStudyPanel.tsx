@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import ReactECharts from "echarts-for-react";
 import { useTranslation } from "react-i18next";
 import { api, type DoeStudy, type ProcessOperationDto } from "../lib/api";
+import { seedTr } from "../lib/seedL10n";
 
 /** One (operation, parameter) pair a DOE study can be run against — every
  * operation window bound is a candidate regression target. */
@@ -41,12 +42,14 @@ export function DoeStudyPanel({
   variantId: string;
   defaultTargetBand?: { min: number; max: number; unit?: string };
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [operations, setOperations] = useState<ProcessOperationDto[]>([]);
   const [studies, setStudies] = useState<DoeStudy[]>([]);
   const [selectedKey, setSelectedKey] = useState<string>("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // operationName is a seeded DB string (process-op name) — overlay per ui lang.
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
 
   const options = useMemo(() => paramOptions(operations), [operations]);
 
@@ -92,7 +95,7 @@ export function DoeStudyPanel({
         >
           {options.map((o) => (
             <option key={o.key} value={o.key}>
-              {o.operationName} — {o.parameter}
+              {tr(o.operationName)} — {o.parameter}
               {o.unit ? ` (${o.unit})` : ""}
             </option>
           ))}
@@ -117,7 +120,8 @@ export function DoeStudyPanel({
 }
 
 function DoeStudyResult({ study }: { study: DoeStudy }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const fit = study.fit;
   const sign = fit.slope > 0 ? "+" : "";
 
@@ -193,7 +197,7 @@ function DoeStudyResult({ study }: { study: DoeStudy }) {
             min: study.target_band.min,
             max: study.target_band.max,
             unit: study.target_band.unit ?? "",
-            source: study.target_band.source,
+            source: tr(study.target_band.source ?? ""),
           })}
         </div>
       )}
@@ -245,7 +249,7 @@ function DoeStudyResult({ study }: { study: DoeStudy }) {
         </tbody>
       </table>
 
-      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 8 }}>{study.disclaimer}</div>
+      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 8 }}>{tr(study.disclaimer)}</div>
     </div>
   );
 }

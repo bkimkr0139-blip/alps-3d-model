@@ -16,6 +16,7 @@ import {
   type SynthResult,
 } from "./edaRunner";
 import { buildLayoutScene, buildProcessScene, buildSynthesisScene } from "./edaScene";
+import { pickL } from "../../lib/lstr";
 import { Eda3DViewer } from "./Eda3DViewer";
 import { EdaWaveform } from "./EdaWaveform";
 
@@ -51,7 +52,7 @@ function Kpi({ label, value, warn }: { label: string; value: string | number; wa
 }
 
 export function EdaTraining() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [mission, setMission] = useState<Mission>(MISSIONS[0]);
   const [rtl, setRtl] = useState(MISSIONS[0].starterRtl);
   const [clockPeriod, setClockPeriod] = useState(10);
@@ -335,7 +336,7 @@ export function EdaTraining() {
                 <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
                   {sim.scenarios.map((s) => (
                     <li key={s.name} style={{ color: s.expected_pass ? "#86efac" : "#fca5a5" }}>
-                      <span style={{ fontFamily: "monospace" }}>{s.name}</span> — {s.description}
+                      <span style={{ fontFamily: "monospace" }}>{s.name}</span> — {pickL(s.description, i18n.resolvedLanguage)}
                     </li>
                   ))}
                 </ul>

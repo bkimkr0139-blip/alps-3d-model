@@ -6,6 +6,8 @@
 // and every run is deterministic for a given input (seeded PRNG replaces
 // Python's random.Random(hash(...))).
 
+import { L, type LStr } from "../../lib/lstr";
+
 export type LintIssue = { line: number; severity: "error" | "warning"; message: string };
 
 export type LintResult = {
@@ -18,7 +20,7 @@ export type LintResult = {
 export type WaveSignal = { name: string; width: number; transitions: [number, string][] };
 export type Waveform = { timescale: string; end_time: number; signals: WaveSignal[] };
 
-export type Scenario = { name: string; description: string; expected_pass: boolean };
+export type Scenario = { name: string; description: LStr; expected_pass: boolean };
 
 export type SimResult = {
   status: "success" | "failed";
@@ -420,32 +422,32 @@ function generateWaveform(top: string, signals: [string, number][], periodNs = 1
 
 const SCENARIO_PRESETS: Record<string, Scenario[]> = {
   counter4: [
-    { name: "reset_then_count", description: "rst_n 해제 후 en=1로 16사이클 카운팅", expected_pass: true },
-    { name: "rollover", description: "0xF → 0x0 wrap-around 동작 확인", expected_pass: true },
-    { name: "enable_pause", description: "en=0일 때 카운트 정지 확인", expected_pass: true },
-    { name: "async_reset_mid", description: "카운팅 중 비동기 reset 0 즉시 적용", expected_pass: true },
+    { name: "reset_then_count", description: L("rst_n 해제 후 en=1로 16사이클 카운팅", "release rst_n, count 16 cycles with en=1", "rst_n解放後、en=1で16サイクルカウント"), expected_pass: true },
+    { name: "rollover", description: L("0xF → 0x0 wrap-around 동작 확인", "verify 0xF → 0x0 wrap-around", "0xF → 0x0ラップアラウンド動作確認"), expected_pass: true },
+    { name: "enable_pause", description: L("en=0일 때 카운트 정지 확인", "verify the count holds when en=0", "en=0時にカウント停止を確認"), expected_pass: true },
+    { name: "async_reset_mid", description: L("카운팅 중 비동기 reset 0 즉시 적용", "assert asynchronous reset 0 mid-count", "カウント中に非同期reset 0を即時適用"), expected_pass: true },
   ],
   alu: [
-    { name: "ADD_basic", description: "0x3 + 0x5 = 0x8", expected_pass: true },
-    { name: "SUB_borrow", description: "0x1 - 0x3 borrow", expected_pass: true },
-    { name: "AND_OR", description: "비트 연산 코너", expected_pass: true },
-    { name: "overflow", description: "ADD에서 5번째 비트 캐리아웃", expected_pass: true },
+    { name: "ADD_basic", description: L("0x3 + 0x5 = 0x8", "0x3 + 0x5 = 0x8", "0x3 + 0x5 = 0x8"), expected_pass: true },
+    { name: "SUB_borrow", description: L("0x1 - 0x3 borrow", "0x1 - 0x3 with borrow", "0x1 - 0x3 ボロー"), expected_pass: true },
+    { name: "AND_OR", description: L("비트 연산 코너", "bitwise-op corner", "ビット演算コーナー"), expected_pass: true },
+    { name: "overflow", description: L("ADD에서 5번째 비트 캐리아웃", "carry-out of bit 4 on ADD", "ADDで第5ビットへのキャリーアウト"), expected_pass: true },
   ],
   fifo: [
-    { name: "write_then_read", description: "8개 push, 8개 pop 일치 확인", expected_pass: true },
-    { name: "full_flag", description: "DEPTH개 push 시 full=1", expected_pass: true },
-    { name: "empty_flag", description: "초기 empty=1", expected_pass: true },
-    { name: "simultaneous_rw", description: "동시 wr_en+rd_en 시 동작", expected_pass: true },
+    { name: "write_then_read", description: L("8개 push, 8개 pop 일치 확인", "verify 8 pushes match 8 pops", "8個push、8個popの一致確認"), expected_pass: true },
+    { name: "full_flag", description: L("DEPTH개 push 시 full=1", "full=1 after DEPTH pushes", "DEPTH個pushでfull=1"), expected_pass: true },
+    { name: "empty_flag", description: L("초기 empty=1", "empty=1 initially", "初期状態でempty=1"), expected_pass: true },
+    { name: "simultaneous_rw", description: L("동시 wr_en+rd_en 시 동작", "behavior with simultaneous wr_en+rd_en", "同時wr_en+rd_en時の動作"), expected_pass: true },
   ],
   uart_tx: [
-    { name: "byte_send", description: "1바이트 송신 후 busy 해제", expected_pass: true },
-    { name: "back_to_back", description: "연속 2바이트 송신", expected_pass: true },
+    { name: "byte_send", description: L("1바이트 송신 후 busy 해제", "send 1 byte, busy deasserts", "1バイト送信後busy解除"), expected_pass: true },
+    { name: "back_to_back", description: L("연속 2바이트 송신", "back-to-back 2-byte send", "連続2バイト送信"), expected_pass: true },
   ],
   risc32_core: [
-    { name: "reset_fetch", description: "리셋 해제 후 pc=0에서 첫 명령 페치", expected_pass: true },
-    { name: "alu_rtype_seq", description: "ADD/SUB/AND/OR/XOR 연산 + 레지스터 쓰기 검증", expected_pass: true },
-    { name: "sw_lw_roundtrip", description: "SW 저장 → LW 적재 데이터 일치", expected_pass: true },
-    { name: "branch_jal", description: "BEQ/BNE 분기 해제와 JAL 링크 레지스터 확인", expected_pass: true },
+    { name: "reset_fetch", description: L("리셋 해제 후 pc=0에서 첫 명령 페치", "first instruction fetch at pc=0 after reset", "リセット解除後pc=0で最初の命令フェッチ"), expected_pass: true },
+    { name: "alu_rtype_seq", description: L("ADD/SUB/AND/OR/XOR 연산 + 레지스터 쓰기 검증", "verify ADD/SUB/AND/OR/XOR ops + register writeback", "ADD/SUB/AND/OR/XOR演算+レジスタ書き込み検証"), expected_pass: true },
+    { name: "sw_lw_roundtrip", description: L("SW 저장 → LW 적재 데이터 일치", "SW store → LW load data matches", "SW格納→LWロードデータ一致"), expected_pass: true },
+    { name: "branch_jal", description: L("BEQ/BNE 분기 해제와 JAL 링크 레지스터 확인", "verify BEQ/BNE branch resolution and the JAL link register", "BEQ/BNE分岐解決とJALリンクレジスタ確認"), expected_pass: true },
   ],
 };
 
@@ -478,7 +480,7 @@ export function runSimulation(rtl: string, topModule: string): SimResult {
   };
   coverage.overall = round((coverage.line + coverage.toggle + coverage.branch + coverage.fsm) / 4);
   const scenarios = SCENARIO_PRESETS[topModule] ?? [
-    { name: "default", description: "기본 시나리오", expected_pass: true },
+    { name: "default", description: L("기본 시나리오", "default scenario", "基本シナリオ"), expected_pass: true },
   ];
   const passed = scenarios.filter((s) => s.expected_pass).length;
   log.push(

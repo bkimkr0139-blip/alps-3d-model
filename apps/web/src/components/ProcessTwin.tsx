@@ -14,6 +14,7 @@ import {
 } from "../lib/api";
 import { DoeStudyPanel } from "./DoeStudyPanel";
 import { ProcessMonitoring } from "./ProcessMonitoring";
+import { seedTr } from "../lib/seedL10n";
 
 const inputStyle: React.CSSProperties = {
   background: "#0f172a",
@@ -41,7 +42,10 @@ function DispositionBadge({ disposition }: { disposition: LotCard["disposition"]
 }
 
 function RootCauseSection({ lotId }: { lotId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Root-cause candidates + disclaimer come from the backend as composed
+  // Korean f-strings / seeded text — overlaid per ui language at render.
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const [hypo, setHypo] = useState<RootCauseHypothesis | null>(null);
 
   const load = () =>
@@ -73,14 +77,14 @@ function RootCauseSection({ lotId }: { lotId: string }) {
                 <span style={{ background: "#fbbf24", color: "#0b1220", padding: "0 6px", borderRadius: 4, fontWeight: 700, fontSize: 10 }}>
                   {t(`proc.cause.${c.cause}`)}
                 </span>
-                <span style={{ fontWeight: 600 }}>{c.title}</span>
+                <span style={{ fontWeight: 600 }}>{tr(c.title)}</span>
                 <span style={{ marginLeft: "auto", fontSize: 10, color: "#fbbf24" }}>{t("proc.rootCause.checkRequired")}</span>
               </div>
-              <div style={{ opacity: 0.8, marginTop: 3 }}>{c.detail}</div>
+              <div style={{ opacity: 0.8, marginTop: 3 }}>{tr(c.detail)}</div>
               {c.evidence.length > 0 && (
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
                   {c.evidence.map((e, j) => (
-                    <span key={j} style={{ background: "#1e293b", borderRadius: 4, padding: "1px 6px", fontSize: 10.5 }} title={e.note}>
+                    <span key={j} style={{ background: "#1e293b", borderRadius: 4, padding: "1px 6px", fontSize: 10.5 }} title={e.note ? tr(e.note) : undefined}>
                       {e.kind}: {e.business_id}
                     </span>
                   ))}
@@ -90,7 +94,7 @@ function RootCauseSection({ lotId }: { lotId: string }) {
           ))}
         </div>
       )}
-      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 6 }}>{hypo.disclaimer}</div>
+      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 6 }}>{tr(hypo.disclaimer)}</div>
     </div>
   );
 }
@@ -109,7 +113,8 @@ function CapaCard({
   testRunOptions: { id: string; business_id: string }[];
   onChange: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const [events, setEvents] = useState<CapaEvent[]>([]);
   const [comment, setComment] = useState("");
   const [testRunId, setTestRunId] = useState("");
@@ -137,20 +142,20 @@ function CapaCard({
   return (
     <div style={{ background: "#0b1220", border: "1px solid #334155", borderRadius: 8, padding: "8px 10px", marginTop: 6 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-        <strong style={{ fontSize: 12.5 }}>{capa.title}</strong>
+        <strong style={{ fontSize: 12.5 }}>{tr(capa.title)}</strong>
         <span style={{ fontSize: 11 }}>{enumLabel(t, "capaStatus", capa.status)}</span>
       </div>
       <div style={{ opacity: 0.6, fontSize: 10.5 }}>
         {capa.business_id} · {enumLabel(t, "capaType", capa.capa_type)} · {t("proc.quality.capa.owner")}: {capa.owner}
       </div>
-      <div style={{ fontSize: 11.5, marginTop: 4 }}>{capa.description}</div>
+      <div style={{ fontSize: 11.5, marginTop: 4 }}>{tr(capa.description)}</div>
 
       {events.length > 0 && (
         <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 2 }}>
           {events.map((e) => (
             <div key={e.id} style={{ fontSize: 10, opacity: 0.65, borderLeft: "2px solid #334155", paddingLeft: 6 }}>
               {enumLabel(t, "capaEventType", e.event_type)} · {e.actor} ({new Date(e.occurred_at).toLocaleString()})
-              {e.comment ? ` — ${e.comment}` : ""}
+              {e.comment ? ` — ${tr(e.comment)}` : ""}
               {e.evidence?.test_run_business_id
                 ? ` · ${t("proc.quality.capa.retest")}: ${String(e.evidence.test_run_business_id)}`
                 : ""}
@@ -214,13 +219,15 @@ function CapaCard({
  * effectiveness-verification picker — a retest must point at a real
  * TestRun, never a free-text claim. */
 function DefectQualitySection({
+
   defectId,
   testRunOptions,
 }: {
   defectId: string;
   testRunOptions: { id: string; business_id: string }[];
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const [fas, setFas] = useState<FailureAnalysis[]>([]);
   const [capasByFa, setCapasByFa] = useState<Record<string, Capa[]>>({});
   const [showFaForm, setShowFaForm] = useState(false);
@@ -337,13 +344,13 @@ function DefectQualitySection({
             <div style={{ fontSize: 12, fontWeight: 600 }}>
               {fa.method} <span style={{ opacity: 0.6, fontWeight: 400 }}>· {fa.analyst} · {new Date(fa.analyzed_at).toLocaleDateString()}</span>
             </div>
-            <div style={{ fontSize: 11.5, opacity: 0.85 }}>{fa.findings}</div>
+            <div style={{ fontSize: 11.5, opacity: 0.85 }}>{tr(fa.findings)}</div>
             {fa.root_cause && (
               <div style={{ fontSize: 11, marginTop: 2 }}>
                 <span style={{ color: fa.root_cause_confirmed ? "#4ade80" : "#fbbf24", fontWeight: 600 }}>
                   {fa.root_cause_confirmed ? t("proc.quality.fa.confirmed") : t("proc.quality.fa.unconfirmed")}
                 </span>{" "}
-                {fa.root_cause}
+                {tr(fa.root_cause)}
               </div>
             )}
 
@@ -541,7 +548,8 @@ function LotDetail({ lot }: { lot: LotCard }) {
 }
 
 function CavityStrip({ comparison }: { comparison: CavityComparison }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   return (
     <div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -566,7 +574,7 @@ function CavityStrip({ comparison }: { comparison: CavityComparison }) {
         </div>
       )}
       {comparison.check_note && (
-        <div style={{ marginTop: 4, fontSize: 11.5, opacity: 0.65 }}>{comparison.check_note}</div>
+        <div style={{ marginTop: 4, fontSize: 11.5, opacity: 0.65 }}>{tr(comparison.check_note)}</div>
       )}
     </div>
   );

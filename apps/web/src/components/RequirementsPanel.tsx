@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { enumLabel } from "../i18n";
 import type { Requirement } from "../lib/api";
 import { useTwinStore } from "../store";
+import { seedTr } from "../lib/seedL10n";
 
 const SAFETY_COLOR: Record<string, string> = {
   QM: "#64748b",
@@ -18,7 +19,7 @@ export function RequirementsPanel({
   requirements: Requirement[];
   onSelect: (requirement: Requirement) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const selectedId = useTwinStore((s) => s.selectedRequirementId);
 
   return (
@@ -37,7 +38,7 @@ export function RequirementsPanel({
           }}
         >
           <div style={{ fontSize: 12, opacity: 0.7 }}>{r.business_id}</div>
-          <div>{r.text}</div>
+          <div>{seedTr(r.text, i18n.resolvedLanguage)}</div>
           <div style={{ display: "flex", gap: 6, marginTop: 4, fontSize: 11 }}>
             <span
               style={{

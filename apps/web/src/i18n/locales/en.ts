@@ -8,6 +8,12 @@ const en = {
     signingIn: "Signing in…",
     language: "Language",
   },
+  docs: {
+    toc: "Contents",
+    copy: "⧉ copy markdown",
+    copied: "✓ copied",
+    download: ".md download",
+  },
   nav: {
     product: "Product",
     variant: "Variant",
@@ -560,7 +566,7 @@ const en = {
       holdoutMax: "Holdout max error (E1)",
       gloveRmse: "Glove holdout RMSE (E1)",
       extrapWarning: "Extrapolation warning — overlap limited",
-      disclosure: "Surrogate values are interpolations of the disclosed solver inside the DOE envelope; outside it they are flagged OOD. Correlation numbers are pipeline checks, never accuracy claims (지시서 §13).",
+      disclosure: "Surrogate values are interpolations of the disclosed solver inside the DOE envelope; outside it they are flagged OOD. Correlation numbers are pipeline checks, never accuracy claims (spec §13).",
     },
   },
   eda: {
@@ -701,6 +707,13 @@ const en = {
       corr: "correlation not run",
       unapproved: "approval pending",
     },
+    cat: {
+      function: "function",
+      quality: "quality",
+      environment: "environment",
+      interface: "interface",
+      safety: "safety",
+    },
     stale: "Change impact — affected evidence is STALE. Re-run to regenerate (§2.1).",
     s1: {
       matrix: "requirements matrix",
@@ -719,6 +732,7 @@ const en = {
       sod: "segregation of duties:",
       sodOk: "author ≠ approver ✓",
       sodNote: "Signature is blocked when the author equals the approver (§10.2).",
+      scope: "Scope",
     },
     s4: {
       design: "design & verification runs",
