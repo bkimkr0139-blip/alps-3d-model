@@ -1313,6 +1313,37 @@ looks transparent" after the S04/AirInput winding fix was already merged):
   connector cluster). No live-browser pass yet — same caveat as the S04 and
   AirInput sections above.
 
+## Center tab bar redesign — grouped, color-coded (DONE, tsc/vite/oxlint clean)
+
+The 6 center tabs (`App.tsx`'s `Workbench`) had grown from the original 3-4
+into a flat row of plain `<h3>`s distinguished only by opacity + an orange
+underline — with "AirInput Field Twin" and "EDA Training" added on top of
+the original 3D/Bench/System-Model/Process set, that stopped being enough
+to scan at a glance. Fixed by request:
+
+- **Per-tab color identity**: a small colored dot (`TabButton`) next to each
+  label — mechanical=blue, electrical=amber, multi-domain model=purple,
+  process=green, AirInput=cyan, EDA=orange — the same "shape + text, never
+  colour alone" rule the process-monitoring chart legend already follows
+  (§5.1), just applied to navigation instead of a status legend.
+- **Active state is a filled pill** (`${color}22` background + matching
+  border), not just an underline — reads at a glance even before the label
+  text registers.
+- **A visual divider before "EDA Training"**: it's the one tab that is NOT
+  a view onto the selected product/variant (see `edaMode`, which already
+  collapsed the side/bottom panels for exactly this reason) — grouped
+  separately from the other five, which all render `key={variantId}` and
+  react to product/variant selection.
+- `<h3>` → `<button role="tab" aria-selected>`: was clickable-but-not-
+  actually-a-control before; buttons don't inherit `font-family` in every
+  browser by default, so `TabButton` sets `fontFamily: "inherit"` explicitly
+  — an easy one to forget when replacing a heading with a button.
+- `t` from `useTranslation()` doesn't structurally satisfy a plain
+  `(key: string) => string` parameter type (its overloads are keyed to the
+  exact literal union of every resource key) — same friction hit before in
+  `TwinControls.tsx`'s stress-legend loop; same fix, cast at the call site:
+  `tabLabel(tab, t as (k: string) => string)`.
+
 ## Known gaps / deliberately deferred
 
 - **Read endpoints have no auth.** There is no router-level/global auth

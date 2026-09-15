@@ -18,6 +18,80 @@ import { TestCorrelationPanel } from "./components/TestCorrelationPanel";
 import { GatePanel } from "./components/GatePanel";
 import { AssistantPanel } from "./components/AssistantPanel";
 
+type CenterTab = "model" | "bench" | "sysmodel" | "proc" | "air" | "eda";
+
+// Per-tab color identity so the bar reads at a glance instead of needing the
+// label text parsed — same "icon (shape) + text together, never colour
+// alone" rule the process-monitoring chart legend already follows (§5.1),
+// just applied to navigation instead of a status legend. "eda" is visually
+// split off from the rest with a divider below: it is the one tab that is
+// NOT a view onto the selected product/variant (see edaMode) — a standalone
+// training module, not another twin.
+const PRODUCT_TWIN_TABS: { tab: CenterTab; color: string }[] = [
+  { tab: "model", color: "#60a5fa" },
+  { tab: "bench", color: "#fbbf24" },
+  { tab: "sysmodel", color: "#a78bfa" },
+  { tab: "proc", color: "#4ade80" },
+  { tab: "air", color: "#22d3ee" },
+];
+const STANDALONE_TABS: { tab: CenterTab; color: string }[] = [{ tab: "eda", color: "#f97316" }];
+
+function tabLabel(tab: CenterTab, t: (key: string) => string): string {
+  switch (tab) {
+    case "model":
+      return t("panels.viewer3d");
+    case "bench":
+      return t("panels.testbench");
+    case "sysmodel":
+      return t("panels.sysmodel");
+    case "proc":
+      return t("panels.proctwin");
+    case "air":
+      return t("panels.air");
+    case "eda":
+      return t("panels.eda");
+  }
+}
+
+function TabButton({
+  label,
+  active,
+  color,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  color: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 10px",
+        borderRadius: 6,
+        border: "1px solid",
+        borderColor: active ? color : "transparent",
+        background: active ? `${color}22` : "transparent",
+        color: active ? "#f1f5f9" : "#94a3b8",
+        fontFamily: "inherit",
+        fontWeight: active ? 600 : 400,
+        fontSize: 13,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+      {label}
+    </button>
+  );
+}
+
 function useTwinData(variantId: string | null) {
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [components, setComponents] = useState<ComponentDto[]>([]);
@@ -45,7 +119,7 @@ function Workbench() {
   const [products, setProducts] = useState<Product[]>([]);
   const [product, setProduct] = useState<Product | null>(null);
   const [variants, setVariants] = useState<Variant[]>([]);
-  const [centerTab, setCenterTab] = useState<"model" | "bench" | "sysmodel" | "proc" | "air" | "eda">("model");
+  const [centerTab, setCenterTab] = useState<CenterTab>("model");
 
   // Selection from another product/variant must not leak into the new one —
   // ids would match no mesh/requirement and leave a stale highlight.
@@ -183,32 +257,28 @@ function Workbench() {
           </div>
         )}
         <div style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", gap: 14, marginBottom: 8 }}>
-            {(["model", "bench", "sysmodel", "proc", "air", "eda"] as const).map((tab) => (
-              <h3
+          <div role="tablist" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, marginBottom: 8 }}>
+            {PRODUCT_TWIN_TABS.map(({ tab, color }) => (
+              <TabButton
                 key={tab}
+                label={tabLabel(tab, t as (k: string) => string)}
+                color={color}
+                active={centerTab === tab}
                 onClick={() => setCenterTab(tab)}
-                style={{
-                  marginTop: 0,
-                  marginBottom: 0,
-                  cursor: "pointer",
-                  opacity: centerTab === tab ? 1 : 0.55,
-                  borderBottom: centerTab === tab ? "2px solid #f97316" : "2px solid transparent",
-                  paddingBottom: 2,
-                }}
-              >
-                {tab === "model"
-                  ? t("panels.viewer3d")
-                  : tab === "bench"
-                    ? t("panels.testbench")
-                    : tab === "sysmodel"
-                      ? t("panels.sysmodel")
-                      : tab === "proc"
-                        ? t("panels.proctwin")
-                        : tab === "air"
-                          ? t("panels.air")
-                          : t("panels.eda")}
-              </h3>
+              />
+            ))}
+            {/* Divider: everything left of it is a view onto the selected
+                product/variant; everything right of it (currently just EDA
+                training) is a standalone module that ignores both. */}
+            <div style={{ width: 1, alignSelf: "stretch", background: "#334155", margin: "2px 4px" }} />
+            {STANDALONE_TABS.map(({ tab, color }) => (
+              <TabButton
+                key={tab}
+                label={tabLabel(tab, t as (k: string) => string)}
+                color={color}
+                active={centerTab === tab}
+                onClick={() => setCenterTab(tab)}
+              />
             ))}
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
