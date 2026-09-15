@@ -13,7 +13,8 @@ const en = {
     variant: "Variant",
     views: "Views",
     modules: "Standalone modules",
-    standaloneHint: "EDA training and the ASIC work center run independently of the product/variant selection.",
+    docs: "Docs",
+    standaloneHint: "EDA training, the ASIC work center and the system docs run independently of the product/variant selection.",
   },
 
   panels: {
@@ -25,6 +26,7 @@ const en = {
     air: "AirInput Field Twin (3D)",
     eda: "EDA Training (IC Design & Circuit Test)",
     asic: "ASIC Program (9-stage work center)",
+    docs: "System Docs",
     simulation: "Result Compare (S08)",
     sweep: "SPICE Resistance Sweep — Variant Compare (S08)",
     correlation: "Test & Correlation (S09)",

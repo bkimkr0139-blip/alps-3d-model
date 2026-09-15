@@ -12,6 +12,7 @@ import { ProcessTwin } from "./components/ProcessTwin";
 import { AirInputStudio } from "./components/air/AirInputStudio";
 import { EdaTraining } from "./components/eda/EdaTraining";
 import { AsicProgram } from "./components/asic/AsicProgram";
+import { SystemDocs } from "./components/SystemDocs";
 import { RequirementsPanel } from "./components/RequirementsPanel";
 import { SimulationPanel } from "./components/SimulationPanel";
 import { SweepChart } from "./components/SweepChart";
@@ -19,15 +20,14 @@ import { TestCorrelationPanel } from "./components/TestCorrelationPanel";
 import { GatePanel } from "./components/GatePanel";
 import { AssistantPanel } from "./components/AssistantPanel";
 
-type CenterTab = "model" | "bench" | "sysmodel" | "proc" | "air" | "eda" | "asic";
+type CenterTab = "model" | "bench" | "sysmodel" | "proc" | "air" | "eda" | "asic" | "docs";
 
 // Per-tab color identity so the bar reads at a glance instead of needing the
 // label text parsed — same "icon (shape) + text together, never colour
 // alone" rule the process-monitoring chart legend already follows (§5.1),
-// just applied to navigation instead of a status legend. "eda" is visually
-// split off from the rest with a divider below: it is the one tab that is
-// NOT a view onto the selected product/variant (see edaMode) — a standalone
-// training module, not another twin.
+// just applied to navigation instead of a status legend. Tabs right of the
+// dividers (see STANDALONE_TABS / DOCS_TABS) are NOT views onto the selected
+// product/variant — standalone modules and reference docs.
 const PRODUCT_TWIN_TABS: { tab: CenterTab; color: string }[] = [
   { tab: "model", color: "#60a5fa" },
   { tab: "bench", color: "#fbbf24" },
@@ -39,6 +39,9 @@ const STANDALONE_TABS: { tab: CenterTab; color: string }[] = [
   { tab: "eda", color: "#f97316" },
   { tab: "asic", color: "#e879f9" },
 ];
+// Reference material, not a work module — slate on purpose so it reads as
+// "meta" next to the colored functional tabs.
+const DOCS_TABS: { tab: CenterTab; color: string }[] = [{ tab: "docs", color: "#94a3b8" }];
 
 function tabLabel(tab: CenterTab, t: (key: string) => string): string {
   switch (tab) {
@@ -56,6 +59,8 @@ function tabLabel(tab: CenterTab, t: (key: string) => string): string {
       return t("panels.eda");
     case "asic":
       return t("panels.asic");
+    case "docs":
+      return t("panels.docs");
   }
 }
 
@@ -231,10 +236,10 @@ function Workbench() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedComponentId, graph]);
 
-  // EDA 교육 탭과 ASIC 9단계 작업 센터는 제품/변량 데이터와 무관한 자립
-  // 모듈이므로 좌우 사이드 패널·하단 비교/상관/게이트 프레임·어시스턴트를
-  // 접어 중앙에 전폭을 내준다.
-  const edaMode = centerTab === "eda" || centerTab === "asic";
+  // EDA 교육 탭·ASIC 9단계 작업 센터·시스템 문서 탭은 제품/변량 데이터와
+  // 무관한 자립 모듈이므로 좌우 사이드 패널·온보딩 가이드·하단 비교/상관/
+  // 게이트 프레임·어시스턴트를 접어 중앙에 전폭을 내준다.
+  const standaloneMode = centerTab === "eda" || centerTab === "asic" || centerTab === "docs";
 
   return (
     <div style={{ minHeight: "100vh", background: "#020617", color: "#e2e8f0", padding: 20, fontFamily: "system-ui, sans-serif" }}>
@@ -258,11 +263,11 @@ function Workbench() {
           unrelated widgets. Product/variant dim + disable in standalone
           module mode — honest UI: EDA/ASIC ignore that context entirely. */}
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12, marginBottom: 12 }}>
-        <span style={{ opacity: edaMode ? 0.45 : 1, transition: "opacity 150ms" }}>
+        <span style={{ opacity: standaloneMode ? 0.45 : 1, transition: "opacity 150ms" }}>
           <Field label={t("nav.product")}>
             <select
               value={product?.id ?? ""}
-              disabled={edaMode}
+              disabled={standaloneMode}
               aria-label={t("nav.product")}
               onChange={(e) => {
                 const p = products.find((x) => x.id === e.target.value);
@@ -278,11 +283,11 @@ function Workbench() {
             </select>
           </Field>
         </span>
-        <span style={{ opacity: edaMode ? 0.45 : 1, transition: "opacity 150ms" }}>
+        <span style={{ opacity: standaloneMode ? 0.45 : 1, transition: "opacity 150ms" }}>
           <Field label={t("nav.variant")}>
             <select
               value={variantId ?? ""}
-              disabled={edaMode}
+              disabled={standaloneMode}
               aria-label={t("nav.variant")}
               onChange={(e) => {
                 clearSelection();
@@ -328,8 +333,24 @@ function Workbench() {
             ))}
           </div>
         </NavGroup>
+        {/* Reference material is its own group: readable at any time, still
+            independent of the product/variant context. */}
+        <div style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
+        <NavGroup label={t("nav.docs")}>
+          <div role="tablist" aria-label={t("nav.docs")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {DOCS_TABS.map(({ tab, color }) => (
+              <TabButton
+                key={tab}
+                label={tabLabel(tab, t as (k: string) => string)}
+                color={color}
+                active={centerTab === tab}
+                onClick={() => setCenterTab(tab)}
+              />
+            ))}
+          </div>
+        </NavGroup>
         <div style={{ flex: 1 }} />
-        {edaMode && (
+        {standaloneMode && (
           <span style={{ fontSize: 12, color: "#64748b", paddingBottom: 8, maxWidth: 340 }}>
             ⓘ {t("nav.standaloneHint")}
           </span>
@@ -339,26 +360,30 @@ function Workbench() {
         </Field>
       </div>
 
-      <OnboardingGuide
-        variantId={variantId}
-        requirements={requirements}
-        components={components}
-        graph={graph}
-        runs={runs}
-        mechRun={mechRun}
-      />
+      {/* The guide coaches the product/variant flow — noise in standalone
+          modules (EDA/ASIC/docs get the full width instead). */}
+      {!standaloneMode && (
+        <OnboardingGuide
+          variantId={variantId}
+          requirements={requirements}
+          components={components}
+          graph={graph}
+          runs={runs}
+          mechRun={mechRun}
+        />
+      )}
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: edaMode ? "1fr" : "320px 1fr 340px",
+          gridTemplateColumns: standaloneMode ? "1fr" : "320px 1fr 340px",
           gap: 16,
           // Tab bar moved up into the nav bar — 62vh keeps the same viewport
           // share the center column had when it still carried the tabs.
           height: "62vh",
         }}
       >
-        {!edaMode && (
+        {!standaloneMode && (
           <div style={{ overflowY: "auto" }}>
             <RequirementsPanel requirements={requirements} onSelect={selectRequirement} />
           </div>
@@ -376,6 +401,8 @@ function Workbench() {
               <EdaTraining />
             ) : centerTab === "asic" ? (
               <AsicProgram />
+            ) : centerTab === "docs" ? (
+              <SystemDocs />
             ) : (
               <ProcessTwin
                 key={variantId ?? "none"}
@@ -384,14 +411,14 @@ function Workbench() {
               />
             )}
         </div>
-        {!edaMode && (
+        {!standaloneMode && (
           <div style={{ overflowY: "auto" }}>
             <SimulationPanel runs={runs} />
           </div>
         )}
       </div>
 
-      {!edaMode && (
+      {!standaloneMode && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
             {compareRuns.length > 0 && (

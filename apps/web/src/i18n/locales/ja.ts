@@ -12,7 +12,8 @@ const ja: Resources = {
     variant: "バリアント",
     views: "表示",
     modules: "独立モジュール",
-    standaloneHint: "EDA教育・ASICワークセンターは製品/バリアントの選択に依存しません。",
+    docs: "文書",
+    standaloneHint: "EDA教育・ASICワークセンター・システム文書は製品/バリアントの選択に依存しません。",
   },
 
   panels: {
@@ -24,6 +25,7 @@ const ja: Resources = {
     air: "AirInputフィールドツイン (3D)",
     eda: "EDA研修 (IC設計・回路テスト)",
     asic: "ASICプログラム(9段階ワークセンター)",
+    docs: "システム文書",
     simulation: "結果比較 (S08)",
     sweep: "SPICE 抵抗スイープ — バリアント比較 (S08)",
     correlation: "試験と相関 (S09)",

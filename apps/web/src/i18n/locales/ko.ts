@@ -12,7 +12,8 @@ const ko: Resources = {
     variant: "변량",
     views: "화면",
     modules: "독립 모듈",
-    standaloneHint: "EDA 교육·ASIC 작업 센터는 제품/변량 선택과 무관하게 동작합니다.",
+    docs: "문서",
+    standaloneHint: "EDA 교육·ASIC 작업 센터·시스템 문서는 제품/변량 선택과 무관하게 동작합니다.",
   },
 
   panels: {
@@ -24,6 +25,7 @@ const ko: Resources = {
     air: "AirInput 필드 트윈 (3D)",
     eda: "EDA 교육 (IC 설계·회로 테스트)",
     asic: "ASIC 프로그램 (9단계 작업 센터)",
+    docs: "시스템 문서",
     simulation: "결과 비교 (S08)",
     sweep: "SPICE 저항 스윕 — 변형 비교 (S08)",
     correlation: "시험 및 상관 (S09)",
