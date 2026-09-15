@@ -117,6 +117,15 @@
 - **ゲートポリシー `alps-asic-v1.1`**: 新ブロッカー `CALIBRATION_EXPIRED`・`MODEL_OOD`・`MIXED_REVISION_EVIDENCE`・`QUAL_FAILURE_OPEN`・`WAIVER_EXPIRED` + 不変の`MOCK_RESULT_PRESENT`。Readiness Ladder 6段階(education_only→…→controlled_pilotまで到達可、production_candidate/releasedは未到達)。**ゲートレポートはサーバー値をそのまま描画** — UIがブロッカーを生成しない。
 - 書き込みはすべてロールゲート(インポート=試験、RCA=ASIC/品質エンジニア、ECO終了=アーキテクト/承認者)。バックエンドの韓国語デモ文字列は描画時のl10nオーバーレイでen/ja表示。
 
+**v1.1 R2拡張 (仕様書§10 — ファウンドリ・パッケージ・テストプログラム・エビデンス)**
+
+- **トレードスタディ (EPIC B)**: プロセス・パッケージ選択肢のNRE/単価/リードタイム加重スコア。未確定の軸は0として計算せず、部分スコア+TBD軸名を明示。決定は根拠・残存リスクとともに記録され、金額はCAN_COSTロールにのみ表示。③段階。
+- **EDA ToolRun (EPIC C)**: `real_adapter`実行はツール出力のsha256+lineageを要求し、`mock`実行はゲートブロッカー(`MOCK_RESULT_PRESENT`)として正直に残る。④段階。
+- **テストプログラムツイン (EPIC D)**: wafer_sort/final_testフロー別の項目・時間・カバレッジ+**クロスターゲット分析**(同一limitsの重複はdrop候補、カバレッジ空白を表示 — レビュー専用、自動適用なし)。サイト時間あたりレート未確定フローの原価はnull(TBD) — 0として計算されない。⑥段階。
+- **サプライチェーン・ロット系譜 (EPIC H)**: ファウンドリ/OSAT/subconパートナー状態、PCN変更追跡、シリコン・マスク・パッケージリビジョンを伴うロットトラベラー、ウェハーマップの歩留まり/再試験率+overkill/underkill(source_classチップ付き)。⑨段階。
+- **製品検証パック (P1-07)**: 4製品テンプレート専用シード — 電流センサー(Template B)はR1+R2全閉ループ、A/C/Dは検証パック(信号チェーン・トレードスタディ・テストフロー)。
+- **エビデンス報告書 (P1-08)**: `GET /asic/templates/{id}/evidence-report?lang=ko|en|ja` — 設計・実測・認証・安全・テスト・サプライチェーン・ゲート全セクションを3言語で。金額は含まず(CAN_COSTビュー専用)、TBDは名前を明示し、SYNTHETIC/MOCKソースはどの言語でも実測値として読めない。パネルはUI言語に自動追従。
+
 ### 3.10 結果比較・相関・ゲート (下部フレーム)
 
 - **SPICE Resistance Sweep — Variant Compare (S08)**: バリアント2つ以上を同一軸・同一単位で重畳比較(§12.2)。

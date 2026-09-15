@@ -41,13 +41,18 @@ import {
   ChainBudgetPanel,
   ChainRevisionPanel,
   CornerStudiesPanel,
+  EvidenceReportPanel,
   EMPTY_LIVE,
   EquipmentRunsPanel,
   FaStudio,
   GateReportPanel,
   BackendQualPanel,
   SafetyTracePanel,
+  SupplyChainPanel,
+  TestFlowAnalysisPanel,
   TestProgramTwin,
+  ToolRunsPanel,
+  TradeStudyPanel,
   loadLive,
   type Live,
   type LiveState,
@@ -461,6 +466,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 </tbody>
               </table>
               </SectionCard>
+              <TradeStudyPanel live={live} liveState={liveState} />
             </>
           )}
 
@@ -558,6 +564,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 </div>
               </SectionCard>
               <CornerStudiesPanel live={live} liveState={liveState} />
+              <ToolRunsPanel live={live} liveState={liveState} />
             </>
           )}
 
@@ -657,6 +664,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
               </div>
             </SectionCard>
             <TestProgramTwin tpl={tpl} testProgRev={testProgRev} maskRev={maskRev} />
+            <TestFlowAnalysisPanel live={live} liveState={liveState} />
             </>
           )}
 
@@ -809,12 +817,14 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   </div>
                 }
               />
+              <EvidenceReportPanel tplId={tpl.id} />
             </>
           )}
 
           {stage === "s9" && (
             <>
               <FaStudio live={live} liveState={liveState} />
+              <SupplyChainPanel live={live} liveState={liveState} />
               <SectionCard title={`${t("asic.stage.s9")} — ${t("asic.s9.quality")}`} right={<Chip color="#a78bfa">{t("asic.conf.synthetic_fixture")}</Chip>}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
                   <div>

@@ -117,6 +117,15 @@
 - **게이트 정책 `alps-asic-v1.1`**: 신규 블로커 `CALIBRATION_EXPIRED`·`MODEL_OOD`·`MIXED_REVISION_EVIDENCE`·`QUAL_FAILURE_OPEN`·`WAIVER_EXPIRED` + 불변의 `MOCK_RESULT_PRESENT`. Readiness Ladder 6단계(education_only→…→controlled_pilot 도달, production_candidate/released는 미도달). **게이트 리포트는 서버 값을 그대로 렌더링** — UI가 블로커를 만들어내지 않는다.
 - 쓰기 전부 역할 게이트(임포트=시험, RCA=전력 ASIC/품질, ECO 종결=아키텍트/승인자). 백엔드 한국어 데모 문자열은 렌더 시점 l10n 오버레이로 en/ja 표시.
 
+**v1.1 R2 고도화 (지시서 §10 — 공정·파트너·테스트 프로그램·증적)**
+
+- **Trade Study (EPIC B)**: 공정·파트너 옵션의 NRE/단가/리드타임 가중 점수. 미확정 축은 0으로 계산하지 않고 부분 점수 + TBD 축 이름을 나열. 결정은 근거·잔여 리스크와 함께 기록되며 금액은 CAN_COST 역할에만 보인다. ③ 단계.
+- **EDA ToolRun (EPIC C)**: `real_adapter` 실행은 도구 산출물 sha256 + lineage를 요구하고, `mock` 실행은 게이트 블로커(`MOCK_RESULT_PRESENT`)로 정직하게 남는다. ④ 단계.
+- **테스트 프로그램 트윈 (EPIC D)**: wafer_sort/final_test 플로우별 항목·시간·커버리지 + **교차 타깃 분석**(동일 limits 중복은 drop 후보, 커버리지 공백 표시 — 검토 전용, 자동 적용 없음). 사이트 시간당 rate 미확정 flow의 원가는 null(TBD) — 0으로 계산되지 않는다. ⑥ 단계.
+- **공급망·lot 계보 (EPIC H)**: 파운드리/OSAT/subcon 파트너 상태, PCN 변경 추적, lot traveler(실리콘·마스크·패키지 리비전 동반), 웨이퍼 맵 수율/재시험율 + overkill/underkill(source_class 칩과 함께). ⑨ 단계.
+- **제품 검증 팩 (P1-07)**: 4개 제품 템플릿 전용 시드 — 전류 센서(Template B)는 R1+R2 전체 폐루프, A/C/D는 검증 팩(신호체인·Trade Study·테스트 플로우).
+- **증적 보고서 (P1-08)**: `GET /asic/templates/{id}/evidence-report?lang=ko|en|ja` — 설계·실측·인증·안전·테스트·공급망·게이트 전 섹션을 3개 언어로. 금액은 포함하지 않고(CAN_COST 뷰 전용), TBD는 이름을 명명하며, SYNTHETIC/MOCK 출처는 어떤 언어에서도 측정값으로 읽히지 않는다. 패널은 UI 언어를 자동 추종.
+
 ### 3.10 결과 비교·상관·게이트 (하단 프레임)
 
 - **SPICE Resistance Sweep — Variant Compare (S08)**: 변량 2개 이상을 동일 축·동일 단위로 중첩 비교(§12.2).

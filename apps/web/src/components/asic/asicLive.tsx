@@ -1,17 +1,25 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   asicApi,
   type AsicCornerStudy,
+  type AsicEvidenceReport,
   type AsicEco,
   type AsicFaCase,
   type AsicFaEvent,
   type AsicFaultInjection,
   type AsicFmedaItem,
   type AsicGateReport,
+  type AsicLotTraveler,
   type AsicMeasurementRun,
+  type AsicPartner,
   type AsicQualPlan,
   type AsicSafetyItem,
   type AsicSignalChain,
+  type AsicTestFlowAnalysis,
+  type AsicToolRun,
+  type AsicTradeStudy,
+  type AsicWaferMap,
 } from "../../lib/api";
 import { makeSeedTr } from "../../lib/seedL10n";
 import { Histogram } from "./asicCharts";
@@ -47,6 +55,13 @@ export type Live = {
   faEvents: Record<string, AsicFaEvent[]>;
   ecos: AsicEco[];
   gate: AsicGateReport | null;
+  // R2 (EPIC B·C·D·H)
+  tradeStudies: AsicTradeStudy[];
+  toolRuns: AsicToolRun[];
+  flowAnalysis: AsicTestFlowAnalysis | null;
+  waferMaps: AsicWaferMap[];
+  partners: AsicPartner[];
+  travelers: AsicLotTraveler[];
 };
 
 export const EMPTY_LIVE: Live = {
@@ -61,6 +76,12 @@ export const EMPTY_LIVE: Live = {
   faEvents: {},
   ecos: [],
   gate: null,
+  tradeStudies: [],
+  toolRuns: [],
+  flowAnalysis: null,
+  waferMaps: [],
+  partners: [],
+  travelers: [],
 };
 
 // ── data loading (best-effort: a backend miss degrades to the fixture view) ──
@@ -76,9 +97,20 @@ export async function loadLive(templateId: string): Promise<{ live: Live; state:
     asicApi.listFaCases(templateId),
     asicApi.listEcos(templateId),
     asicApi.gateReport(templateId),
+    // R2 — listTradeStudies is CAN_COST-restricted: a 403 for roles without
+    // the group is a legitimate state (panel shows "restricted"), not an
+    // outage, so it must not flip the whole workspace to "error"
+    asicApi.listTradeStudies(templateId),
+    asicApi.listToolRuns(templateId),
+    asicApi.testFlowAnalysis(templateId),
+    asicApi.listWaferMaps(templateId),
+    asicApi.listPartners(),
+    asicApi.listLotTravelers(templateId),
   ]);
   const pick = <T,>(i: number): T[] | null => (settled[i].status === "fulfilled" ? (settled[i] as PromiseFulfilledResult<T[]>).value : null);
-  const gate = settled[9].status === "fulfilled" ? (settled[9] as PromiseFulfilledResult<AsicGateReport>).value : null;
+  const one = <T,>(i: number): T | null => (settled[i].status === "fulfilled" ? (settled[i] as PromiseFulfilledResult<T>).value : null);
+  const gate = one<AsicGateReport>(9);
+  const flowAnalysis = one<AsicTestFlowAnalysis>(12);
   const faCases = pick<AsicFaCase>(7) ?? [];
   const eventLists = await Promise.allSettled(faCases.map((c) => asicApi.listFaEvents(c.id)));
   const faEvents: Record<string, AsicFaEvent[]> = {};
@@ -97,11 +129,21 @@ export async function loadLive(templateId: string): Promise<{ live: Live; state:
     faEvents,
     ecos: pick<AsicEco>(8) ?? [],
     gate,
+    tradeStudies: pick<AsicTradeStudy>(10) ?? [],
+    toolRuns: pick<AsicToolRun>(11) ?? [],
+    flowAnalysis,
+    waferMaps: pick<AsicWaferMap>(13) ?? [],
+    partners: pick<AsicPartner>(14) ?? [],
+    travelers: pick<AsicLotTraveler>(15) ?? [],
   };
   const hasData =
     live.chains.length + live.studies.length + live.runs.length + live.plans.length + live.safety.length +
     live.faCases.length + live.ecos.length + (live.gate ? 1 : 0);
-  const anyFail = settled.some((s) => s.status === "rejected");
+  // a rejection counts as an outage unless it's an authorization miss (403) —
+  // api.ts throws "${status} ${path}: …" so the status is always in the message
+  const anyFail = settled.some(
+    (s) => s.status === "rejected" && !/(^|\s)403\s/.test(String((s as PromiseRejectedResult).reason)),
+  );
   const state: LiveState = anyFail ? "error" : hasData > 0 ? "ready" : "empty";
   return { live, state };
 }
@@ -890,6 +932,412 @@ export function FaStudio({ live, liveState }: { live: Live; liveState: LiveState
           )}
         </div>
       ))}
+    </SectionCard>
+  );
+}
+
+// ══ R2 (EPIC B·C·D·H + P1-08) — trade study · EDA tool runs · test program
+// ══ twin analysis · supply chain · 3-language evidence report ═══════════════
+
+const money = (v: number | null | undefined, cur = "KRW") =>
+  v == null ? null : `${v.toLocaleString()} ${cur}`;
+
+function RestrictedNote() {
+  const { t } = useTranslation();
+  return <div style={{ fontSize: 12, color: "#64748b" }}>{t("asic.r2.restricted")}</div>;
+}
+
+// ── s3 · EPIC B: cost/schedule trade study (CAN_COST — money behind role) ──
+export function TradeStudyPanel({ live, liveState }: { live: Live; liveState: LiveState }) {
+  const { t } = useTranslation();
+  const { i18n } = useTranslation();
+  const tr = makeSeedTr(i18n.resolvedLanguage);
+  return (
+    <SectionCard title={t("asic.r2.trade.title")} right={<LiveChip state={liveState} />}>
+      {live.tradeStudies.length === 0 ? (
+        <RestrictedNote />
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {live.tradeStudies.map((s) => {
+            const byOption = new Map((s.result?.per_option ?? []).map((p) => [p.option_id, p]));
+            const winner = s.decision ? byOption.get(s.decision.option_id) : undefined;
+            return (
+              <div key={s.id} style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, background: "#0f172a" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <b style={{ fontFamily: "monospace", color: "#7dd3fc", fontSize: 12 }}>{s.business_id}</b>
+                  <span style={{ fontSize: 12, flex: 1 }}>{tr(s.title)}</span>
+                  <Chip color={s.status === "decided" ? "#34d399" : "#fbbf24"}>{s.status}</Chip>
+                </div>
+                {s.result && (
+                  <div style={{ overflowX: "auto", marginTop: 8 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr>
+                          <th style={th}>{t("asic.r2.trade.option")}</th>
+                          <th style={th}>{t("asic.r2.trade.nre")}</th>
+                          <th style={th}>{t("asic.r2.trade.unit")}</th>
+                          <th style={th}>{t("asic.r2.trade.weeks")}</th>
+                          <th style={th}>{t("asic.r2.trade.score")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {s.result.per_option.map((p) => (
+                          <tr key={p.option_id}>
+                            <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>
+                              {p.business_id}
+                              <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>{tr(p.foundry)} · {p.node} · {p.package}</span>
+                            </td>
+                            <td style={td}>
+                              {p.nre_total == null
+                                ? <Chip color="#fbbf24" title={tr(s.result?.tbd_note)}>{t("asic.r2.tbd")}: {p.nre_tbd_components.join(", ")}</Chip>
+                                : money(p.nre_total)}
+                            </td>
+                            <td style={td}>
+                              {p.unit_cost_total == null
+                                ? <Chip color="#fbbf24">{t("asic.r2.tbd")}: {p.unit_tbd_components.join(", ")}</Chip>
+                                : money(p.unit_cost_total)}
+                            </td>
+                            <td style={{ ...td, fontFamily: "monospace" }}>{p.schedule_weeks_total ?? "—"}</td>
+                            <td style={td}>
+                              {p.score.complete
+                                ? <b style={{ color: "#34d399" }}>{p.score.score}</b>
+                                : <Chip color="#94a3b8" title={p.score.tbd_axes.join(", ")}>{t("asic.r2.trade.partial")}</Chip>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {s.decision && (
+                  <div style={{ fontSize: 11, color: "#34d399", marginTop: 8 }}>
+                    ✓ {t("asic.r2.trade.decided")}: <b style={{ fontFamily: "monospace" }}>{winner?.business_id ?? s.decision.option_id}</b>
+                    {" · "}{tr(s.decision.rationale)}
+                    {(s.decision.residual_risks ?? []).length > 0 && (
+                      <div style={{ color: "#fbbf24" }}>⚠ {t("asic.r2.trade.risks")}: {(s.decision.residual_risks ?? []).map(tr).join(" / ")}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── s4 · EPIC C: EDA tool runs — lineage + runner class provenance ─────────
+export function ToolRunsPanel({ live, liveState }: { live: Live; liveState: LiveState }) {
+  const { t } = useTranslation();
+  if (live.toolRuns.length === 0) {
+    return (
+      <SectionCard title={t("asic.r2.tool.title")} right={<LiveChip state={liveState} />}>
+        <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>
+      </SectionCard>
+    );
+  }
+  return (
+    <SectionCard title={t("asic.r2.tool.title")} right={<LiveChip state={liveState} />}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={th}>run</th>
+              <th style={th}>{t("asic.r2.tool.tool")}</th>
+              <th style={th}>rev</th>
+              <th style={th}>{t("asic.r2.tool.runner")}</th>
+              <th style={th}>input·output hash</th>
+              <th style={th}>{t("asic.r2.tool.lineage")}</th>
+              <th style={th}>exit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {live.toolRuns.map((r) => (
+              <tr key={r.id}>
+                <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{r.business_id}</td>
+                <td style={{ ...td, fontFamily: "monospace" }}>{r.tool}<span style={{ display: "block", fontSize: 9, color: "#64748b" }}>{r.tool_version}</span></td>
+                <td style={{ ...td, fontFamily: "monospace" }}>r{r.design_revision}</td>
+                <td style={td}>
+                  <Chip color={r.runner_class === "real_adapter" ? "#34d399" : "#fbbf24"}>{r.runner_class}</Chip>
+                </td>
+                <td style={{ ...td, fontFamily: "monospace", fontSize: 9, color: "#94a3b8" }}>
+                  {r.input_hash.slice(0, 10)}… → {r.output_hash ? `${r.output_hash.slice(0, 10)}…` : "—"}
+                </td>
+                <td style={{ ...td, fontFamily: "monospace", color: "#a78bfa" }}>{r.lineage_id.slice(0, 8)}…</td>
+                <td style={td}>
+                  <Chip color={r.exit_code === 0 ? "#34d399" : "#f87171"}>{r.exit_code}</Chip>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── s6 · EPIC D: test program twin analysis — time/cost/coverage/dup/gap ──
+export function TestFlowAnalysisPanel({ live, liveState }: { live: Live; liveState: LiveState }) {
+  const { t } = useTranslation();
+  const { i18n } = useTranslation();
+  const tr = makeSeedTr(i18n.resolvedLanguage);
+  const a = live.flowAnalysis;
+  if (!a) {
+    return (
+      <SectionCard title={t("asic.r2.flow.title")} right={<LiveChip state={liveState} />}>
+        <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>
+      </SectionCard>
+    );
+  }
+  const targets = Object.entries(a.per_target);
+  return (
+    <SectionCard title={t("asic.r2.flow.title")} right={<Chip color="#38bdf8">{a.tool_version}</Chip>}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={th}>{t("asic.r2.flow.target")}</th>
+              <th style={th}>{t("asic.r2.flow.silicon")}</th>
+              <th style={th}>{t("asic.r2.flow.items")}</th>
+              <th style={th}>{t("asic.r2.flow.wall")}</th>
+              <th style={th}>{t("asic.r2.flow.cost")}</th>
+              <th style={th}>{t("asic.r2.flow.coverage")}</th>
+              <th style={th}>{t("asic.r2.flow.compat")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {targets.map(([target, p]) => (
+              <tr key={p.flow_id}>
+                <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>
+                  {target} <span style={{ color: "#64748b" }}>r{p.program_revision}</span>
+                </td>
+                <td style={{ ...td, fontFamily: "monospace" }}>{p.silicon_revision}</td>
+                <td style={{ ...td, fontFamily: "monospace" }}>{p.totals.item_count}</td>
+                <td style={{ ...td, fontFamily: "monospace" }}>{round2(p.totals.wall_time_s_per_die)}s</td>
+                <td style={td}>
+                  {p.totals.cost_per_die == null
+                    ? <Chip color="#fbbf24" title={tr(a.tbd_note)}>{t("asic.r2.tbd")}</Chip>
+                    : money(p.totals.cost_per_die)}
+                </td>
+                <td style={td}>
+                  {p.coverage.aggregate_avg_pct}%{(p.coverage.uncovered_classes.length > 0) && (
+                    <span style={{ display: "block", fontSize: 9, color: "#fbbf24" }}>— {p.coverage.uncovered_classes.join(", ")}</span>
+                  )}
+                </td>
+                <td style={td}>
+                  <Chip color={p.compatibility.compatible ? "#34d399" : "#f87171"}>
+                    {p.compatibility.compatible ? "✓" : `✕ ${p.compatibility.mismatches.join(", ")}`}
+                  </Chip>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {a.cross_target && (
+        <div style={{ marginTop: 10, fontSize: 11, color: "#94a3b8" }}>
+          <b>{t("asic.r2.flow.cross")}</b>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+            {a.cross_target.duplicates.map((d) => (
+              <Chip key={d.name} color={d.drop_candidate ? "#fbbf24" : "#64748b"} title={tr(d.reason)}>
+                {d.drop_candidate ? `⚠ ${tr(d.name)}` : tr(d.name)}
+              </Chip>
+            ))}
+            {a.cross_target.coverage_gaps.map((g) => (
+              <Chip key={g.defect_class} color="#f87171" title={tr(g.reason)}>
+                {t("asic.r2.flow.gap")}: {g.defect_class}
+              </Chip>
+            ))}
+            {a.cross_target.duplicates.length + a.cross_target.coverage_gaps.length === 0 && (
+              <span style={{ color: "#34d399" }}>✓ {t("asic.r2.flow.clean")}</span>
+            )}
+          </div>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── s9 · EPIC H: partners · lot travelers · wafer maps (portal data) ───────
+export function SupplyChainPanel({ live, liveState }: { live: Live; liveState: LiveState }) {
+  const { t } = useTranslation();
+  const partnerName = (id: string | null) =>
+    id ? (live.partners.find((p) => p.id === id)?.business_id ?? id.slice(0, 8)) : "—";
+  return (
+    <SectionCard title={t("asic.r2.chain.title")} right={<LiveChip state={liveState} />}>
+      {live.partners.length === 0 && live.travelers.length === 0 && live.waferMaps.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {live.partners.length > 0 && (
+            <div>
+              <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{t("asic.r2.chain.partners")}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {live.partners.map((p) => (
+                  <Chip key={p.id} color={p.status === "approved" ? "#34d399" : p.status === "suspended" ? "#f87171" : "#fbbf24"}>
+                    {p.business_id} · {p.kind} · {p.status}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          )}
+          {live.travelers.length > 0 && (
+            <div style={{ overflowX: "auto" }}>
+              <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{t("asic.r2.chain.lots")}</div>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={th}>lot</th>
+                    <th style={th}>{t("asic.r2.chain.revs")}</th>
+                    <th style={th}>{t("asic.r2.chain.route")}</th>
+                    <th style={th}>{t("asic.r2.chain.parent")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {live.travelers.map((lt) => (
+                    <tr key={lt.id}>
+                      <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>
+                        {lt.lot_ref}
+                        <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>{lt.status}</span>
+                      </td>
+                      <td style={{ ...td, fontFamily: "monospace", fontSize: 10 }}>
+                        {lt.silicon_revision} / {lt.mask_rev} / {lt.package_rev}
+                      </td>
+                      <td style={td}>
+                        {lt.steps.map((s, i) => (
+                          <span key={i} style={{ fontFamily: "monospace", fontSize: 10 }}>
+                            {i > 0 && " → "}{s.partner_business_id}:{s.step}
+                          </span>
+                        ))}
+                        <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>
+                          {t("asic.r2.chain.current")}: {partnerName(lt.current_partner_id)}
+                        </span>
+                      </td>
+                      <td style={{ ...td, fontFamily: "monospace", fontSize: 10 }}>{(lt.parent_lot_refs ?? []).join(", ") || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {live.waferMaps.length > 0 && (
+            <div style={{ overflowX: "auto" }}>
+              <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{t("asic.r2.chain.maps")}</div>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={th}>wafer</th>
+                    <th style={th}>{t("asic.r2.chain.yield")}</th>
+                    <th style={th}>{t("asic.r2.chain.retest")}</th>
+                    <th style={th}>{t("asic.r2.chain.overkill")}</th>
+                    <th style={th}>class</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {live.waferMaps.map((m) => (
+                    <tr key={m.id}>
+                      <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>
+                        {m.wafer_ref ?? m.business_id}
+                        {m.lot_ref && <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>lot {m.lot_ref}</span>}
+                      </td>
+                      <td style={{ ...td, fontFamily: "monospace" }}>{m.analysis ? `${m.analysis.yield_pct}%` : "—"}</td>
+                      <td style={{ ...td, fontFamily: "monospace" }}>{m.analysis ? `${m.analysis.retest_rate_pct}%` : "—"}</td>
+                      <td style={td}>
+                        {m.analysis?.confusion
+                          ? <Chip color={m.analysis.confusion.overkill_count > 0 ? "#fbbf24" : "#34d399"}>
+                              {m.analysis.confusion.overkill_count} / {m.analysis.confusion.escaped_underkill}
+                            </Chip>
+                          : "—"}
+                      </td>
+                      <td style={td}><Chip color={m.source_class === "SYNTHETIC" ? "#a78bfa" : "#34d399"}>{m.source_class}</Chip></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── s8 · P1-08: 3-language evidence report (follows the UI language) ───────
+export function EvidenceReportPanel({ tplId }: { tplId: string }) {
+  const { t, i18n } = useTranslation();
+  const lang = (["ko", "en", "ja"].includes(i18n.resolvedLanguage ?? "") ? i18n.resolvedLanguage : "ko") as
+    | "ko" | "en" | "ja";
+  const [report, setReport] = useState<AsicEvidenceReport | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+
+  // the report is generated server-side per language and the UI language is
+  // the single source — a stale ko report must never linger under a ja UI
+  useEffect(() => {
+    let on = true;
+    setState("loading");
+    asicApi.evidenceReport(tplId, lang).then(
+      (r) => {
+        if (on) {
+          setReport(r);
+          setState("ready");
+        }
+      },
+      () => {
+        if (on) setState("error");
+      },
+    );
+    return () => {
+      on = false;
+    };
+  }, [tplId, lang]);
+
+  const download = () => {
+    if (!report) return;
+    const md = [
+      `# ${report.title} — ${report.template_id}`,
+      `${t("asic.r2.report.generated")}: ${report.generated_at} · v${report.report_version}`,
+      "",
+      ...report.notes.map((n) => `> ${n}`),
+      "",
+      ...report.sections.map((s) => [
+        `## ${s.title}`,
+        ...s.rows.map((r) => `- **${r.label}**: ${String(r.value)}`),
+        "",
+      ].join("\n")),
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `evidence-report-${report.template_id}-${report.lang}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <SectionCard title={t("asic.r2.report.title")} right={<Chip color="#38bdf8">{lang}</Chip>}>
+      {state === "loading" && <div style={{ fontSize: 12, color: "#64748b" }}>…</div>}
+      {state === "error" && <div style={{ fontSize: 12, color: "#f87171" }}>{t("asic.r2.report.error")}</div>}
+      {state === "ready" && report && (
+        <div>
+          <div style={{ fontSize: 10, color: "#475569", marginBottom: 8, fontFamily: "monospace" }}>
+            {report.title} · v{report.report_version} · {report.generated_at}
+          </div>
+          {report.sections.map((s) => (
+            <div key={s.key} style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: "#7dd3fc", fontWeight: 600 }}>{s.title}</div>
+              {s.rows.map((r, i) => (
+                <div key={i} style={{ fontSize: 11, color: "#94a3b8", paddingLeft: 10 }}>
+                  · <span style={{ color: "#cbd5e1" }}>{r.label}</span>: {String(r.value)}
+                </div>
+              ))}
+            </div>
+          ))}
+          <button style={{ border: "1px solid #38bdf8", background: "#38bdf822", color: "#7dd3fc", borderRadius: 6, padding: "4px 10px", fontSize: 11, cursor: "pointer" }} onClick={download}>
+            ↓ {t("asic.r2.report.download")} ({lang})
+          </button>
+        </div>
+      )}
     </SectionCard>
   );
 }

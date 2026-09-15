@@ -117,6 +117,15 @@ All 3D scenes (part geometry, wave propagation and waveforms, package cross-sect
 - **Gate policy `alps-asic-v1.1`**: new blockers `CALIBRATION_EXPIRED`, `MODEL_OOD`, `MIXED_REVISION_EVIDENCE`, `QUAL_FAILURE_OPEN`, `WAIVER_EXPIRED` plus the unconditional `MOCK_RESULT_PRESENT`. Six-step Readiness Ladder (education_only→…→controlled_pilot reachable; production_candidate/released unreachable). **The gate report renders the server value verbatim** — the UI never invents blockers.
 - Every write is role-gated (import=test, RCA=ASIC/quality engineer, ECO close=architect/approver). Korean demo strings coming from the backend are localized at render time for en/ja.
 
+**v1.1 R2 enhancement (spec §10 — foundry, package, test program, evidence)**
+
+- **Trade Study (EPIC B)**: weighted NRE/unit-cost/lead-time scoring across process & package options. Undetermined axes are never computed as 0 — partial score plus named TBD axes. The decision records rationale and residual risks; money is visible only to CAN_COST roles. Stage ③.
+- **EDA ToolRun (EPIC C)**: `real_adapter` runs must carry the tool output sha256 + lineage; `mock` runs stay honestly visible as the `MOCK_RESULT_PRESENT` gate blocker. Stage ④.
+- **Test program twin (EPIC D)**: per-flow items/time/coverage for wafer_sort & final_test plus **cross-target analysis** (same-limits duplicates flagged as drop candidates, coverage gaps surfaced — review-only, nothing auto-applied). Cost is null (TBD) where the per-site-hour rate is undetermined — never computed as 0. Stage ⑥.
+- **Supply chain & lot genealogy (EPIC H)**: foundry/OSAT/subcon partner status, PCN tracking, lot travelers carrying silicon/mask/package revisions, wafer maps with yield/retest rates and overkill/underkill confusion (with source_class chip). Stage ⑨.
+- **Product verification packs (P1-07)**: dedicated seeds for all four product templates — the current-sensor template (B) carries the full R1+R2 closed loop, A/C/D carry verification packs (signal chain, trade study, test flows).
+- **Evidence report (P1-08)**: `GET /asic/templates/{id}/evidence-report?lang=ko|en|ja` — design, measurements, qualification, safety, test program, supply chain and gate sections in all three languages. Money is excluded (CAN_COST views only), TBDs are named rather than zero-filled, and SYNTHETIC/MOCK sources never read as measured in any language. The panel follows the UI language automatically.
+
 ### 3.10 Result compare · correlation · gate (bottom frame)
 
 - **SPICE Resistance Sweep — Variant Compare (S08)**: overlay-compare two or more variants on identical axes and units (§12.2).

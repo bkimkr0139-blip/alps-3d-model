@@ -804,6 +804,171 @@ const RULES: Rule[] = [
   },
 ];
 
+// ── ASIC R2 (seed_asic_r2 + asic_trade/asic_testprog + trade-study router) ──
+// (appended to EXACT before seedTr; see the const above — TS hoisting does
+// not apply, so these live in the object literal's tail via this spread)
+
+const EXACT_R2: Record<string, LStr> = {
+  // trade-study / option prose (seed_asic_r2)
+  "55nm 균형안 — pkg_tooling TBD (0으로 계산되지 않음)": L(
+    "55nm 균형안 — pkg_tooling TBD (0으로 계산되지 않음)",
+    "55nm balanced option — pkg_tooling TBD (never computed as zero)",
+    "55nmバランス案 — pkg_tooling TBD (0として計算しない)",
+  ),
+  "28nm 고정밀 안 — NRE 높지만 단가·정밀도 우위": L(
+    "28nm 고정밀 안 — NRE 높지만 단가·정밀도 우위",
+    "28nm high-precision option — higher NRE, better unit cost & precision",
+    "28nm高精度案 — NREは高いが単価・精度に有利",
+  ),
+  "90nm 저가안 — 기술·공급 리스크로 가중 점수 하락 예상": L(
+    "90nm 저가안 — 기술·공급 리스크로 가중 점수 하락 예상",
+    "90nm low-cost option — weighted score expected to drop on tech/supply risk",
+    "90nm低コスト案 — 技術・供給リスクで加重スコア低下を見込み",
+  ),
+  "가중 점수 1위 옵션으로 확정 — TBD 항목 해소 후 1차 벤더 계약 진행": L(
+    "가중 점수 1위 옵션으로 확정 — TBD 항목 해소 후 1차 벤더 계약 진행",
+    "Confirmed as the top weighted-score option — vendor contract proceeds after TBDs resolve",
+    "加重スコア1位のオプションで確定 — TBD解消後に1次ベンダー契約を進める",
+  ),
+  "견적 대기 — 2차 벤더 협상 중 (TBD 규칙 시연)": L(
+    "견적 대기 — 2차 벤더 협상 중 (TBD 규칙 시연)",
+    "Quote pending — second-vendor negotiation in progress (TBD rule demo)",
+    "見積待ち — 2次ベンダー交渉中 (TBDルールの実演)",
+  ),
+  "G2 등급 라인 가용성": L("G2 등급 라인 가용성", "G2-grade line availability", "G2グレードラインの可用性"),
+  "단일 공급망 — 2차 소스 없음": L(
+    "단일 공급망 — 2차 소스 없음",
+    "Single supply chain — no second source",
+    "単一サプライチェーン — セカンドソースなし",
+  ),
+  "단가 협정 전 환율 변동": L("단가 협정 전 환율 변동", "FX movement before price agreement", "価格協定前の為替変動"),
+  "200mm 웨이퍼 공급 변동": L("200mm 웨이퍼 공급 변동", "200mm wafer supply fluctuation", "200mmウェハ供給変動"),
+  // module prose (asic_trade.py / asic_testprog.py / routers/asic.py)
+  "TBD 항목은 0으로 계산되지 않습니다 — 해당 옵션의 합계/축은 null로 표시되고 부분 점수는 partial_score로만 제공됩니다.": L(
+    "TBD 항목은 0으로 계산되지 않습니다 — 해당 옵션의 합계/축은 null로 표시되고 부분 점수는 partial_score로만 제공됩니다.",
+    "TBD entries are never computed as zero — the option's totals/axes stay null and only a partial_score is offered.",
+    "TBD項目は0として計算されません — 当該オプションの合計/軸はnullで表示され、部分スコアはpartial_scoreでのみ提供されます。",
+  ),
+  "cost_rate_per_site_hour 미확정 flow의 원가는 null(TBD)로 표시되며 0으로 계산되지 않습니다.": L(
+    "cost_rate_per_site_hour 미확정 flow의 원가는 null(TBD)로 표시되며 0으로 계산되지 않습니다.",
+    "A flow without a cost_rate_per_site_hour shows cost as null (TBD) — never computed as zero.",
+    "cost_rate_per_site_hourが未確定のフローの原価はnull(TBD)で表示され、0として計算されません。",
+  ),
+  "동일 limits로 wafer sort에서 이미 검출 — final test 반복은 검토 후 제거 가능": L(
+    "동일 limits로 wafer sort에서 이미 검출 — final test 반복은 검토 후 제거 가능",
+    "Already detected at wafer sort with identical limits — the final-test repeat can be removed after review",
+    "同一limitsでウェハソートで検出済み — ファイナルテストの反復はレビュー後に削除可能",
+  ),
+  "trim/cal·bin 등 목적이 다른 항목 또는 limits 상이 — 제거 대상 아님": L(
+    "trim/cal·bin 등 목적이 다른 항목 또는 limits 상이 — 제거 대상 아님",
+    "Different purpose (trim/cal, bin) or different limits — not a removal candidate",
+    "トリム/較正・ビンなど目的が異なる項目またはlimits不一致 — 削除対象ではない",
+  ),
+  "wafer sort에서 커버되는 결함 클래스가 final test에서 재확인되지 않음": L(
+    "wafer sort에서 커버되는 결함 클래스가 final test에서 재확인되지 않음",
+    "A defect class covered at wafer sort is not re-verified at final test",
+    "ウェハソートでカバーされる欠陥クラスがファイナルテストで再確認されていない",
+  ),
+  // trade-study panel surface (titles · foundries · risks the UI renders)
+  "전류 센서 ASIC 공정/파트너 선택 (2026-09)": L(
+    "전류 센서 ASIC 공정/파트너 선택 (2026-09)",
+    "Current-sensor ASIC process/partner selection (2026-09)",
+    "電流センサーASIC工程/パートナー選定 (2026-09)",
+  ),
+  "마스크 리드타임 변동": L(
+    "마스크 리드타임 변동",
+    "Mask lead-time fluctuation",
+    "マスクリードタイム変動",
+  ),
+  "F1 Fab (교육용 가명)": L(
+    "F1 Fab (교육용 가명)",
+    "F1 Fab (educational alias)",
+    "F1 Fab (教育用仮名)",
+  ),
+  "F2 Fab (교육용 가명)": L(
+    "F2 Fab (교육용 가명)",
+    "F2 Fab (educational alias)",
+    "F2 Fab (教育用仮名)",
+  ),
+  "F3 Fab (교육용 가명)": L(
+    "F3 Fab (교육용 가명)",
+    "F3 Fab (educational alias)",
+    "F3 Fab (教育用仮名)",
+  ),
+  "Contact 전도성 확인": L(
+    "Contact 전도성 확인",
+    "Contact continuity check",
+    "Contact 導通確認",
+  ),
+  "DC 파라미터 (오프셋)": L(
+    "DC 파라미터 (오프셋)",
+    "DC parameters (offset)",
+    "DC パラメータ (オフセット)",
+  ),
+  "감도 스윕 (100 A 등가)": L(
+    "감도 스윕 (100 A 등가)",
+    "Sensitivity sweep (100 A equiv.)",
+    "感度スイープ (100 A 等価)",
+  ),
+  "오프셋 트림/캘리브레이션": L(
+    "오프셋 트림/캘리브레이션",
+    "Offset trim/calibration",
+    "オフセット トリム/キャリブレーション",
+  ),
+  "최종 빈 분류": L(
+    "최종 빈 분류",
+    "Final bin classification",
+    "最終ビン分類",
+  ),
+  "ADC 블록 (G=8.0)": L("ADC 블록 (G=8.0)", "ADC block (G=8.0)", "ADC ブロック (G=8.0)"),
+  "AFE 블록 (G=12.5)": L("AFE 블록 (G=12.5)", "AFE block (G=12.5)", "AFE ブロック (G=12.5)"),
+  "HUM 블록 (G=9.0)": L("HUM 블록 (G=9.0)", "HUM block (G=9.0)", "HUM ブロック (G=9.0)"),
+  "LPF 블록 (G=5.5)": L("LPF 블록 (G=5.5)", "LPF block (G=5.5)", "LPF ブロック (G=5.5)"),
+  "RIPPLE 블록 (G=22.0)": L("RIPPLE 블록 (G=22.0)", "RIPPLE block (G=22.0)", "RIPPLE ブロック (G=22.0)"),
+  "TEMP 블록 (G=4.0)": L("TEMP 블록 (G=4.0)", "TEMP block (G=4.0)", "TEMP ブロック (G=4.0)"),
+  "Capacitive Sensing ASIC 센서 프론트엔드": L(
+    "Capacitive Sensing ASIC 센서 프론트엔드",
+    "Capacitive Sensing ASIC sensor frontend",
+    "Capacitive Sensing ASIC センサーフロントエンド",
+  ),
+  "Motor Ripple Counter 센서 프론트엔드": L(
+    "Motor Ripple Counter 센서 프론트엔드",
+    "Motor Ripple Counter sensor frontend",
+    "Motor Ripple Counter センサーフロントエンド",
+  ),
+  "Environmental Sensor ASIC 센서 프론트엔드": L(
+    "Environmental Sensor ASIC 센서 프론트엔드",
+    "Environmental Sensor ASIC sensor frontend",
+    "Environmental Sensor ASIC センサーフロントエンド",
+  ),
+  "Capacitive Sensing ASIC 공정 선택 검토 (P1-07 팩)": L(
+    "Capacitive Sensing ASIC 공정 선택 검토 (P1-07 팩)",
+    "Capacitive Sensing ASIC process selection review (P1-07 pack)",
+    "Capacitive Sensing ASIC プロセス選定検討 (P1-07 パック)",
+  ),
+  "Motor Ripple Counter 공정 선택 검토 (P1-07 팩)": L(
+    "Motor Ripple Counter 공정 선택 검토 (P1-07 팩)",
+    "Motor Ripple Counter process selection review (P1-07 pack)",
+    "Motor Ripple Counter プロセス選定検討 (P1-07 パック)",
+  ),
+  "Environmental Sensor ASIC 공정 선택 검토 (P1-07 팩)": L(
+    "Environmental Sensor ASIC 공정 선택 검토 (P1-07 팩)",
+    "Environmental Sensor ASIC process selection review (P1-07 pack)",
+    "Environmental Sensor ASIC プロセス選定検討 (P1-07 パック)",
+  ),
+  "DC 파라미터": L("DC 파라미터", "DC parameters", "DC パラメータ"),
+  "OSAT-K1 (교육용 가명)": L("OSAT-K1 (교육용 가명)", "OSAT-K1 (educational alias)", "OSAT-K1 (教育用仮名)"),
+  "Subcon-X (교육용 가명)": L("Subcon-X (교육용 가명)", "Subcon-X (educational alias)", "Subcon-X (教育用仮名)"),
+  "P1-07 검증 팩 옵션 (교육용 가명·합성 단가)": L(
+    "P1-07 검증 팩 옵션 (교육용 가명·합성 단가)",
+    "P1-07 verification pack option (educational alias, synthetic unit price)",
+    "P1-07 検証パック オプション (教育用仮名・合成単価)",
+  ),
+};
+
+// merge into the EXACT table above (the spread keeps one lookup for seedTr)
+Object.assign(EXACT, EXACT_R2);
+
 /** Overlay one stored/composed string into the ui language; a miss returns
  * the original text unchanged (honest fallback for data added later). */
 export function seedTr(text: string | null | undefined, lang: string | null | undefined): string {

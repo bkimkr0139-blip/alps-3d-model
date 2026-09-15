@@ -27,12 +27,18 @@ from sqlalchemy.orm import Session
 
 from app.models.asic import (
     AsicEco,
+    AsicPartner,
     CornerStudy,
     FaCase,
+    LotTraveler,
     MeasurementRun,
+    PartnerChange,
+    QualityAction,
     QualificationPlan,
     QualificationResult,
     SignalChainModel,
+    TestFlow,
+    ToolRun,
 )
 from app.schemas.asic import GateBlocker
 
@@ -135,6 +141,10 @@ def evaluate_gate(db: Session, template_id: str, gate_id: str = "RELEASE_SIGNED"
         rev = db.get(SignalChainModel, s.signal_chain_id)
         if rev is not None:
             revisions_with_evidence.add(rev.revision)
+    # R2 EPIC C (수용기준 2): one gate's EDA tool results must all belong to a
+    # single design revision — results spanning revisions block here too.
+    for tr in db.query(ToolRun).filter_by(template_id=template_id).all():
+        revisions_with_evidence.add(tr.design_revision)
     if len(revisions_with_evidence) > 1:
         blockers.append(
             GateBlocker(
@@ -194,6 +204,105 @@ def evaluate_gate(db: Session, template_id: str, gate_id: str = "RELEASE_SIGNED"
     )
     add_check("eco_loop_closed", not open_ecos, f"open={len(open_ecos)}", "open=0",
               [e.business_id for e in open_ecos])
+
+    # ── R2 EPIC D/H: test program ↔ silicon revision + supply chain ────
+    flows = (
+        db.query(TestFlow)
+        .filter_by(template_id=template_id)
+        .filter(TestFlow.status != "superseded")
+        .all()
+    )
+    travelers = db.query(LotTraveler).filter_by(template_id=template_id).all()
+    partners = {str(p.id): p for p in db.query(AsicPartner).all()}
+
+    flow_silicon_revs = {f.silicon_revision for f in flows}
+    rev_mismatch = [t.lot_ref for t in travelers if t.silicon_revision not in flow_silicon_revs]
+    if rev_mismatch and flows:
+        blockers.append(
+            GateBlocker(
+                code="TEST_PROGRAM_REV_MISMATCH",
+                detail=(
+                    "테스트 프로그램이 커버하지 않는 실리콘 리비전의 로트가 있습니다 — "
+                    "실행·승인이 차단됩니다 (수용기준 3)."
+                ),
+                evidence=rev_mismatch,
+            )
+        )
+    add_check("test_program_revision_match", not (rev_mismatch and flows),
+              f"lot_mismatch={len(rev_mismatch)}", "mismatch=0", rev_mismatch)
+
+    unapproved, bad_lineage = [], []
+    for t in travelers:
+        seen: set[tuple[str, str]] = set()
+        for s in t.steps or []:
+            p = partners.get(str(s.get("partner_id")))
+            if p is None:
+                bad_lineage.append(f"{t.lot_ref}:unknown-partner")
+                continue
+            if p.status != "approved":
+                unapproved.append(f"{t.lot_ref}:{p.business_id}")
+            key = (str(s.get("partner_id")), str(s.get("step")))
+            if key in seen:
+                bad_lineage.append(f"{t.lot_ref}:duplicate-step:{s.get('step')}")
+            seen.add(key)
+    if unapproved:
+        blockers.append(
+            GateBlocker(
+                code="PARTNER_NOT_APPROVED",
+                detail="승인되지 않은 파트너가 lot 여행 경로에 포함되어 있습니다.",
+                evidence=sorted(set(unapproved)),
+            )
+        )
+    if bad_lineage:
+        blockers.append(
+            GateBlocker(
+                code="LINEAGE_INVALID",
+                detail="lot genealogy에 알 수 없는 파트너 또는 중복 단계가 있습니다.",
+                evidence=sorted(set(bad_lineage)),
+            )
+        )
+
+    traveler_partner_ids = {
+        str(s.get("partner_id"))
+        for t in travelers
+        for s in (t.steps or [])
+        if s.get("partner_id")
+    }
+    pending_pcns = (
+        db.query(PartnerChange)
+        .filter(PartnerChange.status.in_(["submitted", "under_review"]))
+        .all()
+        if traveler_partner_ids
+        else []
+    )
+    pending_pcns = [c for c in pending_pcns if str(c.partner_id) in traveler_partner_ids]
+    if pending_pcns:
+        blockers.append(
+            GateBlocker(
+                code="PARTNER_CHANGE_PENDING",
+                detail="승인 대기 중인 파트너 변경(PCN)이 lot 경로의 파트너에 있습니다.",
+                evidence=[c.business_id for c in pending_pcns],
+            )
+        )
+
+    open_actions = (
+        db.query(QualityAction)
+        .filter_by(template_id=template_id, status="open")
+        .all()
+    )
+    if open_actions:
+        blockers.append(
+            GateBlocker(
+                code="QUALITY_ACTION_OPEN",
+                detail="종결되지 않은 품질 조치(hold/quarantine/8D)가 있습니다.",
+                evidence=[a.business_id for a in open_actions],
+            )
+        )
+    add_check("supply_chain_clean",
+              not (unapproved or bad_lineage or pending_pcns or open_actions),
+              f"unapproved={len(unapproved)} lineage={len(bad_lineage)} "
+              f"pcn={len(pending_pcns)} qa={len(open_actions)}",
+              "all=0", [])
 
     # ── readiness rung from evidence depth ─────────────────────────────
     if not runs and not studies:

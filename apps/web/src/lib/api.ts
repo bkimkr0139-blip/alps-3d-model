@@ -995,6 +995,140 @@ export interface AsicGateReport {
   evaluated_at: string;
 }
 
+// ── ASIC Twin v1.1 R2 (EPIC B·C·D·H + P1-08 report) ────────────────────────
+
+export interface AsicTradeStudy {
+  id: string;
+  business_id: string;
+  template_id: string;
+  title: string;
+  option_ids: string[];
+  weights: Record<string, number>;
+  annual_volume: number;
+  status: string;
+  decision: { option_id: string; rationale: string; residual_risks?: string[] } | null;
+  result: {
+    ranking: string[];
+    per_option: {
+      option_id: string;
+      business_id: string;
+      foundry: string;
+      node: string;
+      package: string;
+      nre_total: number | null;
+      nre_tbd_components: string[];
+      unit_cost_total: number | null;
+      unit_tbd_components: string[];
+      schedule_weeks_total: number | null;
+      score: { score: number | null; partial_score: number | null; complete: boolean; tbd_axes: string[] };
+    }[];
+    tbd_note: string;
+  } | null;
+  created_at: string;
+}
+
+export interface AsicToolRun {
+  id: string;
+  business_id: string;
+  template_id: string;
+  design_revision: number;
+  tool: string;
+  tool_version: string;
+  runner_class: string; // real_adapter | mock
+  input_hash: string;
+  output_hash: string | null;
+  exit_code: number;
+  lineage_id: string;
+  status: string;
+  created_at: string;
+}
+
+export interface AsicFlowTotals {
+  item_count: number;
+  total_duration_s: number;
+  wall_time_s_per_die: number;
+  cost_per_die: number | null;
+}
+
+export interface AsicFlowCoverage {
+  per_class: Record<string, number>;
+  uncovered_classes: string[];
+  aggregate_avg_pct: number;
+  unlinked_items: number;
+}
+
+export interface AsicTestFlowAnalysis {
+  tool_version: string;
+  template_id: string;
+  silicon_revisions: string[];
+  per_target: Record<
+    string,
+    {
+      flow_id: string;
+      business_id: string;
+      program_revision: number;
+      silicon_revision: string;
+      totals: AsicFlowTotals;
+      coverage: AsicFlowCoverage;
+      compatibility: { compatible: boolean; mismatches: string[] };
+    }
+  >;
+  cross_target: {
+    duplicates: { name: string; same_limits: boolean; drop_candidate: boolean; reason: string }[];
+    coverage_gaps: { defect_class: string; sort_coverage_pct: number; final_coverage_pct: number; reason: string }[];
+  } | null;
+  tbd_note: string;
+}
+
+export interface AsicWaferMap {
+  id: string;
+  business_id: string;
+  lot_ref: string | null;
+  wafer_ref: string | null;
+  grid: { rows: number; cols: number };
+  analysis: {
+    yield_pct: number;
+    retest_rate_pct: number;
+    fail_rate_pct: number;
+    confusion: { overkill_count: number; escaped_underkill: number } | null;
+  } | null;
+  source_class: string;
+  created_at: string;
+}
+
+export interface AsicPartner {
+  id: string;
+  business_id: string;
+  name: string;
+  kind: string; // foundry | osat | subcon | material
+  status: string; // approved | conditional | suspended
+  approved_at: string | null;
+}
+
+export interface AsicLotTraveler {
+  id: string;
+  business_id: string;
+  lot_ref: string;
+  parent_lot_refs: string[] | null;
+  silicon_revision: string | null;
+  mask_rev: string | null;
+  package_rev: string | null;
+  current_partner_id: string | null;
+  status: string;
+  steps: { partner_business_id: string; step: string; result: string; recorded_at: string }[];
+  created_at: string;
+}
+
+export interface AsicEvidenceReport {
+  report_version: string;
+  template_id: string;
+  lang: string;
+  generated_at: string;
+  title: string;
+  notes: string[];
+  sections: { key: string; title: string; rows: { label: string; value: unknown }[]; source_class?: string }[];
+}
+
 export const asicApi = {
   listSignalChains: (templateId: string) =>
     request<AsicSignalChain[]>(`/api/v1/asic/templates/${templateId}/signal-chains`),
@@ -1017,4 +1151,21 @@ export const asicApi = {
   listEcos: (templateId: string) => request<AsicEco[]>(`/api/v1/asic/templates/${templateId}/ecos`),
   gateReport: (templateId: string) =>
     request<AsicGateReport>(`/api/v1/asic/gate-report/${templateId}`),
+  // R2 — CAN_COST-restricted money views degrade to "error" live state for
+  // roles without the group (loadLive is allSettled, never fatal)
+  listTradeStudies: (templateId: string) =>
+    request<AsicTradeStudy[]>(`/api/v1/asic/templates/${templateId}/trade-studies`),
+  listToolRuns: (templateId: string) =>
+    request<AsicToolRun[]>(`/api/v1/asic/templates/${templateId}/tool-runs`),
+  testFlowAnalysis: (templateId: string) =>
+    request<AsicTestFlowAnalysis>(`/api/v1/asic/templates/${templateId}/test-flow-analysis`),
+  listWaferMaps: (templateId: string) =>
+    request<AsicWaferMap[]>(`/api/v1/asic/templates/${templateId}/wafer-maps`),
+  listPartners: () => request<AsicPartner[]>(`/api/v1/asic/partners`),
+  listLotTravelers: (templateId: string) =>
+    request<AsicLotTraveler[]>(`/api/v1/asic/templates/${templateId}/lot-travelers`),
+  evidenceReport: (templateId: string, lang: string) =>
+    request<AsicEvidenceReport>(
+      `/api/v1/asic/templates/${templateId}/evidence-report?lang=${lang}`,
+    ),
 };

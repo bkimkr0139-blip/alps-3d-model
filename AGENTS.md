@@ -1358,6 +1358,57 @@ to scan at a glance. Fixed by request:
   `TwinControls.tsx`'s stress-legend loop; same fix, cast at the call site:
   `tabLabel(tab, t as (k: string) => string)`.
 
+## ASIC v1.1 R2 — trade study / tool runs / test-program twin / supply chain / evidence report (DONE, pytest 159 + e2e ko/ja CLEAN)
+
+Spec v1.1 §10 R2 on top of R1 (EPIC A·E·F·G): EPIC B (cost/schedule
+trade study), C (EDA ToolRun contract), D (DFT + production test-program
+twin), H (foundry/OSAT portal + lot genealogy), P1-07 product verification
+packs, P1-08 three-language evidence report. Backend `app/asic_trade.py`,
+`app/asic_toolrun.py`, `app/asic_testprog.py`, `app/asic_supply.py`,
+`app/asic_report.py`; panels in `asicLive.tsx`; 20-test R2 suite
+(`test_asic_r2.py`). Gotchas that cost real time:
+
+- **pydantic v2 `model_dump()` silently drops explicit `None`s** unless the
+  field was set on the model instance — a computed `cost_per_die=None`
+  (TBD) assigned to an ORM column survives, but the same dict round-tripped
+  through `model_dump()` on a base-less schema omits the key, and callers
+  doing `result.get("cost_per_die")` then see `None`-vs-missing ambiguity.
+  When "TBD must be present as null" is an acceptance rule, set the
+  attribute explicitly or build the dict by hand.
+- **`program_revision` is a `String` column, not Integer** (test programs
+  carry rev strings like "TP-r2"); comparisons/casts that assume int break
+  at runtime, not migration time.
+- Test payloads go through stdlib `json.dumps` — a raw `uuid.uuid4()` in a
+  `json=` body raises client-side ("Object of type UUID is not JSON
+  serializable"); always `str()`-wrap. And when asserting on
+  `unresolved`/not-found id lists, remember ids that exist in the DB are
+  *resolved* — only the never-persisted probe id is reported.
+- **seedL10n exact-match discipline (bit us twice)**: EXACT-table keys must
+  be byte-identical to the backend/DB string or the overlay silently
+  misses and ja leaks Hangul. Never eyeball Korean equality — a single
+  different syllable (공정/파트너 vs 공정·파트너, 검증/인증…) is invisible
+  to review. Verify programmatically: pull the actual DB strings
+  (`psql` + `[가-힣]` regex over the columns the panels render) and diff
+  against the keys parsed out of `seedL10n.ts` (script at
+  `/tmp/alps-logs/verify_l10n_keys.py`, port into the repo if it keeps
+  earning its keep). New backend strings ⇒ new EXACT keys in the same
+  change, or the ja e2e catches it one cycle later.
+- **`loadLive` treats HTTP 403 as a legitimate state, not an outage**:
+  `listTradeStudies` is CAN_COST-restricted, so a non-privileged demo user
+  gets 403 there on every load. `anyFail` ignores rejections matching
+  `(^|\s)403\s` (the shape of `api.ts`'s thrown message) and the panel
+  renders a restricted note — without this the LiveChip showed ERROR for
+  everyone but the architect.
+- **The evidence report is money-free by rule** (P1-08 수용기준 5): amounts
+  live only in CAN_COST-restricted views. TBD items are *named*, never
+  zero-filled; every section keeps its `source_class` so SYNTHETIC/MOCK
+  never reads as measured — in any of the three languages. The panel
+  derives `lang` from `i18n.resolvedLanguage` and refetches on change: a
+  stale ko report must never linger under a ja UI.
+- Gate blockers arrive as `model_dump()` dicts (`b["code"]`), not attribute
+  access — `b.code` is an AttributeError that only fires when a blocker
+  actually exists.
+
 ## Known gaps / deliberately deferred
 
 - **Read endpoints have no auth.** There is no router-level/global auth

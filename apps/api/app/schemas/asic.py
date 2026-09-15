@@ -474,3 +474,515 @@ class AsicGateReport(BaseModel):
 
 
 QualificationPlanRead.model_rebuild()
+
+
+# ── R2 — EPIC B: FAB·패키지·원가·납기 (지시서 §4 EPIC B) ─────────────────────
+
+NreComponent = Literal[
+    "design", "ip", "mask", "mpw_shuttle", "pkg_tooling", "test_dev", "reliability"
+]
+UnitComponent = Literal["wafer", "die_yield", "assembly", "final_test", "logistics", "scrap"]
+RiskKind = Literal[
+    "supply_single", "long_lead", "yield_uncertainty", "thermal_stress", "equipment_availability"
+]
+
+
+class NreEntry(BaseModel):
+    """One NRE component — decided ({amount,...}) or TBD ({amount_tbd})."""
+
+    amount: float | None = None
+    amount_tbd: str | None = None  # 이유 — TBD는 0으로 계산되지 않는다
+    currency: Literal["KRW", "USD", "JPY", "EUR"] = "KRW"
+    basis_date: str | None = None
+    qty_basis: int | None = None
+    ref: str | None = None  # 근거 문서 (지시서: 모든 숫자에 근거 문서 연결)
+
+
+class UnitCostEntry(BaseModel):
+    """One unit-cost component with Base/Best/Worst bands."""
+
+    base: float | None = None
+    best: float | None = None
+    worst: float | None = None
+    base_tbd: str | None = None
+    unit: str | None = None
+    currency: Literal["KRW", "USD", "JPY", "EUR"] = "KRW"
+    basis_date: str | None = None
+    dies_per_wafer: float | None = None  # wafer entry only
+    ref: str | None = None
+
+
+class SchedulePhase(BaseModel):
+    phase: Literal[
+        "pdk_ip", "design", "tapeout", "wafer", "assembly", "es_cs", "qualification"
+    ]
+    weeks_best: float
+    weeks_base: float
+    weeks_worst: float
+
+
+class RiskEntry(BaseModel):
+    kind: RiskKind
+    note: str
+    severity: Literal["high", "medium", "low"]
+
+
+class ManufacturingOptionCreate(BaseModel):
+    business_id: str = Field(min_length=3, max_length=64)
+    template_id: TemplateId
+    variant_id: uuid.UUID | None = None
+    foundry: str = Field(min_length=1, max_length=64)
+    node: str = Field(min_length=1, max_length=64)
+    wafer_size_mm: float | None = None
+    voltage_option: str | None = None
+    device_option: str | None = None
+    temperature_grade: str | None = None
+    package: str = Field(min_length=1, max_length=64)
+    osat: str | None = None
+    moq: int | None = None
+    tech_score: int | None = Field(default=None, ge=1, le=5)
+    nre: dict[NreComponent, NreEntry]
+    unit_cost: dict[UnitComponent, UnitCostEntry]
+    schedule: list[SchedulePhase]
+    risks: list[RiskEntry] = Field(default_factory=list)
+    status: Literal["draft", "approved"] = "draft"
+    note: str | None = None
+
+
+class ManufacturingOptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    template_id: str
+    variant_id: uuid.UUID | None
+    foundry: str
+    node: str
+    wafer_size_mm: float | None
+    voltage_option: str | None
+    device_option: str | None
+    temperature_grade: str | None
+    package: str
+    osat: str | None
+    moq: int | None
+    tech_score: int | None
+    # cost fields are role-restricted (수용기준: 내부 단가 데이터는 열람 범위 제한) —
+    # unauthenticated/limited callers get cost_restricted=true with these None.
+    nre: dict | None
+    unit_cost: dict | None
+    schedule: list | None
+    risks: list | None
+    status: str
+    note: str | None
+    created_by: str
+    created_at: datetime
+    cost_restricted: bool = False
+
+
+class TradeStudyCreate(BaseModel):
+    business_id: str = Field(min_length=3, max_length=64)
+    template_id: TemplateId
+    variant_id: uuid.UUID | None = None
+    title: str = Field(min_length=1, max_length=255)
+    option_ids: list[uuid.UUID] = Field(min_length=2, max_length=5)
+    weights: dict[Literal["cost", "schedule", "technology", "supply"], float]
+    annual_volume: int = Field(ge=1)
+
+
+class TradeStudyRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    template_id: str
+    variant_id: uuid.UUID | None
+    title: str
+    option_ids: list
+    weights: dict
+    annual_volume: int
+    result: dict | None
+    decision: dict | None
+    status: str
+    created_by: str
+    created_at: datetime
+
+
+class TradeStudyDecision(BaseModel):
+    """옵션 선택 기록 (수용기준: 승인자·판단 근거·잔여 위험을 기록한다)."""
+
+    option_id: uuid.UUID
+    rationale: str = Field(min_length=1)
+    residual_risks: list[str] = Field(default_factory=list)
+
+
+# ── R2 — EPIC C: EDA 실행·검증 오케스트레이션 (지시서 §4 EPIC C) ──────────────
+
+ToolName = Literal[
+    "schematic_check", "spice", "ams", "lint", "cdc", "rdc",
+    "synthesis", "sta", "pr", "drc", "lvs", "erc", "signoff",
+]
+RunnerClass = Literal["real_adapter", "mock"]
+
+
+class ToolRunCreate(BaseModel):
+    """One external EDA execution's approved metadata (도구 자체는 온프레미스
+    실행 — 이 API는 메타데이터·해시·로그 위치만 수집한다)."""
+
+    business_id: str = Field(min_length=3, max_length=64)
+    template_id: TemplateId
+    variant_id: uuid.UUID | None = None
+    design_revision: int = Field(ge=1)
+    tool: ToolName
+    tool_version: str = Field(min_length=1, max_length=64)
+    runner_class: RunnerClass
+    environment: dict | None = None  # {image_digest | host, os, ...}
+    command_profile: str | None = None
+    input_hash: str = Field(min_length=64, max_length=64, pattern="^[0-9a-f]{64}$")
+    output_hash: str | None = Field(default=None, pattern="^[0-9a-f]{64}$")
+    exit_code: int
+    log_uri: str | None = None
+    report_artifact_version_id: uuid.UUID | None = None
+    metrics: dict | None = None
+    note: str | None = None
+
+
+class ToolRunRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    template_id: str
+    variant_id: uuid.UUID | None
+    design_revision: int
+    tool: str
+    tool_version: str
+    runner_class: str
+    environment: dict | None
+    command_profile: str | None
+    input_hash: str
+    output_hash: str | None
+    exit_code: int
+    log_uri: str | None
+    report_artifact_version_id: uuid.UUID | None
+    lineage_id: uuid.UUID
+    metrics: dict | None
+    status: str
+    note: str | None
+    created_by: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# EPIC D — DFT·양산 테스트 프로그램 트윈 (지시서 §4)
+# ---------------------------------------------------------------------------
+
+TestFlowTarget = Literal["wafer_sort", "final_test"]
+TestStage = Literal[
+    "contact", "pre_check", "dc", "analog", "digital", "trim_cal", "interface", "final_bin",
+]
+
+
+class Limits(BaseModel):
+    low: float | None = None
+    high: float | None = None
+    unit: str | None = None
+
+
+class DefectCoverageEntry(BaseModel):
+    defect_class: Literal["open", "short", "leakage", "parametric", "esd", "latchup"]
+    coverage_pct: float = Field(ge=0, le=100)
+
+
+class TestFlowItemIn(BaseModel):
+    seq: int = Field(ge=1)
+    stage: TestStage
+    name: str = Field(min_length=1, max_length=128)
+    limits: Limits | None = None
+    temperature_c: float | None = None
+    site_count: int = Field(default=1, ge=1)
+    pattern: str | None = Field(default=None, max_length=64)
+    instrument: str | None = Field(default=None, max_length=64)
+    equipment_channel: str | None = Field(default=None, max_length=32)
+    expected_duration_s: float = Field(gt=0)
+    requirement_ids: list[str] | None = None
+    failure_mode_refs: list[str] | None = None
+    defect_coverage: list[DefectCoverageEntry] | None = None
+
+
+class TestFlowCreate(BaseModel):
+    business_id: str = Field(min_length=3, max_length=64)
+    template_id: TemplateId
+    variant_id: uuid.UUID | None = None
+    program_revision: int = Field(ge=1)
+    silicon_revision: str = Field(min_length=1, max_length=32)
+    compatible_mask_rev: str | None = Field(default=None, max_length=32)
+    compatible_package_rev: str | None = Field(default=None, max_length=32)
+    target: TestFlowTarget
+    cost_rate_per_site_hour: float | None = None  # None = TBD
+    status: Literal["draft", "released"] = "draft"
+    note: str | None = None
+    items: list[TestFlowItemIn] = Field(min_length=1)
+
+
+class TestFlowItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    test_flow_id: uuid.UUID
+    seq: int
+    stage: str
+    name: str
+    limits: dict | None
+    temperature_c: float | None
+    site_count: int
+    pattern: str | None
+    instrument: str | None
+    equipment_channel: str | None
+    expected_duration_s: float
+    requirement_ids: list | None
+    failure_mode_refs: list | None
+    defect_coverage: list | None
+
+
+class TestFlowRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    template_id: str
+    variant_id: uuid.UUID | None
+    program_revision: int
+    silicon_revision: str
+    compatible_mask_rev: str | None
+    compatible_package_rev: str | None
+    target: str
+    cost_rate_per_site_hour: float | None
+    status: str
+    note: str | None
+    created_by: str
+    created_at: datetime
+    items: list[TestFlowItemRead] = []
+
+
+class LimitChangeCreate(BaseModel):
+    item_id: uuid.UUID
+    new_limits: Limits
+    rationale: str = Field(min_length=1)
+
+
+class LimitChangeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    test_flow_id: uuid.UUID
+    item_id: uuid.UUID
+    old_limits: dict | None
+    new_limits: dict
+    rationale: str
+    impact: dict | None
+    status: str
+    applied_flow_id: uuid.UUID | None
+    created_by: str
+    created_at: datetime
+
+
+class WaferMapCreate(BaseModel):
+    business_id: str = Field(min_length=3, max_length=64)
+    template_id: TemplateId
+    variant_id: uuid.UUID | None = None
+    lot_ref: str | None = Field(default=None, max_length=64)
+    wafer_ref: str | None = Field(default=None, max_length=64)
+    test_flow_id: uuid.UUID | None = None
+    grid: dict  # {rows, cols}
+    bins: list[dict] = Field(min_length=1)  # [{x, y, bin, site}]
+    ground_truth: dict | None = None  # SYNTHETIC fixture only — {bad_xy, note}
+    source_class: SourceClass = "SYNTHETIC"
+    note: str | None = None
+
+
+class WaferMapRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    template_id: str
+    variant_id: uuid.UUID | None
+    lot_ref: str | None
+    wafer_ref: str | None
+    test_flow_id: uuid.UUID | None
+    grid: dict
+    bins: list
+    ground_truth: dict | None
+    analysis: dict | None
+    source_class: str
+    note: str | None
+    created_by: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# EPIC H — 파운드리·OSAT 포털·lot genealogy (지시서 §4)
+# ---------------------------------------------------------------------------
+
+PartnerKind = Literal["foundry", "osat", "subcon", "material"]
+
+
+class AsicPartnerCreate(BaseModel):
+    business_id: str = Field(min_length=3, max_length=64)
+    name: str = Field(min_length=1, max_length=128)
+    kind: PartnerKind
+    status: Literal["approved", "conditional", "suspended"] = "conditional"
+    approved_scope: dict | None = None
+    note: str | None = None
+
+
+class AsicPartnerRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    name: str
+    kind: str
+    status: str
+    approved_scope: dict | None
+    approved_at: datetime | None
+    note: str | None
+    created_by: str
+    created_at: datetime
+
+
+class LotStep(BaseModel):
+    partner_business_id: str
+    step: str = Field(min_length=1, max_length=64)
+    result: str | None = None
+
+
+class LotTravelerCreate(BaseModel):
+    business_id: str = Field(min_length=3, max_length=64)
+    template_id: TemplateId
+    variant_id: uuid.UUID | None = None
+    lot_ref: str = Field(min_length=1, max_length=64)
+    parent_lot_refs: list[str] | None = None
+    silicon_revision: str | None = Field(default=None, max_length=32)
+    mask_rev: str | None = Field(default=None, max_length=32)
+    package_rev: str | None = Field(default=None, max_length=32)
+    note: str | None = None
+    steps: list[LotStep] = Field(min_length=1)
+
+
+class LotTravelerRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    template_id: str
+    variant_id: uuid.UUID | None
+    lot_ref: str
+    parent_lot_refs: list | None
+    silicon_revision: str | None
+    mask_rev: str | None
+    package_rev: str | None
+    current_partner_id: uuid.UUID | None
+    status: str
+    steps: list
+    note: str | None
+    created_by: str
+    created_at: datetime
+
+
+class PartnerArtifactCreate(BaseModel):
+    business_id: str = Field(min_length=3, max_length=64)
+    partner_business_id: str = Field(min_length=3, max_length=64)  # portal principal mapping
+    template_id: TemplateId
+    lot_traveler_id: uuid.UUID | None = None
+    kind: Literal["test_report", "wafer_map", "ship_doc", "cert"]
+    file_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    meta: dict | None = None
+    note: str | None = None
+
+
+class PartnerArtifactRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    partner_id: uuid.UUID
+    lot_traveler_id: uuid.UUID | None
+    template_id: str
+    kind: str
+    file_hash: str
+    artifact_version_id: uuid.UUID | None
+    meta: dict | None
+    status: str
+    note: str | None
+    created_by: str
+    created_at: datetime
+
+
+class PartnerChangeCreate(BaseModel):
+    business_id: str = Field(min_length=3, max_length=64)
+    partner_business_id: str = Field(min_length=3, max_length=64)  # portal principal mapping
+    kind: Literal["process", "site_transfer", "equipment", "material"]
+    description: str = Field(min_length=1)
+    effective_at: datetime | None = None
+    affected_template_ids: list[TemplateId] | None = None
+    note: str | None = None
+
+
+class PartnerChangeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    partner_id: uuid.UUID
+    kind: str
+    description: str
+    effective_at: datetime | None
+    affected_template_ids: list | None
+    status: str
+    reviewed_by: str | None
+    reviewed_at: datetime | None
+    note: str | None
+    created_by: str
+    created_at: datetime
+
+
+class PartnerChangeReview(BaseModel):
+    decision: Literal["approved", "rejected"]
+    note: str | None = None
+
+
+class QualityActionCreate(BaseModel):
+    business_id: str = Field(min_length=3, max_length=64)
+    template_id: TemplateId
+    lot_traveler_id: uuid.UUID | None = None
+    lot_ref: str | None = Field(default=None, max_length=64)
+    action: Literal["hold", "quarantine", "sort", "scrap", "8d"]
+    reason: str = Field(min_length=1)
+    fa_case_id: uuid.UUID | None = None
+    note: str | None = None
+
+
+class QualityActionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    partner_id: uuid.UUID | None
+    lot_traveler_id: uuid.UUID | None
+    template_id: str
+    lot_ref: str | None
+    action: str
+    reason: str
+    status: str
+    fa_case_id: uuid.UUID | None
+    closed_at: datetime | None
+    note: str | None
+    created_by: str
+    created_at: datetime
+
+
+class QualityActionClose(BaseModel):
+    note: str | None = None

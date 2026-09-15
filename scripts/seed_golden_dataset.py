@@ -2350,6 +2350,458 @@ def main() -> None:
 
         # ASIC Twin v1.1 R1: 전류 센서 폐루프 PoC (§17) — EPIC A·E·F·G.
         seed_asic_twin(client, temc_client, asic_client)
+        # ASIC Twin v1.1 R2: EPIC B·C·D·H + 템플릿 4종 검증 팩 (P1-07).
+        seed_asic_r2(client, temc_client, asic_client)
+
+
+
+
+# ── ASIC Twin v1.1 R2 (지시서 §10 R2: EPIC B·C·D·H + 템플릿 4종 팩) ───────────
+
+_TP_R2_REV = {
+    "silicon_revision": "A1", "compatible_mask_rev": "MASK-A1", "compatible_package_rev": "PKG-A1",
+}
+
+
+def seed_asic_r2(client: httpx.Client, temc_client: httpx.Client, asic_client: httpx.Client) -> None:
+    """전류 센서 ASIC R2 한 판 (EPIC B·C·D·H, 지시서 §4·§10).
+
+    공급망은 '청결'하게 심는다 — 승인 파트너만 lot 경로에, PCN은 즉시 승인,
+    품질조치는 종결 — 최종 게이트 블로커는 R1과 동일한
+    MOCK_RESULT_PRESENT + CALIBRATION_EXPIRED 두 개로 유지된다. PCN 대기·
+    미승인 파트너·계보 파손 상태는 pytest가 만든다.
+    """
+    t = ASIC_CS_TEMPLATE
+
+    # ── EPIC C: EDA ToolRun — 실제 SPICE(real_adapter) 2건 + 공개 mock 1건 ──
+    netlist = b"* current_sensor A1 sense chain, ngspice netlist (synthetic demo)"
+    ih = hashlib.sha256(netlist).hexdigest()
+    tr1 = asic_post(temc_client, "/api/v1/asic/tool-runs", "seed-asic-r2-tr-1", {
+        "business_id": "ASIC-CS-TR-SPICE-001", "template_id": t, "design_revision": 2,
+        "tool": "ams", "tool_version": "ngspice-44", "runner_class": "real_adapter",
+        "environment": {"simulator": "ngspice-44", "host_os": "linux", "cpu": "x86_64"},
+        "command_profile": "ngspice -b cs_a1_sense.sp",
+        "input_hash": ih, "output_hash": hashlib.sha256(b"raw-waveform-v1").hexdigest(),
+        "exit_code": 0,
+        "metrics": {"sensitivity_ma_a": 100.12, "offset_uv": 3.1, "sim_time_s": 41.7},
+        "note": "외부 SPICE 실행 브리지 (real_adapter)",
+    }, list_path=f"/api/v1/asic/templates/{t}/tool-runs", match_bid="ASIC-CS-TR-SPICE-001")
+    # 동일 (template, tool, input_hash) 재실행 → 같은 lineage에 append
+    tr2 = asic_post(temc_client, "/api/v1/asic/tool-runs", "seed-asic-r2-tr-2", {
+        "business_id": "ASIC-CS-TR-SPICE-002", "template_id": t, "design_revision": 2,
+        "tool": "ams", "tool_version": "ngspice-44", "runner_class": "real_adapter",
+        "environment": {"simulator": "ngspice-44", "host_os": "linux", "cpu": "x86_64"},
+        "command_profile": "ngspice -b cs_a1_sense.sp",
+        "input_hash": ih, "output_hash": hashlib.sha256(b"raw-waveform-v2-retry").hexdigest(),
+        "exit_code": 0, "metrics": {"sensitivity_ma_a": 100.12, "note": "재실행 재현성 확인"},
+        "note": "동일 입력 재실행 — lineage_id가 SPICE-001과 동일해야 한다",
+    }, list_path=f"/api/v1/asic/templates/{t}/tool-runs", match_bid="ASIC-CS-TR-SPICE-002")
+    same_lineage = tr1["lineage_id"] == tr2["lineage_id"]
+    if not same_lineage:
+        print("WARNING: SPICE-001/002 lineage_id 불일치 (수용기준 4 위반)", file=sys.stderr)
+    asic_post(temc_client, "/api/v1/asic/tool-runs", "seed-asic-r2-tr-3", {
+        "business_id": "ASIC-CS-TR-LINT-001", "template_id": t, "design_revision": 2,
+        "tool": "lint", "tool_version": "edulint-2026.1-mock", "runner_class": "mock",
+        "input_hash": hashlib.sha256(b"rtl snapshot r2 (synthetic)").hexdigest(),
+        "exit_code": 0, "metrics": {"violations": 0},
+        "note": "공개된 mock 실행 — 게이트 MOCK_RESULT_PRESENT 블로커와 연동 (교육용)",
+    }, list_path=f"/api/v1/asic/templates/{t}/tool-runs", match_bid="ASIC-CS-TR-LINT-001")
+    print(f"asic r2: tool runs 3건 (spice lineage 동일={same_lineage}, lint=mock 공개)")
+
+    # ── EPIC B: 제조 옵션 3종 + Trade Study + 의사결정 ──────────────────────
+    def nre(mask, design, ip, mpw):
+        return {
+            "design": {"amount": design, "currency": "KRW", "basis_date": "2026-09-01"},
+            "ip": {"amount": ip, "currency": "KRW", "basis_date": "2026-09-01"},
+            "mask": {"amount": mask, "currency": "KRW", "basis_date": "2026-09-01"},
+            "mpw_shuttle": {"amount": mpw, "currency": "KRW", "basis_date": "2026-09-01"},
+            "pkg_tooling": {"amount": 180_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            "test_dev": {"amount": 120_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            "reliability": {"amount": 90_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+        }
+
+    def unit(wafer, dies, assembly, ft, die_yield):
+        return {
+            "wafer": {"base": wafer, "best": round(wafer * 0.95, 1), "worst": round(wafer * 1.10, 1),
+                      "unit": "KRW", "dies_per_wafer": dies, "basis_date": "2026-09-01"},
+            "assembly": {"base": assembly, "best": round(assembly * 0.95, 1),
+                         "worst": round(assembly * 1.15, 1), "unit": "KRW", "basis_date": "2026-09-01"},
+            "final_test": {"base": ft, "best": round(ft * 0.95, 1), "worst": round(ft * 1.10, 1),
+                           "unit": "KRW", "basis_date": "2026-09-01"},
+            "logistics": {"base": 40.0, "best": 36.0, "worst": 52.0, "unit": "KRW",
+                          "basis_date": "2026-09-01"},
+            "die_yield": {"base": die_yield, "basis_date": "2026-09-01"},
+            "scrap": {"base": 0.008, "basis_date": "2026-09-01"},
+        }
+
+    sched = [
+        {"phase": "pdk_ip", "weeks_base": 6, "weeks_best": 5, "weeks_worst": 9},
+        {"phase": "design", "weeks_base": 14, "weeks_best": 12, "weeks_worst": 20},
+        {"phase": "tapeout", "weeks_base": 10, "weeks_best": 8, "weeks_worst": 14},
+        {"phase": "wafer", "weeks_base": 12, "weeks_best": 10, "weeks_worst": 16},
+        {"phase": "assembly", "weeks_base": 6, "weeks_best": 5, "weeks_worst": 9},
+        {"phase": "qualification", "weeks_base": 14, "weeks_best": 12, "weeks_worst": 18},
+    ]
+    opt_a = asic_post(asic_client, "/api/v1/asic/manufacturing-options", "seed-asic-r2-opt-a", {
+        "business_id": "ASIC-CS-OPT-A28", "template_id": t,
+        "foundry": "F1 Fab (교육용 가명)", "node": "28nm", "wafer_size_mm": 300,
+        "voltage_option": "3.3V", "device_option": "current sensor A1",
+        "temperature_grade": "AEC-Q100 G1", "package": "QFN-32", "osat": "OSAT-K1",
+        "moq": 5000, "tech_score": 4, "nre": nre(2_400_000_000, 900_000_000, 750_000_000, 0),
+        "unit_cost": unit(980_000, 8200, 210.0, 85.0, 0.82),
+        "schedule": sched,
+        "risks": [{"kind": "long_lead", "note": "마스크 셋 리드타임 10주", "severity": "medium"}],
+        "note": "28nm 고정밀 안 — NRE 높지만 단가·정밀도 우위",
+    }, list_path=f"/api/v1/asic/templates/{t}/manufacturing-options", match_bid="ASIC-CS-OPT-A28")
+    opt_b = asic_post(asic_client, "/api/v1/asic/manufacturing-options", "seed-asic-r2-opt-b", {
+        "business_id": "ASIC-CS-OPT-B55", "template_id": t,
+        "foundry": "F2 Fab (교육용 가명)", "node": "55nm", "wafer_size_mm": 200,
+        "voltage_option": "5V", "device_option": "current sensor A1",
+        "temperature_grade": "AEC-Q100 G1", "package": "QFN-32", "osat": "OSAT-K1",
+        "moq": 3000, "tech_score": 3,
+        "nre": {
+            "design": {"amount": 520_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            "ip": {"amount": 300_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            "mask": {"amount": 350_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            "pkg_tooling": {"amount_tbd": "견적 대기 — 2차 벤더 협상 중 (TBD 규칙 시연)"},
+            "test_dev": {"amount": 110_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            "reliability": {"amount": 85_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+        },
+        "unit_cost": unit(620_000, 2600, 205.0, 85.0, 0.78),
+        "schedule": sched,
+        "risks": [{"kind": "long_lead", "note": "200mm 웨이퍼 공급 변동", "severity": "medium"}],
+        "note": "55nm 균형안 — pkg_tooling TBD (0으로 계산되지 않음)",
+    }, list_path=f"/api/v1/asic/templates/{t}/manufacturing-options", match_bid="ASIC-CS-OPT-B55")
+    opt_c = asic_post(asic_client, "/api/v1/asic/manufacturing-options", "seed-asic-r2-opt-c", {
+        "business_id": "ASIC-CS-OPT-C90", "template_id": t,
+        "foundry": "F3 Fab (교육용 가명)", "node": "90nm", "wafer_size_mm": 200,
+        "voltage_option": "5V", "device_option": "current sensor A1",
+        "temperature_grade": "AEC-Q100 G2", "package": "SOIC-8", "osat": "OSAT-K2 (가칭)",
+        "moq": 2000, "tech_score": 2,
+        "nre": {
+            "design": {"amount": 380_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            "ip": {"amount": 210_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            "mask": {"amount": 220_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            "pkg_tooling": {"amount": 95_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            "test_dev": {"amount": 90_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            "reliability": {"amount": 70_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+        },
+        "unit_cost": unit(410_000, 1500, 180.0, 78.0, 0.72),
+        "schedule": [dict(s, weeks_base=w + 2, weeks_best=w + 1, weeks_worst=w + 4) for s, w in
+                     zip(sched, (4, 12, 8, 10, 6, 12))],
+        "risks": [
+            {"kind": "supply_single", "note": "단일 공급망 — 2차 소스 없음", "severity": "high"},
+            {"kind": "equipment_availability", "note": "G2 등급 라인 가용성", "severity": "medium"},
+        ],
+        "note": "90nm 저가안 — 기술·공급 리스크로 가중 점수 하락 예상",
+    }, list_path=f"/api/v1/asic/templates/{t}/manufacturing-options", match_bid="ASIC-CS-OPT-C90")
+
+    study = asic_post(asic_client, "/api/v1/asic/trade-studies", "seed-asic-r2-ts-1", {
+        "business_id": "ASIC-CS-TS-001", "template_id": t,
+        "title": "전류 센서 ASIC 공정/파트너 선택 (2026-09)",
+        "option_ids": [opt_a["id"], opt_b["id"], opt_c["id"]],
+        "weights": {"cost": 0.4, "schedule": 0.2, "technology": 0.2, "supply": 0.2},
+        "annual_volume": 2_000_000,
+        "note": "연 200만 개 기준 — TBD 옵션(B55)은 partial_score만 산출",
+    }, list_path=f"/api/v1/asic/templates/{t}/trade-studies", match_bid="ASIC-CS-TS-001")
+    winner_id = study["result"]["ranking"][0]
+    study = asic_post(client, f"/api/v1/asic/trade-studies/{study['id']}/decision",
+                      "seed-asic-r2-ts-decide", {
+        "option_id": winner_id,
+        "rationale": "가중 점수 1위 옵션으로 확정 — TBD 항목 해소 후 1차 벤더 계약 진행",
+        "residual_risks": ["마스크 리드타임 변동", "단가 협정 전 환율 변동"],
+    }, list_path=f"/api/v1/asic/templates/{t}/trade-studies", match_bid="ASIC-CS-TS-001")
+    print(f"asic r2: options 3종(1 TBD) + trade study 결정={study['decision']['option_id'] == winner_id}")
+
+    # ── EPIC D: test flow 2종 + wafer map + 한계값 변경 검토안 ──────────────
+    def flow_items(*, full: bool) -> list[dict]:
+        items = [
+            {"seq": 1, "stage": "contact", "name": "Contact 전도성 확인",
+             "limits": {"high": 5.0, "unit": "ohm"}, "expected_duration_s": 0.05,
+             "site_count": 8, "instrument": "T2000-CHA1",
+             "defect_coverage": [{"defect_class": "open", "coverage_pct": 96.0},
+                                 {"defect_class": "short", "coverage_pct": 94.0}],
+             "failure_mode_refs": ["FM-CS-OPEN"]},
+            {"seq": 2, "stage": "dc", "name": "DC 파라미터 (오프셋)",
+             "limits": {"low": -25.0, "high": 25.0, "unit": "uV"}, "temperature_c": 25.0,
+             "expected_duration_s": 0.12, "site_count": 8, "instrument": "T2000-CHA2",
+             "defect_coverage": [{"defect_class": "parametric", "coverage_pct": 90.0},
+                                 {"defect_class": "leakage", "coverage_pct": 88.0}],
+             "requirement_ids": ["REQ-CS-AFE"]},
+            {"seq": 3, "stage": "analog", "name": "감도 스윕 (100 A 등가)",
+             "limits": {"low": 98.5, "high": 101.5, "unit": "mA/A"}, "temperature_c": 25.0,
+             "expected_duration_s": 0.30, "site_count": 4, "instrument": "T2000-CHA3",
+             "pattern": "SENS_SWEEP_v3",
+             "defect_coverage": [{"defect_class": "parametric", "coverage_pct": 95.0}],
+             "requirement_ids": ["REQ-CS-SENS"]},
+            {"seq": 4, "stage": "trim_cal", "name": "오프셋 트림/캘리브레이션",
+             "expected_duration_s": 0.45, "site_count": 4, "instrument": "T2000-CHA2",
+             "requirement_ids": ["REQ-CS-AFE"]},
+            {"seq": 5, "stage": "final_bin", "name": "최종 빈 분류",
+             "expected_duration_s": 0.02, "site_count": 8},
+        ]
+        if full:  # final test 전용: ESD/랜치업 + 인터페이스
+            items.insert(3, {
+                "seq": 4, "stage": "interface", "name": "ESD (HBM 2kV)",
+                "expected_duration_s": 0.08, "site_count": 2, "instrument": "ESD-HBM",
+                "defect_coverage": [{"defect_class": "esd", "coverage_pct": 92.0}],
+                "failure_mode_refs": ["FM-CS-ESD"]})
+            items.insert(4, {
+                "seq": 5, "stage": "interface", "name": "Latch-up (25mA)",
+                "expected_duration_s": 0.10, "site_count": 2, "instrument": "LU-25MA",
+                "defect_coverage": [{"defect_class": "latchup", "coverage_pct": 90.0}],
+                "failure_mode_refs": ["FM-CS-LU"]})
+            items[6]["seq"] = 7
+            items[5]["seq"] = 6
+        return items
+
+    fs = asic_post(asic_client, "/api/v1/asic/test-flows", "seed-asic-r2-tf-ws", {
+        "business_id": "ASIC-CS-TP-WS-1", "template_id": t,
+        "program_revision": 1, "target": "wafer_sort", "cost_rate_per_site_hour": None,
+        **_TP_R2_REV,
+        "note": "wafer sort — cost rate 미확정(TBD)·오프셋 항목 요구사항 링크 포함",
+        "items": flow_items(full=False),
+    }, list_path=f"/api/v1/asic/templates/{t}/test-flows", match_bid="ASIC-CS-TP-WS-1")
+    ff = asic_post(asic_client, "/api/v1/asic/test-flows", "seed-asic-r2-tf-ft", {
+        "business_id": "ASIC-CS-TP-FT-1", "template_id": t,
+        "program_revision": 1, "target": "final_test", "cost_rate_per_site_hour": 14500.0,
+        **_TP_R2_REV,
+        "note": "final test — site-hour 단가 14,500 KRW, wafer sort와 항목 계보 비교 대상",
+        "items": flow_items(full=True),
+    }, list_path=f"/api/v1/asic/templates/{t}/test-flows", match_bid="ASIC-CS-TP-FT-1")
+
+    # SYNTHETIC wafer map: 24×24, 불량 다이 12개 고정 주입, site 3 편향
+    rng = random.Random(20260915)
+    rows = cols = 24
+    bad_xy = [(3 + (i * 5) % 20, 4 + (i * 7) % 19) for i in range(12)]
+    bins = []
+    for y in range(rows):
+        for x in range(cols):
+            site = 1 + ((x // 6) + (y // 12)) % 4
+            if (x, y) in bad_xy:
+                b = 3 if site != 3 else 2  # site 3은 재시험(bin2)으로 탈출 1건 의도
+                if (x, y) == bad_xy[4]:
+                    b = 1  # underkill 1건 (SYNTHETIC, 공개)
+            elif site == 3 and rng.random() < 0.06:
+                b = 3  # site 3 오버킬 편향
+            elif rng.random() < 0.05:
+                b = 2  # 재시험
+            else:
+                b = 1
+            bins.append({"x": x, "y": y, "bin": b, "site": site})
+    wm = asic_post(temc_client, "/api/v1/asic/wafer-maps", "seed-asic-r2-wm-1", {
+        "business_id": "ASIC-CS-WM-001", "template_id": t, "lot_ref": "LOT-CS-A1-01",
+        "wafer_ref": "W03", "test_flow_id": fs["id"], "grid": {"rows": rows, "cols": cols},
+        "bins": bins, "source_class": "SYNTHETIC",
+        "ground_truth": {"bad_xy": [list(p) for p in bad_xy],
+                         "note": "교육용 합성 fixture — 주입 불량 좌표 (공개)"},
+        "note": "site 3 오버킬 편향 + underkill 1건 의도 주입 (SYNTHETIC)",
+    }, list_path=f"/api/v1/asic/templates/{t}/wafer-maps", match_bid="ASIC-CS-WM-001")
+    conf = (wm.get("analysis") or {}).get("confusion") or {}
+    print(f"asic r2: wafer map yield={wm['analysis']['yield_pct']}% "
+          f"retest={wm['analysis']['retest_rate_pct']}% "
+          f"overkill={conf.get('overkill_count')} underkill={conf.get('escaped_underkill')}")
+
+    # 한계값 변경 검토안 (적용은 인간 — seed에서는 proposed로 남긴다)
+    ft_detail = next(
+        f for f in client.get(f"/api/v1/asic/templates/{t}/test-flows").json()
+        if f["id"] == ff["id"]
+    )
+    offset_item = next(it for it in ft_detail["items"] if it["name"] == "DC 파라미터 (오프셋)")
+    asic_post(asic_client, f"/api/v1/asic/test-flows/{ff['id']}/limit-changes",
+              "seed-asic-r2-lc-1", {
+        "item_id": offset_item["id"],
+        "new_limits": {"low": -20.0, "high": 20.0, "unit": "uV"},
+        "rationale": "FMEDA 분석 결과 오프셋 가드밴드 축소 여지 — 커버리지 유지 확인 후 검토",
+    })
+    print("asic r2: test flows 2종 + wafer map + 오프셋 한계값 변경 검토안(proposed)")
+
+    # ── EPIC H: 파트너 3종 + lot 여행 + 증적 + PCN(승인) + 품질조치(종결) ────
+    fab = asic_post(client, "/api/v1/asic/partners", "seed-asic-r2-pt-fab", {
+        "business_id": "PRT-F1-FAB", "name": "F1 Fab (교육용 가명)", "kind": "foundry",
+        "approved_scope": {"processes": ["28nm"], "sites": ["Korea"]},
+    }, list_path="/api/v1/asic/partners", match_bid="PRT-F1-FAB")
+    osat = asic_post(client, "/api/v1/asic/partners", "seed-asic-r2-pt-osat", {
+        "business_id": "PRT-OSAT-K1", "name": "OSAT-K1 (교육용 가명)", "kind": "osat",
+        "approved_scope": {"packages": ["QFN-32"], "sites": ["Vietnam"]},
+    }, list_path="/api/v1/asic/partners", match_bid="PRT-OSAT-K1")
+    asic_post(client, "/api/v1/asic/partners", "seed-asic-r2-pt-sub", {
+        "business_id": "PRT-SUBCON-X", "name": "Subcon-X (교육용 가명)", "kind": "subcon",
+        "note": "conditional — lot 경로에 투입 전 승인 필요 (게이트 규칙 데모)",
+    }, list_path="/api/v1/asic/partners", match_bid="PRT-SUBCON-X")
+    client.post(f"/api/v1/asic/partners/{fab['id']}/approve", headers={"Idempotency-Key": "seed-asic-r2-pt-fab-ap"})
+    osat_r = client.post(f"/api/v1/asic/partners/{osat['id']}/approve", headers={"Idempotency-Key": "seed-asic-r2-pt-osat-ap"})
+    if osat_r.status_code not in (200, 409):
+        osat_r.raise_for_status()
+
+    lt = asic_post(temc_client, "/api/v1/asic/lot-travelers", "seed-asic-r2-lt-1", {
+        "business_id": "ASIC-CS-LOT-A1-01", "template_id": t, "lot_ref": "LOT-CS-A1-01",
+        "silicon_revision": "A1", "mask_rev": "MASK-A1", "package_rev": "PKG-A1",
+        "parent_lot_refs": ["CURR-LOT-2609A"],
+        "steps": [
+            {"partner_business_id": "PRT-F1-FAB", "step": "wafer fab (28nm)", "result": "pass"},
+            {"partner_business_id": "PRT-OSAT-K1", "step": "assembly (QFN-32)", "result": "pass"},
+            {"partner_business_id": "PRT-OSAT-K1", "step": "final test", "result": "pass"},
+        ],
+        "note": "ECO A1 실리콘 첫 양산 lot — 계보 완결 (게이트 청결 유지)",
+    }, list_path=f"/api/v1/asic/templates/{t}/lot-travelers", match_bid="ASIC-CS-LOT-A1-01")
+
+    report_hash = hashlib.sha256(b"OSAT-K1 final test report LOT-CS-A1-01 (synthetic)").hexdigest()
+    asic_post(temc_client, "/api/v1/asic/partner-artifacts", "seed-asic-r2-pa-1", {
+        "business_id": "ASIC-CS-PA-001", "partner_business_id": "PRT-OSAT-K1",
+        "template_id": t, "lot_traveler_id": lt["id"], "kind": "test_report",
+        "file_hash": report_hash,
+        "meta": {"pages": 7, "site_yields": {"1": 0.996, "2": 0.995, "3": 0.958}},
+        "note": "OSAT 최종 시험 리포트 (합성 치환본)",
+    }, list_path=f"/api/v1/asic/templates/{t}/partner-artifacts", match_bid="ASIC-CS-PA-001")
+
+    pcn = asic_post(temc_client, "/api/v1/asic/partner-changes", "seed-asic-r2-pcn-1", {
+        "business_id": "ASIC-CS-PCN-001", "partner_business_id": "PRT-OSAT-K1",
+        "kind": "site_transfer",
+        "description": "final test 라인 일부를 Vietnam 제2사이트로 이전 — 장비 동일 모델 이관",
+        "affected_template_ids": [t],
+        "note": "승인 절차 데모 — seed에서는 즉시 승인하여 게이트를 청결하게 유지",
+    }, list_path=f"/api/v1/asic/templates/{t}/partner-changes", match_bid="ASIC-CS-PCN-001")
+    asic_post(client, f"/api/v1/asic/partner-changes/{pcn['id']}/review", "seed-asic-r2-pcn-review", {
+        "decision": "approved",
+        "note": "동일 장비 이관 + CPK 데이터 동등 확인 (2026-09-15 품질 리뷰)",
+    }, list_path=f"/api/v1/asic/templates/{t}/partner-changes", match_bid="ASIC-CS-PCN-001")
+
+    qa = asic_post(client, "/api/v1/asic/quality-actions", "seed-asic-r2-qa-1", {
+        "business_id": "ASIC-CS-QA-001", "template_id": t, "lot_traveler_id": lt["id"],
+        "lot_ref": "LOT-CS-A1-01", "action": "8d",
+        "reason": "site 3 오버킬 편향 (wafer map 분석) — 프로브 카드 접촉 저항 의심",
+        "fa_case_id": None,
+        "note": "프로브 카드 교체 + 재측정으로 종결된 사례 (데모)",
+    }, list_path=f"/api/v1/asic/templates/{t}/quality-actions", match_bid="ASIC-CS-QA-001")
+    qa_close = client.post(f"/api/v1/asic/quality-actions/{qa['id']}/close",
+                           json={"note": "프로브 카드 교체 후 site 3 수율 정상 복원 확인"},
+                           headers={"Idempotency-Key": "seed-asic-r2-qa-close"})
+    if qa_close.status_code not in (200, 409):
+        qa_close.raise_for_status()
+
+    # ── 템플릿 4종 검증 팩 (P1-07): 나머지 3템플릿 라이트 팩 ────────────────
+    _seed_template_pack(client, asic_client, "cap_afe", "Capacitive Sensing ASIC",
+                        [("AFE", 12.5), ("ADC", 8.0)])
+    _seed_template_pack(client, asic_client, "motor_ripple", "Motor Ripple Counter",
+                        [("RIPPLE", 22.0), ("LPF", 5.5)])
+    _seed_template_pack(client, asic_client, "env_sensor", "Environmental Sensor ASIC",
+                        [("HUM", 9.0), ("TEMP", 4.0)])
+
+    # ── 최종 게이트: R1과 동일한 두 블로커만 ────────────────────────────────
+    report = client.get(f"/api/v1/asic/gate-report/{t}").json()
+    codes = sorted(b["code"] for b in report["blockers"])
+    expected = ["CALIBRATION_EXPIRED", "MOCK_RESULT_PRESENT"]
+    if codes != expected:
+        print(f"WARNING: R2 gate blockers = {codes} (expected {expected})", file=sys.stderr)
+    print(
+        "asic r2: 전류 센서 R2 시드 완료 — tool runs×3(real 2+mock 1), options×3+TS 결정, "
+        "test flows×2, wafer map(overkill/underkill 공개), lot 여행+증적+PCN 승인+QA 종결, "
+        f"gate={codes} readiness={report['readiness']}"
+    )
+
+
+def _seed_template_pack(client: httpx.Client, asic_client: httpx.Client,
+                        template_id: str, label: str, blocks_spec: list) -> None:
+    """P1-07 검증 팩 (라이트): 신호체인 r1 + Corner MC + 옵션 2종 + Trade Study
+    + 테스트 플로우 쌍 — 템플릿별 작업센터가 빈 패널 없이 뜨는 최소 증적.
+    전류 센서(§17 PoC)는 seed_asic_twin/seed_asic_r2가 더 풍부한 팩을 심는다."""
+    t = template_id
+    blocks = [
+        {"key": "sensor", "kind": "sensor", "label": f"{label} 센서 프론트엔드",
+         "params": {"nominal": 100.0},
+         "error_budget": {"offset": 0.1, "noise": 0.2, "drift": 0.01},
+         "requirement_ids": [f"REQ-{t.upper()}-SENS"]},
+    ]
+    for key, gain in blocks_spec:
+        blocks.append({
+            "key": key.lower(), "kind": "analog", "label": f"{key} 블록 (G={gain})",
+            "params": {"gain": gain},
+            "error_budget": {"offset": 0.05, "gain_error": 0.1, "noise": 0.08},
+        })
+    asic_post(client, "/api/v1/asic/signal-chains", f"seed-tp-{t}-chain-1", {
+        "business_id": f"ASIC-{t.upper()}-CHAIN-R1", "template_id": t, "blocks": blocks,
+        "note": "P1-07 검증 팩 — 템플릿 기본 신호체인 (SYNTHETIC)",
+    }, list_path=f"/api/v1/asic/templates/{t}/signal-chains", match_bid=f"ASIC-{t.upper()}-CHAIN-R1")
+    chain = client.get(f"/api/v1/asic/templates/{t}/signal-chains").json()[0]
+    asic_post(client, "/api/v1/asic/corner-studies", f"seed-tp-{t}-mc-1", {
+        "business_id": f"ASIC-{t.upper()}-MC-001", "signal_chain_id": chain["id"],
+        "kind": "monte_carlo", "n_draws": 1000,
+        "spec": [{"output": "sensitivity", "nominal": 100.0, "min": 98.0, "max": 102.0,
+                  "unit": "mA/A"}],
+    }, list_path=f"/api/v1/asic/templates/{t}/corner-studies", match_bid=f"ASIC-{t.upper()}-MC-001")
+
+    def _opt(bid: str, foundry: str, node: str, moq: int, tech: int, wafer_cost: float,
+             die_yield: float, mask: int) -> dict:
+        return asic_post(asic_client, "/api/v1/asic/manufacturing-options",
+                         f"seed-tp-{t}-{bid.lower()}", {
+            "business_id": f"ASIC-{t.upper()}-{bid}", "template_id": t,
+            "foundry": foundry, "node": node, "voltage_option": "3.3V",
+            "temperature_grade": "AEC-Q100 G1", "package": "QFN-24", "moq": moq,
+            "tech_score": tech,
+            "nre": {
+                "design": {"amount": 400_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+                "ip": {"amount": 250_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+                "mask": {"amount": mask, "currency": "KRW", "basis_date": "2026-09-01"},
+                "pkg_tooling": {"amount": 120_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+                "test_dev": {"amount": 90_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+                "reliability": {"amount": 70_000_000, "currency": "KRW", "basis_date": "2026-09-01"},
+            },
+            "unit_cost": {
+                "wafer": {"base": wafer_cost, "best": round(wafer_cost * 0.95, 1),
+                          "worst": round(wafer_cost * 1.1, 1), "unit": "KRW",
+                          "dies_per_wafer": 5000, "basis_date": "2026-09-01"},
+                "assembly": {"base": 190.0, "best": 180.0, "worst": 215.0, "unit": "KRW",
+                             "basis_date": "2026-09-01"},
+                "final_test": {"base": 75.0, "best": 71.0, "worst": 85.0, "unit": "KRW",
+                               "basis_date": "2026-09-01"},
+                "logistics": {"base": 35.0, "best": 32.0, "worst": 45.0, "unit": "KRW",
+                              "basis_date": "2026-09-01"},
+                "die_yield": {"base": die_yield, "basis_date": "2026-09-01"},
+                "scrap": {"base": 0.008, "basis_date": "2026-09-01"},
+            },
+            "schedule": [
+                {"phase": "design", "weeks_base": 12, "weeks_best": 10, "weeks_worst": 16},
+                {"phase": "tapeout", "weeks_base": 9, "weeks_best": 8, "weeks_worst": 12},
+                {"phase": "wafer", "weeks_base": 11, "weeks_best": 10, "weeks_worst": 14},
+                {"phase": "qualification", "weeks_base": 13, "weeks_best": 11, "weeks_worst": 17},
+            ],
+            "note": "P1-07 검증 팩 옵션 (교육용 가명·합성 단가)",
+        }, list_path=f"/api/v1/asic/templates/{t}/manufacturing-options",
+            match_bid=f"ASIC-{t.upper()}-{bid}")
+
+    o1 = _opt("OPT-1", "F1 Fab (교육용 가명)", "40nm", 4000, 4, 700_000.0, 0.80, 500_000_000)
+    o2 = _opt("OPT-2", "F3 Fab (교육용 가명)", "90nm", 2000, 3, 380_000.0, 0.74, 210_000_000)
+    asic_post(asic_client, "/api/v1/asic/trade-studies", f"seed-tp-{t}-ts-1", {
+        "business_id": f"ASIC-{t.upper()}-TS-001", "template_id": t,
+        "title": f"{label} 공정 선택 검토 (P1-07 팩)",
+        "option_ids": [o1["id"], o2["id"]],
+        "weights": {"cost": 0.4, "schedule": 0.2, "technology": 0.2, "supply": 0.2},
+        "annual_volume": 1_000_000,
+        "note": "P1-07 검증 팩 — 의사결정은 열어둔다 (검토 워크플로 데모)",
+    }, list_path=f"/api/v1/asic/templates/{t}/trade-studies", match_bid=f"ASIC-{t.upper()}-TS-001")
+
+    for target, cost in (("wafer_sort", None), ("final_test", 13800.0)):
+        bid = f"ASIC-{t.upper()}-TP-{'WS' if target == 'wafer_sort' else 'FT'}-1"
+        asic_post(asic_client, "/api/v1/asic/test-flows", f"seed-tp-{t}-{target}", {
+            "business_id": bid, "template_id": t, "program_revision": 1, "target": target,
+            "cost_rate_per_site_hour": cost, **_TP_R2_REV,
+            "note": "P1-07 검증 팩 테스트 플로우 (합성 항목)",
+            "items": [
+                {"seq": 1, "stage": "contact", "name": "Contact 전도성 확인",
+                 "limits": {"high": 5.0, "unit": "ohm"}, "expected_duration_s": 0.05,
+                 "site_count": 4,
+                 "defect_coverage": [{"defect_class": "open", "coverage_pct": 95.0},
+                                     {"defect_class": "short", "coverage_pct": 93.0}]},
+                {"seq": 2, "stage": "dc", "name": "DC 파라미터",
+                 "limits": {"low": -25.0, "high": 25.0, "unit": "uV"},
+                 "expected_duration_s": 0.12, "site_count": 4,
+                 "defect_coverage": [{"defect_class": "parametric", "coverage_pct": 88.0}],
+                 "requirement_ids": [f"REQ-{t.upper()}-SENS"]},
+                {"seq": 3, "stage": "final_bin", "name": "최종 빈 분류",
+                 "expected_duration_s": 0.02, "site_count": 4},
+            ],
+        }, list_path=f"/api/v1/asic/templates/{t}/test-flows", match_bid=bid)
 
 
 if __name__ == "__main__":

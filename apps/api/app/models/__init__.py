@@ -4,16 +4,28 @@ string-based relationship() references before any query runs."""
 from app.models.artifact import Artifact, ArtifactVersion  # noqa: F401
 from app.models.asic import (  # noqa: F401
     AsicEco,
+    AsicPartner,
     CornerStudy,
     FaCase,
     FaEvent,
     FaultInjectionRun,
     FmedaItem,
+    LimitChange,
+    LotTraveler,
+    ManufacturingOption,
     MeasurementRun,
+    PartnerArtifact,
+    PartnerChange,
+    QualityAction,
     QualificationPlan,
     QualificationResult,
     SafetyItem,
     SignalChainModel,
+    TestFlow,
+    TestFlowItem,
+    ToolRun,
+    TradeStudy,
+    WaferMap,
 )
 from app.models.audit import AuditEvent  # noqa: F401
 from app.models.baseline import Baseline  # noqa: F401
