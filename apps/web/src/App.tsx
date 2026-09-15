@@ -112,6 +112,10 @@ function Workbench() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedComponentId, graph]);
 
+  // EDA 교육 탭은 제품/변량 데이터와 무관한 자립 훈련 모듈이므로 좌우 사이드
+  // 패널·하단 비교/상관/게이트 프레임·어시스턴트를 접어 중앙에 전폭을 내준다.
+  const edaMode = centerTab === "eda";
+
   return (
     <div style={{ minHeight: "100vh", background: "#020617", color: "#e2e8f0", padding: 20, fontFamily: "system-ui, sans-serif" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -165,10 +169,19 @@ function Workbench() {
         mechRun={mechRun}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr 340px", gap: 16, height: "68vh" }}>
-        <div style={{ overflowY: "auto" }}>
-          <RequirementsPanel requirements={requirements} onSelect={selectRequirement} />
-        </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: edaMode ? "1fr" : "320px 1fr 340px",
+          gap: 16,
+          height: "68vh",
+        }}
+      >
+        {!edaMode && (
+          <div style={{ overflowY: "auto" }}>
+            <RequirementsPanel requirements={requirements} onSelect={selectRequirement} />
+          </div>
+        )}
         <div style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", gap: 14, marginBottom: 8 }}>
             {(["model", "bench", "sysmodel", "proc", "air", "eda"] as const).map((tab) => (
@@ -218,30 +231,36 @@ function Workbench() {
             )}
           </div>
         </div>
-        <div style={{ overflowY: "auto" }}>
-          <SimulationPanel runs={runs} />
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
-        {compareRuns.length > 0 && (
-          <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 12 }}>
-            <h3 style={{ marginTop: 0 }}>{t("panels.sweep")}</h3>
-            <SweepChart runsByVariant={compareRuns} />
+        {!edaMode && (
+          <div style={{ overflowY: "auto" }}>
+            <SimulationPanel runs={runs} />
           </div>
         )}
-        <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>{t("panels.correlation")}</h3>
-          <TestCorrelationPanel mechRun={mechRun} />
-        </div>
       </div>
 
-      <div style={{ marginTop: 16, border: "1px solid #334155", borderRadius: 8, padding: 12 }}>
-        <h3 style={{ marginTop: 0 }}>{t("panels.gate")}</h3>
-        <GatePanel variantId={variantId} />
-      </div>
+      {!edaMode && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+            {compareRuns.length > 0 && (
+              <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 12 }}>
+                <h3 style={{ marginTop: 0 }}>{t("panels.sweep")}</h3>
+                <SweepChart runsByVariant={compareRuns} />
+              </div>
+            )}
+            <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 12 }}>
+              <h3 style={{ marginTop: 0 }}>{t("panels.correlation")}</h3>
+              <TestCorrelationPanel mechRun={mechRun} />
+            </div>
+          </div>
 
-      <AssistantPanel />
+          <div style={{ marginTop: 16, border: "1px solid #334155", borderRadius: 8, padding: 12 }}>
+            <h3 style={{ marginTop: 0 }}>{t("panels.gate")}</h3>
+            <GatePanel variantId={variantId} />
+          </div>
+
+          <AssistantPanel />
+        </>
+      )}
     </div>
   );
 }
