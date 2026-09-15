@@ -59,6 +59,45 @@ function tabLabel(tab: CenterTab, t: (key: string) => string): string {
   }
 }
 
+// Shared micro-caption for the control bar — the same label style on the
+// context selects and on the two tab groups is what makes the bar read as
+// one navigation system rather than two separate widgets.
+const captionStyle: React.CSSProperties = { fontSize: 9, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 };
+
+// One shared control spec (height / radius / font) for every control in the
+// bar — selects and tab pills were previously two different widget families.
+const selectStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  borderRadius: 6,
+  background: "#1e293b",
+  color: "white",
+  border: "1px solid #334155",
+  fontFamily: "inherit",
+  fontSize: 13,
+};
+
+// <label> wrapper for a real form control (selects) — caption text activates
+// the control, which is what you want there.
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span style={captionStyle}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+// Plain div variant for tab groups — a <label> would forward caption clicks
+// to the first tab button.
+function NavGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span style={captionStyle}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
 function TabButton({
   label,
   active,
@@ -199,47 +238,106 @@ function Workbench() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#020617", color: "#e2e8f0", padding: 20, fontFamily: "system-ui, sans-serif" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 20 }}>{t("app.title")}</h1>
           <div style={{ opacity: 0.6, fontSize: 13 }}>{product?.name}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <LanguageSwitcher />
-          <select
-            value={product?.id ?? ""}
-            onChange={(e) => {
-              const p = products.find((x) => x.id === e.target.value);
-              if (p) selectProduct(p);
-            }}
-            style={{ padding: "6px 10px", borderRadius: 6, background: "#1e293b", color: "white", border: "1px solid #334155" }}
-          >
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={variantId ?? ""}
-            onChange={(e) => {
-              clearSelection();
-              setVariantId(e.target.value);
-            }}
-            style={{ padding: "6px 10px", borderRadius: 6, background: "#1e293b", color: "white", border: "1px solid #334155" }}
-          >
-            {variants.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
           <span style={{ fontSize: 13, opacity: 0.7 }}>{keycloak.tokenParsed?.preferred_username}</span>
           <button onClick={() => keycloak.logout()} style={{ padding: "6px 10px", borderRadius: 6 }}>
             {t("app.logout")}
           </button>
         </div>
       </header>
+
+      {/* One navigation bar: what I'm looking at (product ▸ variant selects)
+          and where I look from (view tabs / standalone module tabs) share
+          the same control metrics and captions, so the header selects and
+          the center tab bar read as a single hierarchy instead of two
+          unrelated widgets. Product/variant dim + disable in standalone
+          module mode — honest UI: EDA/ASIC ignore that context entirely. */}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12, marginBottom: 12 }}>
+        <span style={{ opacity: edaMode ? 0.45 : 1, transition: "opacity 150ms" }}>
+          <Field label={t("nav.product")}>
+            <select
+              value={product?.id ?? ""}
+              disabled={edaMode}
+              aria-label={t("nav.product")}
+              onChange={(e) => {
+                const p = products.find((x) => x.id === e.target.value);
+                if (p) selectProduct(p);
+              }}
+              style={selectStyle}
+            >
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </span>
+        <span style={{ opacity: edaMode ? 0.45 : 1, transition: "opacity 150ms" }}>
+          <Field label={t("nav.variant")}>
+            <select
+              value={variantId ?? ""}
+              disabled={edaMode}
+              aria-label={t("nav.variant")}
+              onChange={(e) => {
+                clearSelection();
+                setVariantId(e.target.value);
+              }}
+              style={selectStyle}
+            >
+              {variants.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </span>
+        <div style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
+        <NavGroup label={t("nav.views")}>
+          <div role="tablist" aria-label={t("nav.views")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {PRODUCT_TWIN_TABS.map(({ tab, color }) => (
+              <TabButton
+                key={tab}
+                label={tabLabel(tab, t as (k: string) => string)}
+                color={color}
+                active={centerTab === tab}
+                onClick={() => setCenterTab(tab)}
+              />
+            ))}
+          </div>
+        </NavGroup>
+        {/* Everything right of this divider is a standalone module that
+            ignores the product/variant context on the left. */}
+        <div style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
+        <NavGroup label={t("nav.modules")}>
+          <div role="tablist" aria-label={t("nav.modules")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {STANDALONE_TABS.map(({ tab, color }) => (
+              <TabButton
+                key={tab}
+                label={tabLabel(tab, t as (k: string) => string)}
+                color={color}
+                active={centerTab === tab}
+                onClick={() => setCenterTab(tab)}
+              />
+            ))}
+          </div>
+        </NavGroup>
+        <div style={{ flex: 1 }} />
+        {edaMode && (
+          <span style={{ fontSize: 12, color: "#64748b", paddingBottom: 8, maxWidth: 340 }}>
+            ⓘ {t("nav.standaloneHint")}
+          </span>
+        )}
+        <Field label={t("app.language")}>
+          <LanguageSwitcher />
+        </Field>
+      </div>
 
       <OnboardingGuide
         variantId={variantId}
@@ -255,7 +353,9 @@ function Workbench() {
           display: "grid",
           gridTemplateColumns: edaMode ? "1fr" : "320px 1fr 340px",
           gap: 16,
-          height: "68vh",
+          // Tab bar moved up into the nav bar — 62vh keeps the same viewport
+          // share the center column had when it still carried the tabs.
+          height: "62vh",
         }}
       >
         {!edaMode && (
@@ -263,34 +363,8 @@ function Workbench() {
             <RequirementsPanel requirements={requirements} onSelect={selectRequirement} />
           </div>
         )}
-        <div style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
-          <div role="tablist" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, marginBottom: 8 }}>
-            {PRODUCT_TWIN_TABS.map(({ tab, color }) => (
-              <TabButton
-                key={tab}
-                label={tabLabel(tab, t as (k: string) => string)}
-                color={color}
-                active={centerTab === tab}
-                onClick={() => setCenterTab(tab)}
-              />
-            ))}
-            {/* Divider: everything left of it is a view onto the selected
-                product/variant; everything right of it (EDA training + ASIC
-                9-stage work center) is a standalone module that ignores
-                both. */}
-            <div style={{ width: 1, alignSelf: "stretch", background: "#334155", margin: "2px 4px" }} />
-            {STANDALONE_TABS.map(({ tab, color }) => (
-              <TabButton
-                key={tab}
-                label={tabLabel(tab, t as (k: string) => string)}
-                color={color}
-                active={centerTab === tab}
-                onClick={() => setCenterTab(tab)}
-              />
-            ))}
-          </div>
-          <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-            {centerTab === "model" ? (
+        <div style={{ minHeight: 0, overflow: "hidden" }}>
+          {centerTab === "model" ? (
               <ThreeViewer components={components} />
             ) : centerTab === "bench" ? (
               <TestBench product={product} runs={runs} />
@@ -309,7 +383,6 @@ function Workbench() {
                 productBusinessId={product?.business_id}
               />
             )}
-          </div>
         </div>
         {!edaMode && (
           <div style={{ overflowY: "auto" }}>

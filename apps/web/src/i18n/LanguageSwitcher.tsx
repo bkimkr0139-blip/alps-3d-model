@@ -23,7 +23,7 @@ export function LanguageSwitcher() {
       value={i18n.resolvedLanguage ?? "en"}
       onChange={(e) => change(e.target.value)}
       aria-label={t("app.language")}
-      style={{ padding: "6px 10px", borderRadius: 6, background: "#1e293b", color: "white", border: "1px solid #334155" }}
+      style={{ padding: "6px 10px", borderRadius: 6, background: "#1e293b", color: "white", border: "1px solid #334155", fontFamily: "inherit", fontSize: 13 }}
     >
       {LANGUAGES.map((l) => (
         <option key={l.code} value={l.code}>

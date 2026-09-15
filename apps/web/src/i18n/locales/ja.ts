@@ -7,6 +7,14 @@ const ja: Resources = {
     signingIn: "サインイン中…",
     language: "言語",
   },
+  nav: {
+    product: "製品",
+    variant: "バリアント",
+    views: "表示",
+    modules: "独立モジュール",
+    standaloneHint: "EDA教育・ASICワークセンターは製品/バリアントの選択に依存しません。",
+  },
+
   panels: {
     requirements: "要件とトレーサビリティ (S03)",
     viewer3d: "3D 設計レビュー (S04)",

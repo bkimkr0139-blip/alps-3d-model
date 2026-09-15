@@ -7,6 +7,14 @@ const ko: Resources = {
     signingIn: "로그인 중…",
     language: "언어",
   },
+  nav: {
+    product: "제품",
+    variant: "변량",
+    views: "화면",
+    modules: "독립 모듈",
+    standaloneHint: "EDA 교육·ASIC 작업 센터는 제품/변량 선택과 무관하게 동작합니다.",
+  },
+
   panels: {
     requirements: "요구사항 및 트레이스 (S03)",
     viewer3d: "3D 설계 검토 (S04)",

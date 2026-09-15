@@ -8,6 +8,14 @@ const en = {
     signingIn: "Signing in…",
     language: "Language",
   },
+  nav: {
+    product: "Product",
+    variant: "Variant",
+    views: "Views",
+    modules: "Standalone modules",
+    standaloneHint: "EDA training and the ASIC work center run independently of the product/variant selection.",
+  },
+
   panels: {
     requirements: "Requirements & Trace (S03)",
     viewer3d: "3D Design Review (S04)",
