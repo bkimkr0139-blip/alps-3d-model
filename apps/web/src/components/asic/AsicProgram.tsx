@@ -179,7 +179,10 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
     return { samples, perParam, base };
   }, [tpl]);
 
-  const pkgScene = useMemo(() => buildPackageScene(tpl), [tpl]);
+  // The package twin models the stage-② selected option's package (falls
+  // back to the first option before a selection is made)
+  const pkg = tpl.options.find((o) => o.id === optId)?.pkg ?? tpl.options[0].pkg;
+  const pkgScene = useMemo(() => buildPackageScene(tpl, pkg), [tpl, pkg]);
 
   // ── S1 action: reflect the AI proposal — create the missing verification
   //    item and approve the draft requirement (demo of the §9.1 Requirements
@@ -576,7 +579,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
 
           {stage === "s5" && (
             <>
-              <SectionCard title={`${t("asic.stage.s5")} — ${t("asic.s5.pkg")}`} right={<Chip color={tpl.color}>react-three-fiber · {t("asic.s5.schematic")}</Chip>}>
+              <SectionCard title={`${t("asic.stage.s5")} — ${t("asic.s5.pkg")}`} right={<Chip color={tpl.color}>{pkg} · react-three-fiber · {t("asic.s5.schematic")}</Chip>}>
                 <div style={{ height: 360 }}>
                   <Eda3DViewer scene={pkgScene} />
                 </div>
@@ -591,7 +594,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 }
               >
                 <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8, fontFamily: "monospace" }}>
-                  {t("asic.s5.genealogy")}: GDS {maskRev} [{eduHash(tpl.id + maskRev)}] → mask MS-{maskRev} → wafer lot WL-{tpl.id.slice(0, 3).toUpperCase()}-09 (FAB alias) → assembly AL-1120 ({tpl.options[0].pkg}) → ES-1001..1012
+                  {t("asic.s5.genealogy")}: GDS {maskRev} [{eduHash(tpl.id + maskRev)}] → mask MS-{maskRev} → wafer lot WL-{tpl.id.slice(0, 3).toUpperCase()}-09 (FAB alias) → assembly AL-1120 ({pkg}) → ES-1001..1012
                 </div>
                 {corrDone ? (
                   <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 340px) 1fr", gap: 12, alignItems: "start" }}>
