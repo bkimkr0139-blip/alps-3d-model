@@ -175,6 +175,24 @@ verify:seedl10n 101/0 + Playwright 헤드리스 CLEAN):
     토글 버튼 왕복 + 양 모드 스크린샷 육안 확인(/tmp/alps-logs/
     theme_*.png). 대비 감사 하네스: `/tmp/alps-logs/contrast_audit2.mjs`
     (THEME=light|dark).
+21. `509e6b5` **AirInput 개발/테스트 보드 일치**(사용자 지시 "AirInput
+    Proximity Sensor 개발/테스트 보드가 상이하다") — 벤치 탭이 제품명
+    "sensor" 포착으로 MEMS 압력 보드를 보여주던 것을 `air` 패밀리 신설로
+    수정: AirScene과 동일 재질·기하의 puck 모듈 DUT(하우징 셸/PCB/전극/
+    ASIC 패들/커버 글래스, 실물 34×28 벤치 스케일 0.36 공표), **선택 변량의
+    전극 레이아웃 추종**(App→variantName prop, A 센터패드/B 스플릿 링),
+    캐스텔레이션 단자→MCU 배선, 손끝 스티뮬러스 버튼(스코프 CH1 감지 레벨·
+    CH2 터치 컴패레이터 히스테리시스, F-S/ΔC(d) 커서 동기). 부수 수정:
+    air 탭 Layout B 스플릿 링이 x=0에 그려지던 것을 솔버/CAD와 동일한
+    ELECTRODE_CENTER_X=5로.
+22. `4ccad34` **언어 선택기 헤더 우상단 고정**(사용자 지시) — 내비바 끝에
+    있어 줄바꿈에 따라 밀리던 언어 select를 헤더 우측 그룹(테마 토글 옆)
+    으로 이동 + 메탈 레이즈/엠보스 스타일 일치.
+    검증(21·22 공통): 빌드+lint 27+seedl10n 101/0, Playwright 하니스
+    `/tmp/alps-logs/air_bench_check.mjs`(언어 헤더 y<탭 y, 벤치 A/B DUT 칩,
+    손끝 토글 스코프 반응, 0 콘솔 에러), **다크/라이트 대비 감사 재실행
+    전부 CLEAN**, 스크린샷 air_bench_{A,A_near,B}.png·air_tab_B.png
+    육안 확인.
 
 **검증 스크립트**(`/tmp/alps-logs/`, 전부 PASS): cockpit_e2e(W2),
 proc_e2e/proc_mobile_e2e(W3), bench_e2e(W4), review_e2e(W5), w6_sweep(8탭
@@ -188,7 +206,9 @@ pkg 칩 + B OPT-2 → TSSOP-16 재표적), pkg_internals_e2e(⑤ mold-off+분해
   사용자가 "완성하면 내가 웹으로 검증해볼게"라고 한 상태. model 탭 첫 화면
   (실물 재질 + 밝/어둠 배경 토글), proc 탭 실사 라인, ASIC 탭 템플릿별 ⑤단계
   모델, 프리미엄 셸/그래프 전반, **헤더 ☀/☾ 다크·라이트 테마 토글**(3468143 —
-  라이트에서도 스코프/회로도 계기 글래스는 다크 유지가 의도된 디자인).
+  라이트에서도 스코프/회로도 계기 글래스는 다크 유지가 의도된 디자인),
+  **헤더 우상단 언어 선택기**(4ccad34), **벤치 탭 AirInput puck 보드**
+  (509e6b5 — 변량 A/B 전극 레이아웃 추종, 손끝 버튼→스코프).
 - **Temporal 좀비 워크플로 정리** — 이전 세션에 1개만 terminate되고
   ~111개 Running이 남아 있음(재시드로 sim_run 행은 없는데 재시도만 반복).
   사용자가 터미널에서 직접:
