@@ -44,17 +44,28 @@ verify:seedl10n 101/0 + Playwright 헤드리스 CLEAN):
    SOIC/SOP/TSSOP(양측 gull-wing 리드)·LQFP(4측), 몸체 비례·인덱스 노치·
    pin1 점. 다이 레벨은 템플릿 고유 센서(MEMS 스택 vs GMR+coil) 유지.
    계보 문자열·섹션 칩이 모델링된 pkg를 표시.
-8. `1d57f6f` **패키지 내부 구조 산업 표준 정합**(사용자 지시 — 분해도/mold-off
-   에서 핀이 칩·센서 위에 뿌려진다는 보고) — 3결함 수정: (a) 본드 맵 재작성 —
-   핑거가 다이 주변 무어트에 링을 이루고 와이어는 같은 변의 다이 패드↔핑거
-   1:1 부채꼴(QFN은 z/x 행 교차 vs S/N 패드 순서라 와이어 절반이 다이를
-   가로질렀고, LGA는 랜드 그리드 좌표를 써서 핑거가 다이 위에 놓임), 패드는
-   와이어 수만큼만 렌더; (b) 센서 배치 — QFN/WLCSP는 MEMS를 다이 위 모놀리
-   식 적층, LGA는 별도 MEMS 다이+전용 패드 와이어본딩, 협소 SOIC/SOP/TSSOP는
-   GMR을 다이 위 공동집적(기존엔 다이 발찌와 겹쳐 파묻힘+공중 와이어); (c)
-   `explodeAnchors`(EdaScene 선택 필드)로 분해 레이어 케이크가 단면 순서
-   (PCB→solder→package→die→bond→sensor→mold→mark)로 분리. 검증:
-   pkg_internals_e2e(mold-off+explode 스크린샷 A/B/D)·pkg_e2e·eda_e2e CLEAN.
+8. `1d57f6f`+`2fa26e5` **패키지 내부 구조 산업 표준 정합**(사용자 지시 — 분해도/
+   mold-off에서 핀이 칩·센서 위에 뿌려진다는 보고 + "핀에 연결된 와이어로") —
+   3결함 수정 + 와이어 실사화: (a) 본드 맵 재작성 — 핑거가 다이 주변 무어트에
+   링을 이루고 와이어는 같은 변의 다이 패드↔핑거 1:1 부채꼴(QFN은 z/x 행 교차
+   vs S/N 패드 순서라 와이어 절반이 다이를 가로질렀고, LGA는 랜드 그리드 좌표를
+   써서 핑거가 다이 위에 놓임), 패드는 와이어 수만큼만 렌더; (b) 센서 배치 —
+   QFN/WLCSP는 MEMS를 다이 위 모놀리식 적층, LGA는 별도 MEMS 다이+전용 패드
+   와이어본딩, 협소 SOIC/SOP/TSSOP는 GMR을 다이 위 공동집적(기존엔 다이 발찌와
+   겹쳐 파묻힘+공중 와이어); (c) `explodeAnchors`(EdaScene 선택 필드)로 분해
+   레이어 케이크가 단면 순서(PCB→solder→package→die→bond→sensor→mold→mark)로
+   분리; (d) 와이어=가는 Au 튜브(0.12, 오버랩 샘플링으로 연속 호)+패드 볼본드+
+   핑거 스티치본드, 내부 핑거 팁은 외부 리드와 같은 은도금 구리(LEAD), LGA만
+   ENIG 금. 검증: pkg_internals_e2e(mold-off+explode 스크린샷 A/B/D)·pkg_e2e·
+   eda_e2e CLEAN.
+9. `81f44d6` **EDA 교육 미션을 자사 제품 실리콘으로**(사용자 지시) — 교육용 5칩
+   (4비트 카운터/ALU/FIFO/UART/RISC)을 앱 ASIC 9단계 시나리오 칩셋으로 재테마:
+   TACT 스위치 채터링 필터(tact_debounce4)·터치 스냅 판정 ALU(touch_alu4)·
+   AFE 샘플 링버퍼 FIFO(afe_sample_fifo)·센서값 UART 송신기(sensor_uart_tx)·
+   AFE/SoC 제어 RISC 코어(afe_soc_core). 난이도 사다리·휴리스틱 엔진 불변
+   (포트/신호명 유지 — 파형/시나리오/STA 프리셋 그대로 적용), topModule은
+   MISSIONS+SIGNAL/SCENARIO/criticalPath 프리셋 맵에 반영, 스타터 RTL 헤더에
+   제품 블록 명시, ko/en/ja 표시명·설명 교체. eda_e2e 셀렉터 갱신.
 
 **검증 스크립트**(`/tmp/alps-logs/`, 전부 PASS): cockpit_e2e(W2),
 proc_e2e/proc_mobile_e2e(W3), bench_e2e(W4), review_e2e(W5), w6_sweep(8탭
