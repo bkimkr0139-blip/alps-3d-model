@@ -66,12 +66,26 @@ verify:seedl10n 101/0 + Playwright 헤드리스 CLEAN):
    (포트/신호명 유지 — 파형/시나리오/STA 프리셋 그대로 적용), topModule은
    MISSIONS+SIGNAL/SCENARIO/criticalPath 프리셋 맵에 반영, 스타터 RTL 헤더에
    제품 블록 명시, ko/en/ja 표시명·설명 교체. eda_e2e 셀렉터 갱신.
+10. `71e25a1` **EDA 3D 씬 3종을 선택 제품 칩으로**(사용자 지시 "웨이퍼/설계
+   결과물이 동일 샘플이면 안 된다") — 공정(웨이퍼→FEOL→BEOL)·합성(게이트
+   클러스터)·레이아웃(층 케이크) 빌더가 전부 `silProfileOf(slug)` 실리콘
+   프로파일을 따름: 미션별 다이 크기(TACT-DB4 9.5×7.0 순디지털 ~ AFE-SOC1
+   15×11), 레이아웃 매크로=실기능 블록(DEBCNT/TOUCH_AFE/RING_RAM/TX_SHFT/
+   RISC_CORE/SRAM32K…), 플로어플랜 슬라이더가 미션 전환 시 제품 다이 기본값
+   세팅, 합성 바닥=다이 종횡비+혼성신호 미션은 AFE 아일랜드(하드매크로+MIM
+   캡+가드링, near 코너), 공정 흐름=리티클 필드 2×2 반복+딥 n웰/MIM캡/폴리
+   저항/실드 링+메모리 셀 어레이+비트라인+터치 전극 콤+패드 링 제품별 수.
+   캔버스 HUD에 "◈ 트윈 대상 칩: 칩코드 · topModule · gates" 표기(i18n 3
+   로케일 `eda.view3dChip`). 미지 slug는 구 제네릭 샘플 유지. 검증:
+   eda_e2e(TACT-DB4 무아날로그 vs TCH-ALU4 analog 칩 단정 추가)+
+   eda_sil_e2e(SoC/FIFO/UART 공정·레이아웃 스크린샷)+w6_sweep CLEAN.
 
 **검증 스크립트**(`/tmp/alps-logs/`, 전부 PASS): cockpit_e2e(W2),
 proc_e2e/proc_mobile_e2e(W3), bench_e2e(W4), review_e2e(W5), w6_sweep(8탭
 ko + en/ja 스모크 + 390×844 모바일), pkg_e2e(템플릿 A~D × ⑤단계 캔버스+
 pkg 칩 + B OPT-2 → TSSOP-16 재표적), pkg_internals_e2e(⑤ mold-off+분해도
-0.45 스크린샷 A/B/D — 내부 구조 육안 검증용).
+0.45 스크린샷 A/B/D — 내부 구조 육안 검증용), eda_sil_e2e(EDA 미션별
+공정·레이아웃 3D 스크린샷 FIFO/UART/SoC — 71e25a1 육안 검증용).
 
 **다음 세션(또는 사용자)이 할 일**:
 - **`git push`** (사용자 직접 실행 필요, 위 참조) + **웹 브라우저 검증** —
