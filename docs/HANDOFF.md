@@ -153,6 +153,28 @@ verify:seedl10n 101/0 + Playwright 헤드리스 CLEAN):
     (밀집 카테고리축 splitLine off)에 전파, ProcessMonitoring SVG 관리도는
     웰 베젤+관리한계 밴드 미팅트+드롭섀도 트레이스+모노 눈금. 검증: 빌드·
     lint 27·seedl10n 101/0+w6_sweep PASS, 차트 3종 스크린샷 육안 확인.
+18. `7ddd604` **대비 전수검사** — 셀렉트 팝업 option 색상 토큰화 + 전 탭
+    Playwright TreeWalker 대비 감사(전경색×합성 배경 알파 합성) 4.5:1/3:1
+    미달 전부 수정, 다크 모드 CLEAN.
+19. `e87d68a` **로터리 인코더 CAD 정합** — 다이얼 노브 메시 + 케이스 안쪽
+    포텐셔미터 연결부(샤프트·브래킷·기어 링크) 모델링, 미구현 부품 해소.
+20. `3468143` **앱 전역 다크/라이트 테마 토글** — 헤더 ☀/☾ 버튼
+    (`store.uiTheme`, localStorage `alps.ui-theme`, 마운트 전 `<html>`
+    data-theme 반영으로 깜빡임 없음). `index.css` 전면 `--alps-*` 변수화 +
+    라이트 팔레트(페이지 #dde3ec 계열, 상태색은 라이트용으로 어두운 톤 —
+    faint #51627a / ok #0c6b43 / ok-alt #136a32 / attention #8a5606 /
+    accent-orange #a83a0b / idle #526178). 파서 경계 처리: tokens는
+    var() 문자열, three.js 머티리얼용 `rawStatus`/`rawAccent` raw hex 유지,
+    ECharts는 `useChartTheme()` 모드별 콘크리트 팔레트, SVG 차트는
+    `useSvgPalette()`, 칩/버튼 틴트는 `color-mix(in srgb, var N%,
+    transparent)`. **계기 유리(keep-dark)**: 스코프 패널·F-S 오버레이·
+    sysmodel 웰·회로도 캔버스·EDA 코드 에디터·온보딩 스트립은 라이트에서도
+    다크 유지(라이트 베젤 + 다크 글래스, 컨테이너에 `color:"#e2e8f0"` 핀).
+    검증: 빌드+lint 27+seedl10n 101/0+w6_sweep PASS, **다크/라이트 각 8탭
+    대비 감사 전부 CLEAN**(라이트 초기 246건 → 루트원인 7종 수정),
+    토글 버튼 왕복 + 양 모드 스크린샷 육안 확인(/tmp/alps-logs/
+    theme_*.png). 대비 감사 하네스: `/tmp/alps-logs/contrast_audit2.mjs`
+    (THEME=light|dark).
 
 **검증 스크립트**(`/tmp/alps-logs/`, 전부 PASS): cockpit_e2e(W2),
 proc_e2e/proc_mobile_e2e(W3), bench_e2e(W4), review_e2e(W5), w6_sweep(8탭
@@ -165,7 +187,8 @@ pkg 칩 + B OPT-2 → TSSOP-16 재표적), pkg_internals_e2e(⑤ mold-off+분해
 - **웹 브라우저 검증** —
   사용자가 "완성하면 내가 웹으로 검증해볼게"라고 한 상태. model 탭 첫 화면
   (실물 재질 + 밝/어둠 배경 토글), proc 탭 실사 라인, ASIC 탭 템플릿별 ⑤단계
-  모델, 프리미엄 셸/그래프 전반.
+  모델, 프리미엄 셸/그래프 전반, **헤더 ☀/☾ 다크·라이트 테마 토글**(3468143 —
+  라이트에서도 스코프/회로도 계기 글래스는 다크 유지가 의도된 디자인).
 - **Temporal 좀비 워크플로 정리** — 이전 세션에 1개만 terminate되고
   ~111개 Running이 남아 있음(재시드로 sim_run 행은 없는데 재시도만 반복).
   사용자가 터미널에서 직접:
