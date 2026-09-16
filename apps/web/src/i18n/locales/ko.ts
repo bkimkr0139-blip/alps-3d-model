@@ -612,24 +612,24 @@ const ko: Resources = {
     },
     mission: {
       counter_4bit: {
-        name: "4비트 카운터",
-        desc: "동기식 4비트 카운터를 구현하고 reset/enable 동작을 파형으로 검증합니다. 표준셀 행만으로 구성되는 작은 다이를 체험합니다.",
+        name: "TACT 스위치 채터링 필터",
+        desc: "제품 TACT 스위치의 접점 채터링을 4비트 안정 카운터로 걸러내는 디바운스 블록. reset/enable 동작을 파형으로 검증하고 표준셀 행만으로 구성되는 작은 다이를 체험합니다.",
       },
       alu_4bit: {
-        name: "4비트 ALU",
-        desc: "ADD/SUB/AND/OR 조합논리 ALU. case 문 활용과 조합 회로의 critical path를 이해합니다.",
+        name: "터치 스냅 판정 ALU",
+        desc: "AirInput 정전 터치의 임계값·오프셋 연산(ADD/SUB/AND/OR) 판정 유닛. case 문 활용과 조합 회로의 critical path를 이해합니다.",
       },
       fifo_sync: {
-        name: "동기 FIFO",
-        desc: "full/empty 플래그가 있는 동기 FIFO를 직접 구현하고 쓰기/읽기 시나리오를 검증합니다.",
+        name: "AFE 샘플 링버퍼 FIFO",
+        desc: "정전용량 AFE가 내보내는 샘플 스트림을 버퍼링하는 full/empty 링버퍼 FIFO를 구현하고 쓰기/읽기 시나리오를 검증합니다.",
       },
       uart_tx: {
-        name: "UART TX 미니",
-        desc: "8N1 직렬 송신기를 구현합니다. 상태머신과 busy 핸드셰이크를 연습합니다.",
+        name: "센서값 UART 송신기",
+        desc: "전류 센서 신호조절 ASIC이 측정 바이트를 8N1 직렬로 내보내는 송신 블록. 상태머신과 busy 핸드셰이크를 연습합니다.",
       },
       risc32: {
-        name: "32비트 RISC 코어",
-        desc: "단일 사이클 RV32I 서브셋 — 페치/디코드/실행, 16엔트리 레지스터 파일. LW/SW·분기·JAL을 파형과 합성으로 검증합니다.",
+        name: "AFE/SoC 제어 RISC 코어",
+        desc: "정전용량 센서 AFE/SoC(템플릿 A)의 온칩 제어 코어 — 단일 사이클 RV32I 서브셋. 페치/디코드/실행, 16엔트리 레지스터 파일을 파형과 합성으로 검증합니다.",
       },
     },
     rtl: "RTL 코드",

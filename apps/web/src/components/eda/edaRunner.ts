@@ -120,13 +120,22 @@ export type Mission = {
 };
 
 export const MISSIONS: Mission[] = [
+  // The practice chips are the workbench's own product scenario silicon:
+  // every block below exists in one of the ALPS products / ASIC templates
+  // (TACT switch input stage, AirInput touch judgement, capacitive-AFE
+  // datapath, current-sensor ASIC output, AFE/SoC control core), so the
+  // EDA ladder trains on the same kind of chipset the 9-stage ASIC flow
+  // builds. Port names stay generic so the heuristic engines (waveform,
+  // scenario, STA presets) apply unchanged.
   {
     slug: "counter_4bit",
-    title: "4-bit Counter",
+    title: "TACT Debounce Counter",
     difficulty: "beginner",
-    topModule: "counter4",
+    topModule: "tact_debounce4",
     known: true,
-    starterRtl: `module counter4 (
+    starterRtl: `// TACT switch (S04) contact filter: count 16 stable samples to debounce
+// the contact before it drives the key scan logic.
+module tact_debounce4 (
     input  wire        clk,
     input  wire        rst_n,
     input  wire        en,
@@ -143,11 +152,13 @@ endmodule
   },
   {
     slug: "alu_4bit",
-    title: "4-bit ALU",
+    title: "Touch Snap ALU",
     difficulty: "beginner",
-    topModule: "alu",
+    topModule: "touch_alu4",
     known: true,
-    starterRtl: `module alu (
+    starterRtl: `// AirInput capacitive touch: threshold/offset arithmetic unit used by the
+// snap judgement stage (baseline offset, touch delta, mask).
+module touch_alu4 (
     input  wire [3:0] a,
     input  wire [3:0] b,
     input  wire [1:0] op,   // 00 ADD, 01 SUB, 10 AND, 11 OR
@@ -166,11 +177,13 @@ endmodule
   },
   {
     slug: "fifo_sync",
-    title: "Synchronous FIFO",
+    title: "AFE Sample FIFO",
     difficulty: "intermediate",
-    topModule: "fifo",
+    topModule: "afe_sample_fifo",
     known: true,
-    starterRtl: `module fifo #(parameter DEPTH = 8, WIDTH = 8) (
+    starterRtl: `// Ring buffer packing the capacitive-AFE sample stream (Template A)
+// before the digital front end consumes it.
+module afe_sample_fifo #(parameter DEPTH = 8, WIDTH = 8) (
     input  wire             clk,
     input  wire             rst_n,
     input  wire             wr_en,
@@ -186,11 +199,13 @@ endmodule
   },
   {
     slug: "uart_tx",
-    title: "UART TX Mini",
+    title: "Sensor UART TX",
     difficulty: "advanced",
-    topModule: "uart_tx",
+    topModule: "sensor_uart_tx",
     known: true,
-    starterRtl: `module uart_tx (
+    starterRtl: `// Streams measurement bytes out of the current-sensor conditioning ASIC
+// (Template B) over an 8N1 serial line.
+module sensor_uart_tx (
     input  wire       clk,
     input  wire       rst_n,
     input  wire [7:0] data,
@@ -204,24 +219,15 @@ endmodule
   },
   {
     slug: "risc32",
-    title: "32-bit RISC Core",
+    title: "AFE/SoC Control Core",
     difficulty: "advanced",
-    topModule: "risc32_core",
+    topModule: "afe_soc_core",
     known: true,
-    starterRtl: `module risc32_core (
-    input  wire        clk,
-    input  wire        rst_n,
-    input  wire [31:0] imem_data,    // instruction word fetched at imem_addr
-    output wire [31:0] imem_addr,    // fetch address (= pc)
-    output wire [31:0] dmem_addr,
-    output wire [31:0] dmem_wdata,
-    output wire        dmem_we,
-    output wire [31:0] dbg_pc,
-    output wire [31:0] dbg_alu_y
-);
-    // Educational single-cycle RV32I subset:
-    //   R-type ADD/SUB/AND/OR/XOR/SLTU, ADDI, LW/SW, BEQ/BNE, JAL
-    //   16-entry register file (x0 hardwired to zero)
+    starterRtl: `// On-chip control core of the capacitive sensor AFE/SoC (Template A).
+// Educational single-cycle RV32I subset:
+//   R-type ADD/SUB/AND/OR/XOR/SLTU, ADDI, LW/SW, BEQ/BNE, JAL
+//   16-entry register file (x0 hardwired to zero)
+module afe_soc_core (
     localparam OP_RTYPE  = 7'b0110011;
     localparam OP_ALUI   = 7'b0010011;
     localparam OP_LOAD   = 7'b0000011;
@@ -327,11 +333,11 @@ export function runLint(rtl: string, topModule: string): LintResult {
 
 // ── SIMULATION (port of _signals_for_top + _generate_generic_vcd + coverage) ──
 const SIGNAL_PRESETS: Record<string, [string, number][]> = {
-  counter4: [["clk", 1], ["rst_n", 1], ["en", 1], ["count", 4]],
-  alu: [["a", 4], ["b", 4], ["op", 2], ["y", 5]],
-  fifo: [["clk", 1], ["rst_n", 1], ["wr_en", 1], ["rd_en", 1], ["din", 8], ["dout", 8], ["full", 1], ["empty", 1]],
-  uart_tx: [["clk", 1], ["rst_n", 1], ["data", 8], ["send", 1], ["tx", 1], ["busy", 1]],
-  risc32_core: [["clk", 1], ["rst_n", 1], ["pc", 32], ["instr", 32], ["alu_y", 32], ["dmem_we", 1]],
+  tact_debounce4: [["clk", 1], ["rst_n", 1], ["en", 1], ["count", 4]],
+  touch_alu4: [["a", 4], ["b", 4], ["op", 2], ["y", 5]],
+  afe_sample_fifo: [["clk", 1], ["rst_n", 1], ["wr_en", 1], ["rd_en", 1], ["din", 8], ["dout", 8], ["full", 1], ["empty", 1]],
+  sensor_uart_tx: [["clk", 1], ["rst_n", 1], ["data", 8], ["send", 1], ["tx", 1], ["busy", 1]],
+  afe_soc_core: [["clk", 1], ["rst_n", 1], ["pc", 32], ["instr", 32], ["alu_y", 32], ["dmem_we", 1]],
 };
 
 // (1 << 32) is 1 in JS 32-bit bitwise — mask 32-wide buses explicitly.
@@ -421,29 +427,29 @@ function generateWaveform(top: string, signals: [string, number][], periodNs = 1
 }
 
 const SCENARIO_PRESETS: Record<string, Scenario[]> = {
-  counter4: [
+  tact_debounce4: [
     { name: "reset_then_count", description: L("rst_n 해제 후 en=1로 16사이클 카운팅", "release rst_n, count 16 cycles with en=1", "rst_n解放後、en=1で16サイクルカウント"), expected_pass: true },
     { name: "rollover", description: L("0xF → 0x0 wrap-around 동작 확인", "verify 0xF → 0x0 wrap-around", "0xF → 0x0ラップアラウンド動作確認"), expected_pass: true },
     { name: "enable_pause", description: L("en=0일 때 카운트 정지 확인", "verify the count holds when en=0", "en=0時にカウント停止を確認"), expected_pass: true },
     { name: "async_reset_mid", description: L("카운팅 중 비동기 reset 0 즉시 적용", "assert asynchronous reset 0 mid-count", "カウント中に非同期reset 0を即時適用"), expected_pass: true },
   ],
-  alu: [
+  touch_alu4: [
     { name: "ADD_basic", description: L("0x3 + 0x5 = 0x8", "0x3 + 0x5 = 0x8", "0x3 + 0x5 = 0x8"), expected_pass: true },
     { name: "SUB_borrow", description: L("0x1 - 0x3 borrow", "0x1 - 0x3 with borrow", "0x1 - 0x3 ボロー"), expected_pass: true },
     { name: "AND_OR", description: L("비트 연산 코너", "bitwise-op corner", "ビット演算コーナー"), expected_pass: true },
     { name: "overflow", description: L("ADD에서 5번째 비트 캐리아웃", "carry-out of bit 4 on ADD", "ADDで第5ビットへのキャリーアウト"), expected_pass: true },
   ],
-  fifo: [
+  afe_sample_fifo: [
     { name: "write_then_read", description: L("8개 push, 8개 pop 일치 확인", "verify 8 pushes match 8 pops", "8個push、8個popの一致確認"), expected_pass: true },
     { name: "full_flag", description: L("DEPTH개 push 시 full=1", "full=1 after DEPTH pushes", "DEPTH個pushでfull=1"), expected_pass: true },
     { name: "empty_flag", description: L("초기 empty=1", "empty=1 initially", "初期状態でempty=1"), expected_pass: true },
     { name: "simultaneous_rw", description: L("동시 wr_en+rd_en 시 동작", "behavior with simultaneous wr_en+rd_en", "同時wr_en+rd_en時の動作"), expected_pass: true },
   ],
-  uart_tx: [
+  sensor_uart_tx: [
     { name: "byte_send", description: L("1바이트 송신 후 busy 해제", "send 1 byte, busy deasserts", "1バイト送信後busy解除"), expected_pass: true },
     { name: "back_to_back", description: L("연속 2바이트 송신", "back-to-back 2-byte send", "連続2バイト送信"), expected_pass: true },
   ],
-  risc32_core: [
+  afe_soc_core: [
     { name: "reset_fetch", description: L("리셋 해제 후 pc=0에서 첫 명령 페치", "first instruction fetch at pc=0 after reset", "リセット解除後pc=0で最初の命令フェッチ"), expected_pass: true },
     { name: "alu_rtype_seq", description: L("ADD/SUB/AND/OR/XOR 연산 + 레지스터 쓰기 검증", "verify ADD/SUB/AND/OR/XOR ops + register writeback", "ADD/SUB/AND/OR/XOR演算+レジスタ書き込み検証"), expected_pass: true },
     { name: "sw_lw_roundtrip", description: L("SW 저장 → LW 적재 데이터 일치", "SW store → LW load data matches", "SW格納→LWロードデータ一致"), expected_pass: true },
@@ -624,20 +630,20 @@ export function runSynthesis(rtl: string, topModule: string, clockPeriodNs: numb
 // synthesis slack so the STA table and the synth KPIs agree.
 function criticalPathsFor(top: string, clockPeriod: number, slack: number): CriticalPath[] {
   const presets: Record<string, [string, string, string[]][]> = {
-    counter4: [
+    tact_debounce4: [
       ["count[3]/Q", "count[3]/D", ["count[3]/CLK", "ADD4/co", "MUX/sel", "count[3]/D"]],
       ["count[2]/Q", "count[2]/D", ["count[2]/CLK", "ADD4/s2", "count[2]/D"]],
       ["rst_n", "count[0]/D", ["rst_n", "AND2/y", "count[0]/D"]],
     ],
-    alu: [
+    touch_alu4: [
       ["a[3]", "y[4]", ["a[3]", "ADD/co", "y[4]"]],
       ["op[1]", "y[3]", ["op[1]", "MUX/sel", "y[3]"]],
     ],
-    fifo: [
+    afe_sample_fifo: [
       ["din[7]/Q", "dout[7]/D", ["din[7]/Q", "RAM/wr", "RAM/rd", "dout[7]/D"]],
       ["wr_ptr[2]/Q", "full", ["wr_ptr[2]/Q", "CMP/eq", "full"]],
     ],
-    risc32_core: [
+    afe_soc_core: [
       ["pc[2]/Q", "xreg[4]/D", ["pc[2]/CLK", "IMEM/dout", "DEC/funct3", "REG/rs1", "ALU32/y", "xreg[4]/D"]],
       ["rs1_v[31]", "pc[2]/D", ["REG/rs1", "CMP32/eq", "BADD32/sum", "pc[2]/D"]],
       ["imem_data[24]", "dmem_wdata[24]", ["DEC/rs2", "REG/rd", "dmem_wdata[24]"]],

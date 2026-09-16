@@ -614,24 +614,24 @@ const en = {
     },
     mission: {
       counter_4bit: {
-        name: "4-bit Counter",
-        desc: "Implement a synchronous 4-bit counter and verify reset/enable behavior on the waveform. A tiny die built from standard-cell rows only.",
+        name: "TACT Switch Chatter Filter",
+        desc: "Debounce block that filters the product TACT switch's contact chatter with a 4-bit stability counter. Verify reset/enable on the waveform; a tiny die built from standard-cell rows only.",
       },
       alu_4bit: {
-        name: "4-bit ALU",
-        desc: "ADD/SUB/AND/OR combinational ALU. Practice case statements and understand combinational critical paths.",
+        name: "Touch Snap Judgement ALU",
+        desc: "Threshold/offset arithmetic unit (ADD/SUB/AND/OR) behind AirInput capacitive-touch snap detection. Practice case statements and combinational critical paths.",
       },
       fifo_sync: {
-        name: "Synchronous FIFO",
-        desc: "Implement a synchronous FIFO with full/empty flags and verify write/read scenarios.",
+        name: "AFE Sample Ring-Buffer FIFO",
+        desc: "Implement the full/empty ring-buffer FIFO that packs the capacitive-AFE sample stream and verify write/read scenarios.",
       },
       uart_tx: {
-        name: "UART TX Mini",
-        desc: "Implement an 8N1 serial transmitter. Practice state machines and the busy handshake.",
+        name: "Sensor Value UART TX",
+        desc: "The transmit block that streams measurement bytes out of the current-sensor conditioning ASIC as 8N1 serial. Practice state machines and the busy handshake.",
       },
       risc32: {
-        name: "32-bit RISC Core",
-        desc: "Single-cycle RV32I subset — fetch/decode/execute with a 16-entry register file. Verify LW/SW, branches and JAL on waveform + synthesis.",
+        name: "AFE/SoC Control RISC Core",
+        desc: "On-chip control core of the capacitive sensor AFE/SoC (Template A) — single-cycle RV32I subset. Verify fetch/decode/execute and a 16-entry register file on waveform + synthesis.",
       },
     },
     rtl: "RTL code",
