@@ -142,14 +142,14 @@ export function SystemDocs() {
               ↓ {t("docs.download")}
             </a>
           ) : (
-            <span style={{ display: "inline-flex", alignItems: "center", padding: "6px 10px", borderRadius: 6, background: "#1e293b", color: "#64748b", fontSize: 13 }}>…</span>
+            <span style={{ display: "inline-flex", alignItems: "center", padding: "6px 10px", borderRadius: 6, background: "#1e293b", color: "#8b99b5", fontSize: 13 }}>…</span>
           )}
         </div>
 
         <article style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "28px 32px", lineHeight: 1.7, fontSize: 14 }}>
           {/* TOC from the h2 blocks — a doc this size needs jump links */}
           <nav style={{ border: "1px solid #334155", borderRadius: 8, background: "#1e293b", padding: "10px 14px", marginBottom: 20, fontSize: 13 }}>
-            <div style={{ color: "#64748b", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{t("docs.toc")}</div>
+            <div style={{ color: "#8b99b5", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{t("docs.toc")}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px" }}>
               {toc.map((h) => (
                 <a key={h.id} href={`#${h.id}`} onClick={(e) => { e.preventDefault(); scrollTo(h.id); }} style={{ color: "#93c5fd", textDecoration: "none" }}>

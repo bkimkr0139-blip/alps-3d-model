@@ -9,7 +9,7 @@ import type { Waveform, WaveSignal } from "./edaRunner";
 export function EdaWaveform({ data }: { data: Waveform | null }) {
   const { t } = useTranslation();
   const [cursor, setCursor] = useState(0);
-  if (!data) return <div style={{ fontSize: 12, color: "#64748b" }}>{t("eda.wave.empty")}</div>;
+  if (!data) return <div style={{ fontSize: 12, color: "#8b99b5" }}>{t("eda.wave.empty")}</div>;
 
   const W = 640;
   const ROW = 30;
@@ -62,7 +62,7 @@ export function EdaWaveform({ data }: { data: Waveform | null }) {
       </div>
       <table style={{ marginTop: 8, fontSize: 11, width: "100%", borderCollapse: "collapse" }}>
         <thead>
-          <tr style={{ color: "#64748b" }}>
+          <tr style={{ color: "#8b99b5" }}>
             <th style={{ textAlign: "left" }}>signal</th>
             <th style={{ textAlign: "left" }}>value @ cursor</th>
           </tr>

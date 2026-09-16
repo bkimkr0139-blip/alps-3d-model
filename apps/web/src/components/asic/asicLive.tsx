@@ -211,8 +211,8 @@ export function ChainFlowSvg({ blocks, height = 108 }: { blocks: { key: string; 
             </text>
             {i < blocks.length - 1 && (
               <>
-                <line x1={x + bw + 3} y1={y0 + 24} x2={x + bw + 21} y2={y0 + 24} stroke="#475569" strokeWidth={1.2} />
-                <polygon points={`${x + bw + 21},${y0 + 20} ${x + bw + 26},${y0 + 24} ${x + bw + 21},${y0 + 28}`} fill="#475569" />
+                <line x1={x + bw + 3} y1={y0 + 24} x2={x + bw + 21} y2={y0 + 24} stroke="#7b8aa6" strokeWidth={1.2} />
+                <polygon points={`${x + bw + 21},${y0 + 20} ${x + bw + 26},${y0 + 24} ${x + bw + 21},${y0 + 28}`} fill="#7b8aa6" />
               </>
             )}
           </g>
@@ -252,12 +252,12 @@ export function ChainRevisionPanel({ live, liveState, tpl }: { live: Live; liveS
             .slice()
             .sort((a, b) => a.revision - b.revision)
             .map((c) => (
-              <Chip key={c.id} color={c.status === "superseded" ? "#64748b" : "#34d399"}>
+              <Chip key={c.id} color={c.status === "superseded" ? "#8b99b5" : "#34d399"}>
                 rev {c.revision} · {c.status}
                 {c.supersedes_id ? " ⟲ supersedes" : ""}
               </Chip>
             ))}
-          <span style={{ fontSize: 10, color: "#475569", fontFamily: "monospace", alignSelf: "center" }}>
+          <span style={{ fontSize: 10, color: "#7b8aa6", fontFamily: "monospace", alignSelf: "center" }}>
             {chain ? `hash ${chain.content_hash.slice(0, 12)}…` : ""}
           </span>
         </div>
@@ -276,7 +276,7 @@ export function ChainBudgetPanel({ live, liveState }: { live: Live; liveState: L
   if (!chain) {
     return (
       <SectionCard title="NRE — error budget (ASIC Twin v1.1)" right={<LiveChip state={liveState} />}>
-        <div style={{ fontSize: 12, color: "#64748b" }}>— no backend signal chain for this template</div>
+        <div style={{ fontSize: 12, color: "#8b99b5" }}>— no backend signal chain for this template</div>
       </SectionCard>
     );
   }
@@ -326,7 +326,7 @@ export function CornerStudiesPanel({ live, liveState }: { live: Live; liveState:
   if (live.studies.length === 0) {
     return (
       <SectionCard title="Corner / Monte-Carlo (ASIC Twin v1.1)" right={<LiveChip state={liveState} />}>
-        <div style={{ fontSize: 12, color: "#64748b" }}>{t("asic.mc.none")}</div>
+        <div style={{ fontSize: 12, color: "#8b99b5" }}>{t("asic.mc.none")}</div>
       </SectionCard>
     );
   }
@@ -337,12 +337,12 @@ export function CornerStudiesPanel({ live, liveState }: { live: Live; liveState:
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
             <b style={{ fontFamily: "monospace", color: "#7dd3fc", fontSize: 12 }}>{s.business_id}</b>
             <Chip color="#38bdf8">{s.kind}</Chip>
-            <Chip color="#64748b">n={s.n_draws} · seed={s.seed}</Chip>
+            <Chip color="#8b99b5">n={s.n_draws} · seed={s.seed}</Chip>
             <Chip color="#a78bfa">{s.source_class}</Chip>
             {s.result?.model_ood ? (
               <Chip color="#f87171" title={(s.result.ood_reason ?? []).join(" | ")}>⚠ {t("asic.mc.ood")}</Chip>
             ) : null}
-            <span style={{ fontSize: 10, color: "#475569", fontFamily: "monospace" }}>{s.tool_version}</span>
+            <span style={{ fontSize: 10, color: "#7b8aa6", fontFamily: "monospace" }}>{s.tool_version}</span>
           </div>
           {(s.result?.per_output ?? []).map((o) => (
             <div key={o.output} style={{ display: "grid", gridTemplateColumns: "minmax(200px, 300px) 1fr", gap: 12, alignItems: "start", marginBottom: 8 }}>
@@ -372,7 +372,7 @@ export function CornerStudiesPanel({ live, liveState }: { live: Live; liveState:
                 {o.hist && o.hist.counts.length > 0 ? (
                   <Histogram values={histValues(o.hist.edges, o.hist.counts)} specMin={o.spec_min} specMax={o.spec_max} height={110} />
                 ) : null}
-                <div style={{ fontSize: 10, color: "#475569", fontFamily: "monospace" }}>
+                <div style={{ fontSize: 10, color: "#7b8aa6", fontFamily: "monospace" }}>
                   spec [{o.spec_min ?? "—"}, {o.spec_max ?? "—"}] · T={s.result?.temperatures_c.join("/")} °C
                 </div>
               </div>
@@ -446,7 +446,7 @@ export function EquipmentRackStrip({ runs }: { runs: AsicMeasurementRun[] }) {
           />
           <span style={{ color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.equipment_id}</span>
         </div>
-        <div style={{ fontSize: 9.5, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{ fontSize: 9.5, color: "#8b99b5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {r.equipment_type}
           {r.equipment_model ? ` · ${r.equipment_model}` : ""}
         </div>
@@ -470,11 +470,11 @@ export function EquipmentRackStrip({ runs }: { runs: AsicMeasurementRun[] }) {
     <div style={{ marginBottom: 10 }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{runs.map(slot)}</div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
-        <span style={{ fontSize: 9.5, color: "#475569" }}>{t("asic.rack.scale")}</span>
+        <span style={{ fontSize: 9.5, color: "#7b8aa6" }}>{t("asic.rack.scale")}</span>
         {findingCounts.size > 0 && (
           <>
-            <span style={{ fontSize: 9.5, color: "#475569" }}>·</span>
-            <span style={{ fontSize: 9.5, color: "#475569" }}>{t("asic.rack.findings")}:</span>
+            <span style={{ fontSize: 9.5, color: "#7b8aa6" }}>·</span>
+            <span style={{ fontSize: 9.5, color: "#7b8aa6" }}>{t("asic.rack.findings")}:</span>
             {[...findingCounts.entries()].map(([code, n]) => (
               <Chip key={code} color="#fbbf24">
                 {code}
@@ -495,7 +495,7 @@ export function EquipmentRunsPanel({ live, liveState }: { live: Live; liveState:
   if (live.runs.length === 0) {
     return (
       <SectionCard title="Equipment measurement runs (EPIC E)" right={<LiveChip state={liveState} />}>
-        <div style={{ fontSize: 12, color: "#64748b" }}>— no imported measurement run</div>
+        <div style={{ fontSize: 12, color: "#8b99b5" }}>— no imported measurement run</div>
       </SectionCard>
     );
   }
@@ -523,11 +523,11 @@ export function EquipmentRunsPanel({ live, liveState }: { live: Live; liveState:
                 <tr key={r.id}>
                   <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>
                     {r.business_id}
-                    {r.lot_ref && <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>lot {r.lot_ref}</span>}
+                    {r.lot_ref && <span style={{ display: "block", fontSize: 9, color: "#8b99b5" }}>lot {r.lot_ref}</span>}
                   </td>
                   <td style={{ ...td, fontFamily: "monospace" }}>
                     {r.equipment_id}
-                    <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>
+                    <span style={{ display: "block", fontSize: 9, color: "#8b99b5" }}>
                       {r.equipment_type}{r.equipment_model ? ` · ${r.equipment_model}` : ""}
                     </span>
                   </td>
@@ -542,7 +542,7 @@ export function EquipmentRunsPanel({ live, liveState }: { live: Live; liveState:
                   </td>
                   <td style={td}>
                     {(r.findings ?? []).length === 0 ? (
-                      <span style={{ color: "#475569" }}>—</span>
+                      <span style={{ color: "#7b8aa6" }}>—</span>
                     ) : (
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                         {(r.findings ?? []).map((f, i) => (
@@ -604,7 +604,7 @@ export function TestProgramTwin({ tpl, testProgRev, maskRev }: { tpl: AsicTempla
           <tbody>
             {steps.map((s, i) => (
               <tr key={s.key}>
-                <td style={{ ...td, fontFamily: "monospace", color: "#475569" }}>{i + 1}</td>
+                <td style={{ ...td, fontFamily: "monospace", color: "#7b8aa6" }}>{i + 1}</td>
                 <td style={td}>{t(`asic.tp.${s.key}` as never)}</td>
                 <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{s.limit}</td>
                 <td style={{ ...td, fontFamily: "monospace" }}>{s.time} ms</td>
@@ -619,7 +619,7 @@ export function TestProgramTwin({ tpl, testProgRev, maskRev }: { tpl: AsicTempla
           </tbody>
         </table>
       </div>
-      <div style={{ fontSize: 10, color: "#475569", marginTop: 8 }}>{t("asic.s6.tpNote")}</div>
+      <div style={{ fontSize: 10, color: "#7b8aa6", marginTop: 8 }}>{t("asic.s6.tpNote")}</div>
     </SectionCard>
   );
 }
@@ -638,7 +638,7 @@ export function BackendQualPanel({ live, liveState }: { live: Live; liveState: L
   if (live.plans.length === 0) {
     return (
       <SectionCard title="Qualification matrix — golden dataset" right={<LiveChip state={liveState} />}>
-        <div style={{ fontSize: 12, color: "#64748b" }}>— no backend qualification plan</div>
+        <div style={{ fontSize: 12, color: "#8b99b5" }}>— no backend qualification plan</div>
       </SectionCard>
     );
   }
@@ -649,7 +649,7 @@ export function BackendQualPanel({ live, liveState }: { live: Live; liveState: L
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6, alignItems: "center" }}>
             <b style={{ fontFamily: "monospace", color: "#7dd3fc", fontSize: 12 }}>{p.business_id}</b>
             <Chip color="#38bdf8">{p.grade}</Chip>
-            <Chip color="#64748b">{p.policy_version}</Chip>
+            <Chip color="#8b99b5">{p.policy_version}</Chip>
             {p.standard_version && <Chip color="#a78bfa">{p.standard_version}</Chip>}
             {p.note && <span style={{ fontSize: 11, color: "#94a3b8" }}>{tr(p.note)}</span>}
           </div>
@@ -714,7 +714,7 @@ export function SafetyTracePanel({ live, liveState }: { live: Live; liveState: L
   if (live.safety.length === 0) {
     return (
       <SectionCard title="Safety trace (EPIC F)" right={<LiveChip state={liveState} />}>
-        <div style={{ fontSize: 12, color: "#64748b" }}>— no backend safety items</div>
+        <div style={{ fontSize: 12, color: "#8b99b5" }}>— no backend safety items</div>
       </SectionCard>
     );
   }
@@ -761,10 +761,10 @@ export function SafetyTracePanel({ live, liveState }: { live: Live; liveState: L
                   </td>
                   <td style={td}>
                     <span style={{ paddingLeft: depth * 14 }}>
-                      {depth > 0 && <span style={{ color: "#475569" }}>└ </span>}
+                      {depth > 0 && <span style={{ color: "#7b8aa6" }}>└ </span>}
                       {tr(item.title)}
                     </span>
-                    {item.safe_state && <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>safe state: {tr(item.safe_state)}</span>}
+                    {item.safe_state && <span style={{ display: "block", fontSize: 9, color: "#8b99b5" }}>safe state: {tr(item.safe_state)}</span>}
                   </td>
                   <td style={{ ...td, fontFamily: "monospace", color: item.asil === "B" ? "#fbbf24" : "#94a3b8" }}>{item.asil ?? "—"}</td>
                   <td style={{ ...td, fontSize: 10, color: "#94a3b8" }}>{item.safety_mechanism ? tr(item.safety_mechanism) : "—"}</td>
@@ -778,7 +778,7 @@ export function SafetyTracePanel({ live, liveState }: { live: Live; liveState: L
       </div>
       {live.fmeda.length > 0 && (
         <>
-          <div style={{ fontSize: 11, color: "#64748b", margin: "10px 0 6px", fontFamily: "monospace" }}>FMEDA</div>
+          <div style={{ fontSize: 11, color: "#8b99b5", margin: "10px 0 6px", fontFamily: "monospace" }}>FMEDA</div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
@@ -797,7 +797,7 @@ export function SafetyTracePanel({ live, liveState }: { live: Live; liveState: L
                     <td style={{ ...td, fontFamily: "monospace" }}>{f.distribution_pct}%</td>
                     <td style={{ ...td, fontFamily: "monospace" }}>{f.dc_pct != null ? `${f.dc_pct}%` : "—"}</td>
                     <td style={{ ...td, fontFamily: "monospace" }}>{f.fit_rate ?? "—"}</td>
-                    <td style={{ ...td, fontFamily: "monospace", fontSize: 10, color: "#475569" }}>
+                    <td style={{ ...td, fontFamily: "monospace", fontSize: 10, color: "#7b8aa6" }}>
                       {f.source_ref}
                       {f.formula_version ? ` · ${f.formula_version}` : ""}
                       {f.source_hash ? ` · sha ${f.source_hash.slice(0, 8)}…` : ""}
@@ -811,7 +811,7 @@ export function SafetyTracePanel({ live, liveState }: { live: Live; liveState: L
       )}
       {live.injections.length > 0 && (
         <>
-          <div style={{ fontSize: 11, color: "#64748b", margin: "10px 0 6px", fontFamily: "monospace" }}>Fault injection</div>
+          <div style={{ fontSize: 11, color: "#8b99b5", margin: "10px 0 6px", fontFamily: "monospace" }}>Fault injection</div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
@@ -854,7 +854,7 @@ export function GateReportPanel({ live, liveState, fallback }: { live: Live; liv
   if (!gate) {
     return (
       <SectionCard title="Release gate report (ASIC Twin v1.1)" right={<LiveChip state={liveState} />}>
-        <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>— gate-report unavailable; fixture evaluation below</div>
+        <div style={{ fontSize: 12, color: "#8b99b5", marginBottom: 8 }}>— gate-report unavailable; fixture evaluation below</div>
         {fallback}
       </SectionCard>
     );
@@ -866,12 +866,12 @@ export function GateReportPanel({ live, liveState, fallback }: { live: Live; liv
       right={
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <Chip color={gate.status === "pass" ? "#34d399" : "#f87171"}>{gate.status}</Chip>
-          <Chip color="#64748b">{gate.policy_version}</Chip>
+          <Chip color="#8b99b5">{gate.policy_version}</Chip>
           <LiveChip state={liveState} />
         </div>
       }
     >
-      <div style={{ fontSize: 10, color: "#475569", marginBottom: 8, fontFamily: "monospace" }}>
+      <div style={{ fontSize: 10, color: "#7b8aa6", marginBottom: 8, fontFamily: "monospace" }}>
         {gate.gate_id} · evaluated_at {gate.evaluated_at.slice(0, 19).replace("T", " ")}
       </div>
       {/* readiness ladder — the backend's rung lights up; unreachable rungs stay ✕ */}
@@ -880,7 +880,7 @@ export function GateReportPanel({ live, liveState, fallback }: { live: Live; liv
           const isCurrent = l.key === gate.readiness;
           const reachable = ladderKey(gate.readiness) ? READINESS_LEVELS.findIndex((x) => x.key === l.key) <= READINESS_LEVELS.findIndex((x) => x.key === gate.readiness) : false;
           return (
-            <Chip key={l.key} color={isCurrent ? "#34d399" : reachable ? "#64748b" : "#7f1d1d"}>
+            <Chip key={l.key} color={isCurrent ? "#34d399" : reachable ? "#8b99b5" : "#7f1d1d"}>
               {isCurrent ? "● " : reachable ? "○ " : "✕ "}
               {l.key}
             </Chip>
@@ -921,7 +921,7 @@ export function GateReportPanel({ live, liveState, fallback }: { live: Live; liv
                 </td>
                 <td style={{ ...td, fontFamily: "monospace" }}>{typeof c.actual === "object" ? JSON.stringify(c.actual) : String(c.actual)}</td>
                 <td style={{ ...td, fontFamily: "monospace", color: "#94a3b8" }}>{typeof c.target === "object" ? JSON.stringify(c.target) : String(c.target)}</td>
-                <td style={{ ...td, fontFamily: "monospace", fontSize: 10, color: "#475569" }}>{c.evidence_refs.join(", ") || "—"}</td>
+                <td style={{ ...td, fontFamily: "monospace", fontSize: 10, color: "#7b8aa6" }}>{c.evidence_refs.join(", ") || "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -938,7 +938,7 @@ export function FaStudio({ live, liveState }: { live: Live; liveState: LiveState
   if (live.faCases.length === 0 && live.ecos.length === 0) {
     return (
       <SectionCard title="FA studio — closed loop (EPIC G)" right={<LiveChip state={liveState} />}>
-        <div style={{ fontSize: 12, color: "#64748b" }}>— no backend FA case / ECO</div>
+        <div style={{ fontSize: 12, color: "#8b99b5" }}>— no backend FA case / ECO</div>
       </SectionCard>
     );
   }
@@ -962,33 +962,33 @@ export function FaStudio({ live, liveState }: { live: Live; liveState: LiveState
         <div key={c.id} style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, marginBottom: 10, background: "#0f172a" }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <b style={{ fontFamily: "monospace", color: "#7dd3fc", fontSize: 12 }}>{c.business_id}</b>
-            <Chip color="#64748b">{c.scope}</Chip>
-            {c.lot_ref && <Chip color="#64748b">lot {c.lot_ref}</Chip>}
+            <Chip color="#8b99b5">{c.scope}</Chip>
+            {c.lot_ref && <Chip color="#8b99b5">lot {c.lot_ref}</Chip>}
             <Chip color={FA_STATUS_COLOR[c.status] ?? "#94a3b8"}>{c.status}</Chip>
             {c.cause_class && <Chip color="#a78bfa">{c.cause_class}</Chip>}
           </div>
           <div style={{ fontSize: 12, color: "#e2e8f0", margin: "6px 0" }}>{tr(c.symptom)}</div>
           {(c.observations ?? []).length > 0 && (
             <div style={{ marginBottom: 6 }}>
-              <div style={{ fontSize: 10, color: "#64748b", fontFamily: "monospace" }}>observations</div>
+              <div style={{ fontSize: 10, color: "#8b99b5", fontFamily: "monospace" }}>observations</div>
               {(c.observations ?? []).map((o, i) => (
                 <div key={i} style={{ fontSize: 11, color: "#cbd5e1" }}>
                   • {tr(o.fact)}
-                  {o.source && <span style={{ color: "#475569", fontFamily: "monospace" }}> ← {o.source}</span>}
+                  {o.source && <span style={{ color: "#7b8aa6", fontFamily: "monospace" }}> ← {o.source}</span>}
                 </div>
               ))}
             </div>
           )}
           {(c.hypotheses ?? []).length > 0 && (
             <div style={{ marginBottom: 6 }}>
-              <div style={{ fontSize: 10, color: "#64748b", fontFamily: "monospace" }}>hypotheses</div>
+              <div style={{ fontSize: 10, color: "#8b99b5", fontFamily: "monospace" }}>hypotheses</div>
               {(c.hypotheses ?? []).map((h, i) => (
-                <div key={i} style={{ fontSize: 11, color: h.excluded ? "#64748b" : "#cbd5e1" }}>
+                <div key={i} style={{ fontSize: 11, color: h.excluded ? "#8b99b5" : "#cbd5e1" }}>
                   {h.excluded ? "✕ " : "• "}
                   <span style={h.excluded ? { textDecoration: "line-through" } : undefined}>{tr(h.text)}</span>
                   {h.excluded && h.exclusion_basis ? ` — ${tr(h.exclusion_basis)}` : ""}
                   {(h.confirm_tests ?? []).length > 0 && !h.excluded && (
-                    <span style={{ color: "#475569", fontFamily: "monospace" }}> [{(h.confirm_tests ?? []).map((ct) => tr(ct)).join(", ")}]</span>
+                    <span style={{ color: "#7b8aa6", fontFamily: "monospace" }}> [{(h.confirm_tests ?? []).map((ct) => tr(ct)).join(", ")}]</span>
                   )}
                 </div>
               ))}
@@ -999,7 +999,7 @@ export function FaStudio({ live, liveState }: { live: Live; liveState: LiveState
               <b style={{ fontSize: 11, color: "#a78bfa" }}>root cause confirmed{c.cause_class ? ` · ${c.cause_class}` : ""}</b>
               <div style={{ fontSize: 11, color: "#ddd6fe", marginTop: 2 }}>{tr(c.root_cause)}</div>
               {c.location && (
-                <div style={{ fontSize: 10, fontFamily: "monospace", color: "#64748b", marginTop: 3 }}>
+                <div style={{ fontSize: 10, fontFamily: "monospace", color: "#8b99b5", marginTop: 3 }}>
                   location: {String((c.location as Record<string, unknown>).ref ?? "—")}
                 </div>
               )}
@@ -1007,11 +1007,11 @@ export function FaStudio({ live, liveState }: { live: Live; liveState: LiveState
           )}
           {(live.faEvents[c.id] ?? []).length > 0 && (
             <div style={{ marginTop: 8, borderLeft: "2px solid #1e293b", paddingLeft: 10 }}>
-              <div style={{ fontSize: 10, color: "#64748b", fontFamily: "monospace", marginBottom: 4 }}>event ledger (append-only)</div>
+              <div style={{ fontSize: 10, color: "#8b99b5", fontFamily: "monospace", marginBottom: 4 }}>event ledger (append-only)</div>
               {(live.faEvents[c.id] ?? []).map((e) => (
                 <div key={e.id} style={{ fontSize: 10.5, marginBottom: 3, color: "#94a3b8" }}>
                   <span style={{ fontFamily: "monospace", color: "#38bdf8" }}>{e.event_type}</span>{" "}
-                  <span style={{ color: "#475569" }}>{e.occurred_at.slice(0, 16).replace("T", " ")} · {e.actor}</span>
+                  <span style={{ color: "#7b8aa6" }}>{e.occurred_at.slice(0, 16).replace("T", " ")} · {e.actor}</span>
                   {e.comment && <span> — {tr(e.comment)}</span>}
                 </div>
               ))}
@@ -1023,7 +1023,7 @@ export function FaStudio({ live, liveState }: { live: Live; liveState: LiveState
         <div key={e.id} style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, marginBottom: 10, background: "#0f172a" }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <b style={{ fontFamily: "monospace", color: "#7dd3fc", fontSize: 12 }}>{e.business_id}</b>
-            <Chip color="#64748b">{e.trigger}</Chip>
+            <Chip color="#8b99b5">{e.trigger}</Chip>
             <Chip color={ECO_STATUS_COLOR[e.status] ?? "#94a3b8"}>{e.status}</Chip>
             {e.design_rev_from && e.design_rev_to && (
               <Chip color="#38bdf8">{e.design_rev_from} → {e.design_rev_to}</Chip>
@@ -1036,21 +1036,21 @@ export function FaStudio({ live, liveState }: { live: Live; liveState: LiveState
           {(e.impact ?? []).length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
               {(e.impact ?? []).map((row, i) => (
-                <Chip key={i} color="#64748b" title={tr(String(row.detail ?? ""))}>
+                <Chip key={i} color="#8b99b5" title={tr(String(row.detail ?? ""))}>
                   {String(row.area ?? "?")}
                 </Chip>
               ))}
             </div>
           )}
           {(e.regression_run_ids ?? []).length > 0 && (
-            <div style={{ fontSize: 10, fontFamily: "monospace", color: "#475569", marginTop: 6 }}>
+            <div style={{ fontSize: 10, fontFamily: "monospace", color: "#7b8aa6", marginTop: 6 }}>
               regression: {(e.regression_run_ids ?? []).join(", ")}
             </div>
           )}
           {e.verification_note && (
             <div style={{ fontSize: 11, color: "#34d399", marginTop: 6 }}>
               ✓ {tr(e.verification_note)}
-              {e.closed_at && <span style={{ color: "#475569", fontFamily: "monospace" }}> · closed {e.closed_at.slice(0, 10)}</span>}
+              {e.closed_at && <span style={{ color: "#7b8aa6", fontFamily: "monospace" }}> · closed {e.closed_at.slice(0, 10)}</span>}
             </div>
           )}
         </div>
@@ -1067,7 +1067,7 @@ const money = (v: number | null | undefined, cur = "KRW") =>
 
 function RestrictedNote() {
   const { t } = useTranslation();
-  return <div style={{ fontSize: 12, color: "#64748b" }}>{t("asic.r2.restricted")}</div>;
+  return <div style={{ fontSize: 12, color: "#8b99b5" }}>{t("asic.r2.restricted")}</div>;
 }
 
 // ── s3 · EPIC B: cost/schedule trade study (CAN_COST — money behind role) ──
@@ -1108,7 +1108,7 @@ export function TradeStudyPanel({ live, liveState }: { live: Live; liveState: Li
                           <tr key={p.option_id}>
                             <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>
                               {p.business_id}
-                              <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>{tr(p.foundry)} · {p.node} · {p.package}</span>
+                              <span style={{ display: "block", fontSize: 9, color: "#8b99b5" }}>{tr(p.foundry)} · {p.node} · {p.package}</span>
                             </td>
                             <td style={td}>
                               {p.nre_total == null
@@ -1156,7 +1156,7 @@ export function ToolRunsPanel({ live, liveState }: { live: Live; liveState: Live
   if (live.toolRuns.length === 0) {
     return (
       <SectionCard title={t("asic.r2.tool.title")} right={<LiveChip state={liveState} />}>
-        <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>
+        <div style={{ fontSize: 12, color: "#8b99b5" }}>— {t("asic.r2.none")}</div>
       </SectionCard>
     );
   }
@@ -1179,7 +1179,7 @@ export function ToolRunsPanel({ live, liveState }: { live: Live; liveState: Live
             {live.toolRuns.map((r) => (
               <tr key={r.id}>
                 <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{r.business_id}</td>
-                <td style={{ ...td, fontFamily: "monospace" }}>{r.tool}<span style={{ display: "block", fontSize: 9, color: "#64748b" }}>{r.tool_version}</span></td>
+                <td style={{ ...td, fontFamily: "monospace" }}>{r.tool}<span style={{ display: "block", fontSize: 9, color: "#8b99b5" }}>{r.tool_version}</span></td>
                 <td style={{ ...td, fontFamily: "monospace" }}>r{r.design_revision}</td>
                 <td style={td}>
                   <Chip color={r.runner_class === "real_adapter" ? "#34d399" : "#fbbf24"}>{r.runner_class}</Chip>
@@ -1209,7 +1209,7 @@ export function TestFlowAnalysisPanel({ live, liveState }: { live: Live; liveSta
   if (!a) {
     return (
       <SectionCard title={t("asic.r2.flow.title")} right={<LiveChip state={liveState} />}>
-        <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>
+        <div style={{ fontSize: 12, color: "#8b99b5" }}>— {t("asic.r2.none")}</div>
       </SectionCard>
     );
   }
@@ -1233,7 +1233,7 @@ export function TestFlowAnalysisPanel({ live, liveState }: { live: Live; liveSta
             {targets.map(([target, p]) => (
               <tr key={p.flow_id}>
                 <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>
-                  {target} <span style={{ color: "#64748b" }}>r{p.program_revision}</span>
+                  {target} <span style={{ color: "#8b99b5" }}>r{p.program_revision}</span>
                 </td>
                 <td style={{ ...td, fontFamily: "monospace" }}>{p.silicon_revision}</td>
                 <td style={{ ...td, fontFamily: "monospace" }}>{p.totals.item_count}</td>
@@ -1263,7 +1263,7 @@ export function TestFlowAnalysisPanel({ live, liveState }: { live: Live; liveSta
           <b>{t("asic.r2.flow.cross")}</b>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
             {a.cross_target.duplicates.map((d) => (
-              <Chip key={d.name} color={d.drop_candidate ? "#fbbf24" : "#64748b"} title={tr(d.reason)}>
+              <Chip key={d.name} color={d.drop_candidate ? "#fbbf24" : "#8b99b5"} title={tr(d.reason)}>
                 {d.drop_candidate ? `⚠ ${tr(d.name)}` : tr(d.name)}
               </Chip>
             ))}
@@ -1290,12 +1290,12 @@ export function SupplyChainPanel({ live, liveState }: { live: Live; liveState: L
   return (
     <SectionCard title={t("asic.r2.chain.title")} right={<LiveChip state={liveState} />}>
       {live.partners.length === 0 && live.travelers.length === 0 && live.waferMaps.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>
+        <div style={{ fontSize: 12, color: "#8b99b5" }}>— {t("asic.r2.none")}</div>
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
           {live.partners.length > 0 && (
             <div>
-              <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{t("asic.r2.chain.partners")}</div>
+              <div style={{ fontSize: 10, color: "#7b8aa6", marginBottom: 4 }}>{t("asic.r2.chain.partners")}</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {live.partners.map((p) => (
                   <Chip key={p.id} color={p.status === "approved" ? "#34d399" : p.status === "suspended" ? "#f87171" : "#fbbf24"}>
@@ -1307,7 +1307,7 @@ export function SupplyChainPanel({ live, liveState }: { live: Live; liveState: L
           )}
           {live.travelers.length > 0 && (
             <div style={{ overflowX: "auto" }}>
-              <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{t("asic.r2.chain.lots")}</div>
+              <div style={{ fontSize: 10, color: "#7b8aa6", marginBottom: 4 }}>{t("asic.r2.chain.lots")}</div>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
@@ -1322,7 +1322,7 @@ export function SupplyChainPanel({ live, liveState }: { live: Live; liveState: L
                     <tr key={lt.id}>
                       <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>
                         {lt.lot_ref}
-                        <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>{lt.status}</span>
+                        <span style={{ display: "block", fontSize: 9, color: "#8b99b5" }}>{lt.status}</span>
                       </td>
                       <td style={{ ...td, fontFamily: "monospace", fontSize: 10 }}>
                         {lt.silicon_revision} / {lt.mask_rev} / {lt.package_rev}
@@ -1333,7 +1333,7 @@ export function SupplyChainPanel({ live, liveState }: { live: Live; liveState: L
                             {i > 0 && " → "}{s.partner_business_id}:{s.step}
                           </span>
                         ))}
-                        <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>
+                        <span style={{ display: "block", fontSize: 9, color: "#8b99b5" }}>
                           {t("asic.r2.chain.current")}: {partnerName(lt.current_partner_id)}
                         </span>
                       </td>
@@ -1346,7 +1346,7 @@ export function SupplyChainPanel({ live, liveState }: { live: Live; liveState: L
           )}
           {live.waferMaps.length > 0 && (
             <div style={{ overflowX: "auto" }}>
-              <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{t("asic.r2.chain.maps")}</div>
+              <div style={{ fontSize: 10, color: "#7b8aa6", marginBottom: 4 }}>{t("asic.r2.chain.maps")}</div>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
@@ -1362,7 +1362,7 @@ export function SupplyChainPanel({ live, liveState }: { live: Live; liveState: L
                     <tr key={m.id}>
                       <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>
                         {m.wafer_ref ?? m.business_id}
-                        {m.lot_ref && <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>lot {m.lot_ref}</span>}
+                        {m.lot_ref && <span style={{ display: "block", fontSize: 9, color: "#8b99b5" }}>lot {m.lot_ref}</span>}
                       </td>
                       <td style={{ ...td, fontFamily: "monospace" }}>{m.analysis ? `${m.analysis.yield_pct}%` : "—"}</td>
                       <td style={{ ...td, fontFamily: "monospace" }}>{m.analysis ? `${m.analysis.retest_rate_pct}%` : "—"}</td>
@@ -1439,11 +1439,11 @@ export function EvidenceReportPanel({ tplId }: { tplId: string }) {
 
   return (
     <SectionCard title={t("asic.r2.report.title")} right={<Chip color="#38bdf8">{lang}</Chip>}>
-      {state === "loading" && <div style={{ fontSize: 12, color: "#64748b" }}>…</div>}
+      {state === "loading" && <div style={{ fontSize: 12, color: "#8b99b5" }}>…</div>}
       {state === "error" && <div style={{ fontSize: 12, color: "#f87171" }}>{t("asic.r2.report.error")}</div>}
       {state === "ready" && report && (
         <div>
-          <div style={{ fontSize: 10, color: "#475569", marginBottom: 8, fontFamily: "monospace" }}>
+          <div style={{ fontSize: 10, color: "#7b8aa6", marginBottom: 8, fontFamily: "monospace" }}>
             {report.title} · v{report.report_version} · {report.generated_at}
           </div>
           {report.sections.map((s) => (
@@ -1480,7 +1480,7 @@ const ACT_BTN: React.CSSProperties = {
 
 const RISK_COLOR: Record<string, string> = { high: "#f87171", medium: "#fbbf24", low: "#94a3b8" };
 const STATUS_COLOR: Record<string, string> = {
-  open: "#fbbf24", resolved: "#34d399", invalidated: "#f87171", superseded: "#64748b",
+  open: "#fbbf24", resolved: "#34d399", invalidated: "#f87171", superseded: "#8b99b5",
   submitted: "#fbbf24", approved: "#34d399", rejected: "#f87171",
 };
 const CE_ROLES = new Set(["system_architect", "electrical_asic_engineer"]); // CAN_DESIGN
@@ -1528,10 +1528,10 @@ export function ConcurrentEngineeringPanel({
 
   return (
     <SectionCard title={t("asic.r3.ce.title")} right={<LiveChip state={liveState} />}>
-      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>{t("asic.r3.ce.hint")}</div>
+      <div style={{ fontSize: 11, color: "#8b99b5", marginBottom: 8 }}>{t("asic.r3.ce.hint")}</div>
       {err && <div style={{ fontSize: 11, color: "#f87171", marginBottom: 8 }}>⚠ {err}</div>}
       <div style={{ display: "grid", gap: 8 }}>
-        {live.assumptions.length === 0 && <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>}
+        {live.assumptions.length === 0 && <div style={{ fontSize: 12, color: "#8b99b5" }}>— {t("asic.r2.none")}</div>}
         {live.assumptions.map((a) => {
           const scans = live.scans[a.id] ?? [];
           const openScans = openScansOf(a);
@@ -1547,7 +1547,7 @@ export function ConcurrentEngineeringPanel({
               <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
                 {tr(a.detail)}
               </div>
-              <div style={{ fontSize: 10, color: "#64748b", marginTop: 4, display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 10, color: "#8b99b5", marginTop: 4, display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <span>{t("asic.r3.ce.confidence")}: {(a.confidence * 100).toFixed(0)}% ({t("asic.r3.ce.heuristic")})</span>
                 <span>{t("asic.r3.ce.owner")}: {a.owner}</span>
                 {a.due_at && <span>{t("asic.r3.ce.due")}: {a.due_at.slice(0, 10)}</span>}
@@ -1566,7 +1566,7 @@ export function ConcurrentEngineeringPanel({
               )}
               {/* 영향 탐색 — findings는 pending→done→clear 순서로만 종결된다 */}
               <div style={{ marginTop: 8 }}>
-                <button style={{ ...ACT_BTN, border: "1px solid #475569", background: "transparent", color: "#94a3b8" }}
+                <button style={{ ...ACT_BTN, border: "1px solid #7b8aa6", background: "transparent", color: "#94a3b8" }}
                   onClick={() => setOpenScan((m) => ({ ...m, [a.id]: !m[a.id] }))}>
                   {t("asic.r3.ce.scans")} ({scans.length}){openScans.length > 0 ? ` · ${t("asic.r3.ce.openCount")} ${openScans.length}` : ""}
                 </button>
@@ -1576,7 +1576,7 @@ export function ConcurrentEngineeringPanel({
                       <div key={s.id} style={{ border: "1px solid #141c2e", borderRadius: 6, padding: 8 }}>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 11 }}>
                           <b style={{ fontFamily: "monospace", color: "#a78bfa" }}>{s.business_id}</b>
-                          <span style={{ color: "#64748b" }}>{t(`asic.r3.ce.trigger.${s.trigger}` as never)}</span>
+                          <span style={{ color: "#8b99b5" }}>{t(`asic.r3.ce.trigger.${s.trigger}` as never)}</span>
                           <Chip color={s.status === "open" ? "#fbbf24" : "#34d399"}>{s.status}</Chip>
                           {s.status === "open" && canDesign && openScans.length === 1 && s.findings.every((f) => f.status === "done") && (
                             <button style={ACT_BTN} onClick={() => act("clear", () => asicApi.clearScan(s.id, idem()))}>
@@ -1601,7 +1601,7 @@ export function ConcurrentEngineeringPanel({
                                       ? <button style={ACT_BTN} onClick={() => act("done", () => asicApi.findingDone(s.id, f.ref, t("asic.r3.ce.doneNote"), idem()))}>
                                           {t("asic.r3.ce.markDone")}
                                         </button>
-                                      : <Chip color="#64748b">{t("asic.r3.ce.pending")}</Chip>}
+                                      : <Chip color="#8b99b5">{t("asic.r3.ce.pending")}</Chip>}
                                 </td>
                               </tr>
                             ))}
@@ -1633,7 +1633,7 @@ export function ConcurrentEngineeringPanel({
               )}
               {/* 변경 이력 — append-only ledger (created/field_changed/resolved…) */}
               <div style={{ marginTop: 8 }}>
-                <button style={{ ...ACT_BTN, border: "1px solid #475569", background: "transparent", color: "#94a3b8" }}
+                <button style={{ ...ACT_BTN, border: "1px solid #7b8aa6", background: "transparent", color: "#94a3b8" }}
                   onClick={() => {
                     if (ev) { setEvents((m) => ({ ...m, [a.id]: null })); return; }
                     asicApi.listAssumptionEvents(a.id).then((rows) => setEvents((m) => ({ ...m, [a.id]: rows })));
@@ -1659,13 +1659,13 @@ export function ConcurrentEngineeringPanel({
       {/* 편차 — 생략 활동은 숨겨지지 않고 승인된 편차로 조회된다 (수용기준 3) */}
       <div style={{ fontSize: 12, color: "#7dd3fc", fontWeight: 600, margin: "14px 0 6px" }}>{t("asic.r3.ce.deviations")}</div>
       <div style={{ display: "grid", gap: 8 }}>
-        {live.deviations.length === 0 && <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>}
+        {live.deviations.length === 0 && <div style={{ fontSize: 12, color: "#8b99b5" }}>— {t("asic.r2.none")}</div>}
         {live.deviations.map((d) => (
           <div key={d.id} style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, background: "#0f172a" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <b style={{ fontFamily: "monospace", color: "#7dd3fc", fontSize: 12 }}>{d.business_id}</b>
               <Chip color={STATUS_COLOR[d.status] ?? "#94a3b8"}>{d.status}</Chip>
-              <span style={{ fontSize: 10, color: "#64748b" }}>
+              <span style={{ fontSize: 10, color: "#8b99b5" }}>
                 {d.requested_by}{d.decided_by ? ` → ${d.decided_by}` : ""}
                 {d.decided_at ? ` · ${d.decided_at.slice(0, 16).replace("T", " ")}` : ""}
               </span>
@@ -1686,7 +1686,7 @@ export function ConcurrentEngineeringPanel({
             </div>
             <div style={{ fontSize: 11, color: "#94a3b8" }}>{tr(d.rationale)}</div>
             <div style={{ fontSize: 11, color: "#fbbf24" }}>⚠ {t("asic.r3.ce.residual")}: {tr(d.residual_risk)}</div>
-            {d.note && <div style={{ fontSize: 10, color: "#64748b" }}>{tr(d.note)}</div>}
+            {d.note && <div style={{ fontSize: 10, color: "#8b99b5" }}>{tr(d.note)}</div>}
           </div>
         ))}
       </div>
@@ -1764,7 +1764,7 @@ export function CopilotPanel({
 
   return (
     <SectionCard title={t("asic.r3.copilot.title")} right={<LiveChip state={liveState} />}>
-      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>{t("asic.r3.copilot.hint")}</div>
+      <div style={{ fontSize: 11, color: "#8b99b5", marginBottom: 8 }}>{t("asic.r3.copilot.hint")}</div>
       {err && <div style={{ fontSize: 11, color: "#f87171", marginBottom: 8 }}>⚠ {err}</div>}
       {/* 실행 바 — 유스케이스 7종 (근거 없는 제안은 엔진이 만들지 않는다) */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
@@ -1773,7 +1773,7 @@ export function CopilotPanel({
             onClick={() => setUsecase(u)}
             style={{
               ...ACT_BTN,
-              ...(usecase === u ? {} : { border: "1px solid #475569", background: "transparent", color: "#94a3b8" }),
+              ...(usecase === u ? {} : { border: "1px solid #7b8aa6", background: "transparent", color: "#94a3b8" }),
             }}>
             {t(`asic.r3.copilot.uc.${u}` as never)}
           </button>
@@ -1804,7 +1804,7 @@ export function CopilotPanel({
         {!canCopilot && <span style={{ fontSize: 10, color: "#fbbf24", marginLeft: 8 }}>{t("asic.r3.copilot.roleNeeded")}</span>}
       </div>
       {/* 최근 상호작록 — 감사 재현 메타데이터(input_hash·engine_version) 표시 */}
-      {recent.length === 0 && <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>}
+      {recent.length === 0 && <div style={{ fontSize: 12, color: "#8b99b5" }}>— {t("asic.r2.none")}</div>}
       <div style={{ display: "grid", gap: 8 }}>
         {recent.map((it) => {
           const r = it.result;
@@ -1813,10 +1813,10 @@ export function CopilotPanel({
             <div key={it.id} style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, background: "#0f172a" }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <Chip color="#38bdf8">{t(`asic.r3.copilot.uc.${it.usecase}` as never)}</Chip>
-                <span style={{ fontSize: 10, color: "#64748b", fontFamily: "monospace" }}>
+                <span style={{ fontSize: 10, color: "#8b99b5", fontFamily: "monospace" }}>
                   {it.engine_version} · {it.input_hash.slice(0, 10)}… · {it.created_by}
                 </span>
-                <span style={{ fontSize: 10, color: "#64748b" }}>
+                <span style={{ fontSize: 10, color: "#8b99b5" }}>
                   {t("asic.r3.copilot.confidence")}: {(r.confidence * 100).toFixed(0)}% ({t("asic.r3.ce.heuristic")})
                 </span>
                 {r.abstain && <Chip color={ABSTAIN_COLOR}>{t("asic.r3.copilot.abstain")}: {t(`asic.r3.copilot.abstainReason.${r.abstain_reason}` as never)}</Chip>}
@@ -1829,7 +1829,7 @@ export function CopilotPanel({
               )}
               {(r.facts ?? []).length > 0 && (
                 <div style={{ marginTop: 6 }}>
-                  <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{t("asic.r3.copilot.facts")}</div>
+                  <div style={{ fontSize: 10, color: "#8b99b5", fontWeight: 600 }}>{t("asic.r3.copilot.facts")}</div>
                   {r.facts.map((f, i) => (
                     <div key={i} style={{ fontSize: 11, color: "#94a3b8", paddingLeft: 10 }}>· {tr(f)}</div>
                   ))}
@@ -1844,7 +1844,7 @@ export function CopilotPanel({
               )}
               {(r.proposals ?? []).length > 0 && (
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
-                  <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{t("asic.r3.copilot.proposals")}</div>
+                  <div style={{ fontSize: 10, color: "#8b99b5", fontWeight: 600 }}>{t("asic.r3.copilot.proposals")}</div>
                   {r.proposals.map((p) => {
                     const k = `${it.id}:${p.pid}`;
                     const d = diffs[k];

@@ -37,14 +37,14 @@ const card: React.CSSProperties = {
 };
 
 function StatusDot({ state }: { state: StageState }) {
-  const color = state === "ok" ? "#34d399" : state === "failed" ? "#f87171" : state === "running" ? "#facc15" : "#475569";
+  const color = state === "ok" ? "#34d399" : state === "failed" ? "#f87171" : state === "running" ? "#facc15" : "#7b8aa6";
   return <span style={{ width: 8, height: 8, borderRadius: 8, background: color, display: "inline-block" }} />;
 }
 
 function Kpi({ label, value, warn }: { label: string; value: string | number; warn?: boolean }) {
   return (
     <div style={{ background: "#0f172a", borderRadius: 6, padding: "6px 10px", minWidth: 86 }}>
-      <div style={{ fontSize: 10, color: "#64748b", whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ fontSize: 10, color: "#8b99b5", whiteSpace: "nowrap" }}>{label}</div>
       <div style={{ fontSize: 15, fontFamily: "monospace", color: warn ? "#f87171" : "#67e8f9" }}>{value}</div>
     </div>
   );
@@ -282,7 +282,7 @@ export function EdaTraining() {
                   <StatusDot state={s.state} />
                   {s.label}
                 </button>
-                {i < stages.length - 1 && <span style={{ color: "#475569", fontSize: 12 }}>→</span>}
+                {i < stages.length - 1 && <span style={{ color: "#7b8aa6", fontSize: 12 }}>→</span>}
               </span>
             ))}
             <span style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto", fontSize: 11, color: "#94a3b8" }}>
@@ -306,7 +306,7 @@ export function EdaTraining() {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <Kpi label={t("eda.kpi.errors")} value={lint.errors.length} warn={lint.errors.length > 0} />
                 <Kpi label={t("eda.kpi.warnings")} value={lint.warnings.length} warn={lint.warnings.length > 0} />
-                <span style={{ fontSize: 11, color: "#64748b", alignSelf: "center", fontFamily: "monospace" }}>{t("eda.log")}: {lint.log.split("\n").slice(-2, -1)[0]}</span>
+                <span style={{ fontSize: 11, color: "#8b99b5", alignSelf: "center", fontFamily: "monospace" }}>{t("eda.log")}: {lint.log.split("\n").slice(-2, -1)[0]}</span>
               </div>
               {(lint.errors.length > 0 || lint.warnings.length > 0) && (
                 <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 11, color: "#fca5a5" }}>
@@ -433,7 +433,7 @@ export function EdaTraining() {
                 </select>
               </label>
             </div>
-            <div style={{ fontSize: 10, color: "#64748b", marginTop: 6 }}>{t("eda.fpHint")}</div>
+            <div style={{ fontSize: 10, color: "#8b99b5", marginTop: 6 }}>{t("eda.fpHint")}</div>
           </div>
         </div>
       </div>
@@ -493,7 +493,7 @@ export function EdaTraining() {
             ◈ {t("eda.view3dChip")}: {silProfileOf(mission.slug).chip} · {mission.topModule}
             {synth?.status === "success" ? ` · ${synth.gateCount} gates` : ""}
           </span>
-          <span style={{ fontSize: 11, color: "#64748b" }}>{t("eda.view3dHint")}</span>
+          <span style={{ fontSize: 11, color: "#8b99b5" }}>{t("eda.view3dHint")}</span>
         </div>
         <div style={{ height: 430 }}>
           <Eda3DViewer scene={scene} />

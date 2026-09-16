@@ -31,7 +31,7 @@ export function Scatter({
       <line x1={P} y1={height - 22} x2={W - 8} y2={height - 22} stroke={AX} />
       <line x1={P} y1={12} x2={P} y2={height - 22} stroke={AX} />
       {/* y = x reference: prediction should land on measurement */}
-      <line x1={x(a)} y1={y(a)} x2={x(b)} y2={y(b)} stroke="#475569" strokeDasharray="4 3" />
+      <line x1={x(a)} y1={y(a)} x2={x(b)} y2={y(b)} stroke="#7b8aa6" strokeDasharray="4 3" />
       {points.map(([px, m], i) => (
         <circle key={i} cx={x(px)} cy={y(m)} r={2.6} fill="#22d3ee" opacity={0.85} />
       ))}
@@ -188,7 +188,7 @@ export function SpcChart({
       <line x1={P} y1={height - 20} x2={W - 10} y2={height - 20} stroke={AX} />
       <line x1={P} y1={y(ucl)} x2={W - 10} y2={y(ucl)} stroke="#f87171" strokeDasharray="4 3" />
       <line x1={P} y1={y(lcl)} x2={W - 10} y2={y(lcl)} stroke="#f87171" strokeDasharray="4 3" />
-      <line x1={P} y1={y(target)} x2={W - 10} y2={y(target)} stroke="#475569" />
+      <line x1={P} y1={y(target)} x2={W - 10} y2={y(target)} stroke="#7b8aa6" />
       <path d={path} fill="none" stroke="#a78bfa" strokeWidth={1.6} />
       {flat.map((v, i) => (
         <circle key={i} cx={x(i)} cy={y(v)} r={violIdx.includes(i) ? 4 : 2.4} fill={violIdx.includes(i) ? "#f87171" : "#a78bfa"} />

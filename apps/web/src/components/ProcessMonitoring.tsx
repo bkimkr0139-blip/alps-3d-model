@@ -100,7 +100,7 @@ function ChartSvg({ chart }: { chart: ControlChart }) {
       {[hi, lo].map((v, i) => (
         <g key={i}>
           <line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke="#1e293b" strokeWidth={1} />
-          <text x={PAD.l - 6} y={y(v) + 3.5} textAnchor="end" fontSize={10} fill="#64748b" fontFamily={fontMono}>{fmt(v)}</text>
+          <text x={PAD.l - 6} y={y(v) + 3.5} textAnchor="end" fontSize={10} fill="#8b99b5" fontFamily={fontMono}>{fmt(v)}</text>
         </g>
       ))}
       {chart.center_line !== null && (

@@ -49,7 +49,9 @@ export const text = {
   body: "#e2e8f0",
   bright: "#f1f5f9",
   muted: "#94a3b8",
-  faint: "#64748b",
+  // Tertiary text clears WCAG 4.5:1 on every surface in the depth model
+  // (page, panel, raise) — the full-app contrast audit reads these.
+  faint: "#8b99b5",
 } as const;
 
 export const font = {
@@ -70,7 +72,7 @@ export const status = {
   violation: "#f87171", // reject, out-of-window, blocked, expired
   synthetic: "#a78bfa", // ◈ synthetic fixture / sysmodel tab
   info: "#38bdf8", // backend-backed info cyan
-  idle: "#64748b", // no data / idle
+  idle: "#8b99b5", // no data / idle (kept ≥4.5:1 as chip text)
 } as const;
 
 export const accent = {

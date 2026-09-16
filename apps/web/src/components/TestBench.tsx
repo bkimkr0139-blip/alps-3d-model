@@ -623,12 +623,12 @@ function Scope({ family, pressure, running }: { family: BenchFamily; pressure: n
       ctx.fillText(`CH1 ${(s.v1 * VCC).toFixed(2)} V`, mL + pw, 14);
       ctx.fillStyle = "#38bdf8";
       ctx.fillText(`CH2 ${(s.v2 * VCC).toFixed(2)} V`, mL + pw - 74, 14);
-      ctx.fillStyle = "#64748b";
+      ctx.fillStyle = "#8b99b5";
       ctx.textAlign = "center";
       for (let i = 0; i <= cols; i += 2) {
         ctx.fillText(`${((cols - i) * 60) / 10}ms`, mL + (pw * i) / cols, h - 6);
       }
-      ctx.fillStyle = inputRef.current.running ? "#22c55e" : "#64748b";
+      ctx.fillStyle = inputRef.current.running ? "#22c55e" : "#8b99b5";
       ctx.textAlign = "left";
       ctx.fillText(inputRef.current.running ? "● RUN" : "○ STOP", 6, 14);
     };
@@ -682,7 +682,7 @@ function Scope({ family, pressure, running }: { family: BenchFamily; pressure: n
           {led("#38bdf8", running)}
           <span style={{ color: "#38bdf8" }}>CH2</span>
         </span>
-        <span style={{ marginLeft: "auto", fontSize: 10.5, fontFamily: "monospace", color: running ? "#22c55e" : "#64748b" }}>
+        <span style={{ marginLeft: "auto", fontSize: 10.5, fontFamily: "monospace", color: running ? "#22c55e" : "#8b99b5" }}>
           {running ? "● RUN" : "○ STOP"}
         </span>
       </div>

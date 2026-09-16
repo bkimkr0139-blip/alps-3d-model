@@ -286,12 +286,12 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 <GateDot status={g.status} />
                 <span style={{ fontSize: 12, fontWeight: active ? 600 : 400, flex: 1 }}>
                   {t(`asic.stage.${s.id}` as never)}
-                  <span style={{ display: "block", fontSize: 9, color: "#64748b" }}>{s.ws}</span>
+                  <span style={{ display: "block", fontSize: 9, color: "#8b99b5" }}>{s.ws}</span>
                 </span>
               </button>
             );
           })}
-          <div style={{ fontSize: 9, color: "#475569", padding: "6px 4px", lineHeight: 1.5 }}>{t("asic.menuHint")}</div>
+          <div style={{ fontSize: 9, color: "#7b8aa6", padding: "6px 4px", lineHeight: 1.5 }}>{t("asic.menuHint")}</div>
         </div>
 
         {/* ── Stage panel ── */}
@@ -323,7 +323,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                         <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{r.id}</td>
                         <td style={td}>
                           {pickText(r.text, lang)}
-                          <span style={{ display: "block", fontSize: 9, color: "#475569" }}>{pickText(r.source, lang)}</span>
+                          <span style={{ display: "block", fontSize: 9, color: "#7b8aa6" }}>{pickText(r.source, lang)}</span>
                         </td>
                         <td style={td}>{t(`asic.cat.${r.category}` as never)}</td>
                         <td style={td}>{r.priority}</td>
@@ -352,7 +352,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 <span>
                   {t("asic.s1.conflict")}: <b style={{ fontFamily: "monospace", color: reqs.some((r) => r.status === "draft") ? "#f87171" : "#34d399" }}>{reqs.filter((r) => r.status === "draft").length}</b>
                 </span>
-                <span style={{ color: "#475569" }}>{t("asic.s1.gate")}: REQ_TRACE_100</span>
+                <span style={{ color: "#7b8aa6" }}>{t("asic.s1.gate")}: REQ_TRACE_100</span>
               </div>
             </SectionCard>
           )}
@@ -386,7 +386,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                       NRE ×{o.nreIdx.toFixed(2)}
                     </div>
                     <div style={{ marginTop: 6 }}>
-                      {optId === o.id ? <Chip color="#34d399">✓ {t("asic.s2.approved")}</Chip> : <Chip color="#64748b">{t("asic.s2.clickApprove")}</Chip>}
+                      {optId === o.id ? <Chip color="#34d399">✓ {t("asic.s2.approved")}</Chip> : <Chip color="#8b99b5">{t("asic.s2.clickApprove")}</Chip>}
                     </div>
                   </div>
                 ))}
@@ -431,7 +431,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                       <td style={td}>{pickL(m.text, lang)}</td>
                       <td style={{ ...td, fontFamily: "monospace", color: "#94a3b8", width: 100 }}>{m.due}</td>
                       <td style={td}>
-                        <Chip color={m.status === "done" ? "#34d399" : "#64748b"}>{m.status}</Chip>
+                        <Chip color={m.status === "done" ? "#34d399" : "#8b99b5"}>{m.status}</Chip>
                       </td>
                     </tr>
                   ))}
@@ -456,7 +456,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                     {t("asic.act.sign")} (BASELINE_SIGNED)
                   </button>
                 )}
-                <div style={{ fontSize: 10, color: "#475569", marginTop: 6 }}>{t("asic.s3.sodNote")}</div>
+                <div style={{ fontSize: 10, color: "#7b8aa6", marginTop: 6 }}>{t("asic.s3.sodNote")}</div>
               </div>
               <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12 }}>
                 <thead>
@@ -485,7 +485,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 title={`${t("asic.stage.s4")} — ${t("asic.s4.design")}`}
                 right={
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {ranAt && <span style={{ fontSize: 10, color: "#475569", fontFamily: "monospace" }}>{ranAt}</span>}
+                    {ranAt && <span style={{ fontSize: 10, color: "#7b8aa6", fontFamily: "monospace" }}>{ranAt}</span>}
                     <ConfidenceBadge kind="educational_estimate" />
                   </div>
                 }
@@ -583,7 +583,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 <div style={{ height: 360 }}>
                   <Eda3DViewer scene={pkgScene} />
                 </div>
-                <div style={{ fontSize: 10, color: "#475569", marginTop: 6 }}>{t("asic.s5.pkgNote")}</div>
+                <div style={{ fontSize: 10, color: "#7b8aa6", marginTop: 6 }}>{t("asic.s5.pkgNote")}</div>
               </SectionCard>
               <SectionCard
                 title={t("asic.s5.corr")}
@@ -629,11 +629,11 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                           ))}
                         </tbody>
                       </table>
-                      <div style={{ fontSize: 10, color: "#475569", marginTop: 6 }}>{t("asic.s5.corrNote")}</div>
+                      <div style={{ fontSize: 10, color: "#7b8aa6", marginTop: 6 }}>{t("asic.s5.corrNote")}</div>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: "#64748b" }}>{t("asic.s5.corrHint")}</div>
+                  <div style={{ fontSize: 12, color: "#8b99b5" }}>{t("asic.s5.corrHint")}</div>
                 )}
               </SectionCard>
               <EquipmentRunsPanel live={live} liveState={liveState} />
@@ -643,7 +643,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
           {stage === "s6" && (
             <>
             <SectionCard title={`${t("asic.stage.s6")} — ECO & Test Program`}>
-              {ecos.length === 0 && <div style={{ fontSize: 12, color: "#64748b" }}>{t("asic.s6.none")}</div>}
+              {ecos.length === 0 && <div style={{ fontSize: 12, color: "#8b99b5" }}>{t("asic.s6.none")}</div>}
               {ecos.map((e) => (
                 <div key={e.id} style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, marginBottom: 8, background: "#0f172a" }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -703,7 +703,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                         <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{r.group}</td>
                         <td style={td}>
                           {pickText(r.method, lang)}
-                          {r.note && <span style={{ display: "block", fontSize: 9, color: r.status === "fail" ? "#f87171" : "#64748b" }}>{pickL(r.note, lang)}</span>}
+                          {r.note && <span style={{ display: "block", fontSize: 9, color: r.status === "fail" ? "#f87171" : "#8b99b5" }}>{pickL(r.note, lang)}</span>}
                         </td>
                         <td style={td}>{pickText(r.cond, lang)}</td>
                         <td style={{ ...td, fontFamily: "monospace" }}>{r.duration}</td>
@@ -735,7 +735,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   </tbody>
                 </table>
               </div>
-              <div style={{ fontSize: 10, color: "#475569", marginTop: 8 }}>{t("asic.s7.note")}</div>
+              <div style={{ fontSize: 10, color: "#7b8aa6", marginTop: 8 }}>{t("asic.s7.note")}</div>
             </SectionCard>
             <SafetyTracePanel live={live} liveState={liveState} />
             </>
@@ -765,9 +765,9 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                           <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{e.id}</td>
                           <td style={td}>{pickL(e.kind, lang)}</td>
                           <td style={{ ...td, fontFamily: "monospace" }}>{e.rev}</td>
-                          <td style={{ ...td, fontFamily: "monospace", color: "#475569" }}>{eduHash(e.id + e.rev)}…</td>
+                          <td style={{ ...td, fontFamily: "monospace", color: "#7b8aa6" }}>{eduHash(e.id + e.rev)}…</td>
                           <td style={td}>
-                            <Chip color={e.classification === "CUSTOMER_CONFIDENTIAL" ? "#f87171" : "#64748b"} title={t("asic.s8.clsNote")}>
+                            <Chip color={e.classification === "CUSTOMER_CONFIDENTIAL" ? "#f87171" : "#8b99b5"} title={t("asic.s8.clsNote")}>
                               {e.classification}
                             </Chip>
                           </td>
@@ -800,7 +800,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                       {READINESS_LEVELS.map((l) => {
                         const reached = l.reachable && gates.s8.status === "pass" ? l.key === "controlled_pilot" : l.key === "education_only";
                         return (
-                          <Chip key={l.key} color={reached ? "#34d399" : l.reachable ? "#64748b" : "#7f1d1d"}>
+                          <Chip key={l.key} color={reached ? "#34d399" : l.reachable ? "#8b99b5" : "#7f1d1d"}>
                             {reached ? "● " : l.reachable ? "○ " : "✕ "}
                             {l.key}
                           </Chip>
@@ -900,7 +900,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                     </tbody>
                   </table>
                 </div>
-                <div style={{ fontSize: 10, color: "#475569", marginTop: 8 }}>{t("asic.s9.note")}</div>
+                <div style={{ fontSize: 10, color: "#7b8aa6", marginTop: 8 }}>{t("asic.s9.note")}</div>
               </SectionCard>
             </>
           )}
@@ -920,7 +920,7 @@ export function AsicProgram() {
     <div style={{ height: "100%", overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
         <h2 style={{ margin: 0, fontSize: 16 }}>{t("asic.title")}</h2>
-        <span style={{ fontSize: 12, color: "#64748b" }}>{t("asic.subtitle")}</span>
+        <span style={{ fontSize: 12, color: "#8b99b5" }}>{t("asic.subtitle")}</span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
         {ASIC_TEMPLATES.map((x) => (

@@ -5,7 +5,7 @@ import { useTwinStore } from "../store";
 import { seedTr } from "../lib/seedL10n";
 
 const SAFETY_COLOR: Record<string, string> = {
-  QM: "#64748b",
+  QM: "#8b99b5",
   ASIL_A: "#22c55e",
   ASIL_B: "#eab308",
   ASIL_C: "#f97316",
@@ -42,8 +42,11 @@ export function RequirementsPanel({
           <div style={{ display: "flex", gap: 6, marginTop: 4, fontSize: 11 }}>
             <span
               style={{
-                background: SAFETY_COLOR[r.safety_class] ?? "#64748b",
-                color: "white",
+                background: SAFETY_COLOR[r.safety_class] ?? "#8b99b5",
+                // Bright badge fills — dark text keeps ≥4.5:1 (white fails
+                // on QM gray/ASIL_A green; caught by the contrast audit).
+                color: "#0b1220",
+                fontWeight: 600,
                 padding: "1px 6px",
                 borderRadius: 4,
               }}

@@ -110,7 +110,7 @@ export function Eda3DViewer({ scene }: { scene: EdaScene | null }) {
 
   if (!scene) {
     return (
-      <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#64748b", fontSize: 13 }}>
+      <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#8b99b5", fontSize: 13 }}>
         {t("eda.view3d.empty")}
       </div>
     );
@@ -247,7 +247,7 @@ export function Eda3DViewer({ scene }: { scene: EdaScene | null }) {
                 borderRadius: 10,
                 border: "1px solid #334155",
                 background: "rgba(2,6,23,0.72)",
-                color: off ? "#475569" : "#cbd5e1",
+                color: off ? "#7b8aa6" : "#cbd5e1",
                 cursor: "pointer",
                 textDecoration: off ? "line-through" : "none",
               }}

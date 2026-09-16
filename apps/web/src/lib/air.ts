@@ -196,7 +196,7 @@ export function dcThresholdFf(cfg: AsicConfigPayload, counts: number): number {
 }
 
 export const AIR_STATE_COLOR: Record<AirState, string> = {
-  IDLE: "#64748b",
+  IDLE: "#8b99b5",
   NEAR: "#38bdf8",
   TOUCH: "#f97316",
 };

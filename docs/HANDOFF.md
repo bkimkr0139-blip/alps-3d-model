@@ -2,8 +2,9 @@
 
 > **이 문서의 목적**: 이 저장소에서 개발 세션(사람 또는 Claude)이 맥락 없이
 > 병렬로 작업을 이어받을 수 있도록 현재 상태·실행 방법·규칙·남은 작업을 한
-> 문서에 정리한다. 최종 갱신: 2026-09-16 (UI/UX 3D-트윈 퍼스트 고도화 완료 —
-> 사용자 브라우저 테스트 대기 중, **아래 §0 핸드오프 상태 먼저 읽을 것**).
+> 문서에 정리한다. 최종 갱신: 2026-09-16 (UI/UX 3D-트윈 퍼스트 고도화 +
+> S04 실물 재질·상용 수준 프리미엄 UI 완료 — 사용자 브라우저 테스트 대기 중,
+> **아래 §0 핸드오프 상태 먼저 읽을 것**).
 
 ## 0. 지금 세션 핸드오프 상태 (2026-09-16, 다음 세션이 먼저 읽을 것)
 
@@ -11,9 +12,10 @@
 실제 제품·부품·장비의 3D 디지털 트윈을 보고 체험하고 활용하는 화면으로")에
 따른 전면 개편. 계획 파일
 `~/.claude/plans/cosmic-riding-phoenix.md`의 W1~W6 전부 완료 + 실행 중
-사용자 추가 지시 2건(공정 트윈 실사화, ASIC ⑤ 단계 템플릿별 패키지 모델)
-까지 반영. **커밋은 로컬 `main`에만 있음 — push는 사용자가 직접**:
-`cd /Users/wizbase/works/alps && git push` (classifier가 main push 차단).
+사용자 추가 지시(공정 트윈 실사화, ASIC ⑤ 단계 템플릿별 패키지 모델, S04
+실물 재질, 배경 토글, 상용 수준 프리미엄 UI)까지 반영. **전부 push 완료**
+(origin/main 동기 — 세션에서 `cd /Users/wizbase/works/alps && git push`
+로 푸시됨).
 
 이번 세션 커밋 (전부 웹 프론트, 라이브 스택 = vite dev :5173 → :8090 프록시에
 즉시 반영, 게이트 전부 통과: tsc/vite 빌드 + oxlint 27 warnings 베이스라인 +
@@ -115,6 +117,43 @@ verify:seedl10n 101/0 + Playwright 헤드리스 CLEAN):
    패시베이션=유리(rough 0.25), 웨이퍼 노치/플랫 금속 마감. 검증: eda_e2e+
    eda_sil_e2e+w6_sweep CLEAN.
 
+14. `a633769` **S04 3D 모델 실물 재질**(사용자 지시 "핀은 구리색, 버튼·케이스
+    등 산업표준 소재의 원래 색") — `convert.py` MATERIAL_BY_KEYWORD: 터미널=
+    인청동 구리(0.80,0.45,0.28, metal 1.0/rough 0.32), 플런저=POM 백색,
+    lcp/pbt 블랙 rough 0.42(사출 광택). 근본 원인 진정: GLB 머티리얼은 정상
+    (런타임 `__THREE_DEVTOOLS__` 덤프로 입증) — RoomEnvironment 백실 조도가
+    0.04 알베도 LCP를 중간회색으로 세척. ThreeViewer의 환경을 **생성형 다크
+    스튜디오**(PMREM MeshBasicMaterial 패널, color×intensity>1=HDR 라이트,
+    측면 스트립 라이트=곡면 금속 버티컬 하이라이트)로 교체+직사광 축소.
+    레지네레이션: 각 변량의 최신 succeeded cad_convert run의 입력 STEP을 재사
+    용해 신규 run POST(/tmp/alps-logs/regen_cad_glb.py)→8변량 전부 relink,
+    0 실패(새 RUN-CAD-REALISM 런이 Result Compare에 보임). 워커 수정 시:
+    apps/workers/cad-converter는 소스 기반 자체 .venv — ps/lsof로 정확 PID
+    찾아 kill 후 nohup 재기동(로그 /tmp/alps-logs/cad-converter.log).
+15. `9a64cb9` **S04 배경 밝/어둠 토글**(사용자 지시 "케이스가 어두운데 배경도
+    어두워 제품 구분이 안 된다") — store `viewerBg` dark|light(변량 전환에
+    안 보존), TwinControls 토글 버튼(`twin.bgLight`/`twin.bgDark` ko/en/ja),
+    ViewerEnvironment가 BG_THEMES로 모드별 env 재구축(배경색+패널 강도 함께
+    전환 — 머티리얼이 리라이트되지 배경만 바뀌는 게 아님), Canvas 전환 0.25s.
+16. `6f9f7b7` **프리미엄 인스트루먼트 디자인 언어 기반**(사용자 지시 "상용제품
+    수준 … 폰트·양각 메뉴버튼·메탈릭 UI/UX … 유사 제품 디자인 전수 조사 이상
+    으로") — 유사 조사( Siemens 다크 HMI 템플릿, ISA-101 고성능 HMI: 무채
+    표면+색은 신호 전용, 레이어드 톤)를 "정밀 계기" 언어로 치환: index.html
+    Pretendard Variable(다이내믹 서브셋)+JetBrains Mono 프리커넥트/로드,
+    tokens.ts 레이어드 다크(bg.page→card→panel→raise, metalHeader/Panel/
+    Raise/Well 브러시드 그라디언트, rim 라이트)+emboss 섀도 3종(lift/panel/
+    well)+tracking, kit.tsx 카드·th(실크스크린 대문자 트래킹)·Kpi(웰+모노)·
+    btn(양각 키), index.css 전역 버튼 호버/프레스/포커스+씬 스크롤바,
+    App.tsx 메탈릭 헤더+키캡 탭(LED pip). 820px 미디어쿼리 불변.
+17. `c5cd4e4` **프리미엄 그래프/모니터링 패스** — 신규 `ui/chartTheme.ts`
+    (공용 ECharts 베이스: 헤어라인 스파인 #3b4a63, 모노 틱 라벨 10px, 대시
+    스캐폴드 그리드, 다크 글래스 모노 툴팁, TRACE_PALETTE+traceGlow 자체색
+    발광)을 SweepChart(변량별 팔레트색)/TestCorrelationPanel(예측=사이언
+    글로우+실측=앰버 마커, 잔차 Δ 차트 포함)/DoeStudyPanel/AirSignalChart
+    (밀집 카테고리축 splitLine off)에 전파, ProcessMonitoring SVG 관리도는
+    웰 베젤+관리한계 밴드 미팅트+드롭섀도 트레이스+모노 눈금. 검증: 빌드·
+    lint 27·seedl10n 101/0+w6_sweep PASS, 차트 3종 스크린샷 육안 확인.
+
 **검증 스크립트**(`/tmp/alps-logs/`, 전부 PASS): cockpit_e2e(W2),
 proc_e2e/proc_mobile_e2e(W3), bench_e2e(W4), review_e2e(W5), w6_sweep(8탭
 ko + en/ja 스모크 + 390×844 모바일), pkg_e2e(템플릿 A~D × ⑤단계 캔버스+
@@ -123,9 +162,10 @@ pkg 칩 + B OPT-2 → TSSOP-16 재표적), pkg_internals_e2e(⑤ mold-off+분해
 공정·레이아웃 3D 스크린샷 FIFO/UART/SoC — 71e25a1 육안 검증용).
 
 **다음 세션(또는 사용자)이 할 일**:
-- **`git push`** (사용자 직접 실행 필요, 위 참조) + **웹 브라우저 검증** —
-  사용자가 "완성하면 내가 웹으로 검증해볼게"라고 한 상태. model 탭 첫 화면,
-  proc 탭 실사 라인, ASIC 탭 템플릿별 ⑤단계 모델 위주.
+- **웹 브라우저 검증** —
+  사용자가 "완성하면 내가 웹으로 검증해볼게"라고 한 상태. model 탭 첫 화면
+  (실물 재질 + 밝/어둠 배경 토글), proc 탭 실사 라인, ASIC 탭 템플릿별 ⑤단계
+  모델, 프리미엄 셸/그래프 전반.
 - **Temporal 좀비 워크플로 정리** — 이전 세션에 1개만 terminate되고
   ~111개 Running이 남아 있음(재시드로 sim_run 행은 없는데 재시도만 반복).
   사용자가 터미널에서 직접:

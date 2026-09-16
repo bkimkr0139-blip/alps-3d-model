@@ -73,6 +73,19 @@ input[type="text"] {
   font: inherit;
 }
 
+/* Native <select> popups ignore the styled select face — without explicit
+   option colors the OS draws a white list with our light text on it
+   (unreadable). Dark glass + light text keeps the list on-palette. */
+select option,
+select optgroup {
+  background-color: #101a2c;
+  color: #e2e8f0;
+}
+
+select option:checked {
+  background-color: #1d2940;
+}
+
 ::selection {
   background: rgba(255, 107, 53, 0.35);
 }

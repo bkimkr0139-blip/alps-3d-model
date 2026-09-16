@@ -81,7 +81,7 @@ function ModelCanvas({ model }: { model: SystemModel }) {
       >
         <defs>
           <marker id="sm-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b99b5" />
           </marker>
         </defs>
         {model.links.map((link) => {
@@ -99,7 +99,7 @@ function ModelCanvas({ model }: { model: SystemModel }) {
               <path
                 d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`}
                 fill="none"
-                stroke="#64748b"
+                stroke="#8b99b5"
                 strokeWidth={1.6}
                 markerEnd="url(#sm-arrow)"
               />
@@ -333,7 +333,7 @@ function ModelCardDrawer({ card, onClose }: { card: ModelCardDto; onClose: () =>
               >
                 {(t as (k: string) => string)(`sysmodel.trust.${step}`)}
               </span>
-              {i < TRUST_STEPS.length - 1 && <span style={{ color: "#475569", fontSize: 9 }}>→</span>}
+              {i < TRUST_STEPS.length - 1 && <span style={{ color: "#7b8aa6", fontSize: 9 }}>→</span>}
             </span>
           ))}
         </div>
