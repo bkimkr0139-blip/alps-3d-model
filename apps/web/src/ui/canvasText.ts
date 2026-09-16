@@ -4,15 +4,20 @@ import * as THREE from "three";
 // and use it as an alpha-mapped plane. Shared by the TestBench silkscreen and
 // the production-line station signs (extracted from TestBench.silkTexture).
 
-export function canvasTextTexture(text: string, color = "#e2e8f0"): THREE.CanvasTexture {
+export function canvasTextTexture(
+  text: string,
+  color = "#e2e8f0",
+  opts: { width?: number; height?: number; font?: string } = {}
+): THREE.CanvasTexture {
+  const { width = 256, height = 64, font = "bold 38px system-ui, sans-serif" } = opts;
   const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 64;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d")!;
-  ctx.font = "bold 38px system-ui, sans-serif";
+  ctx.font = font;
   ctx.fillStyle = color;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, 128, 34);
+  ctx.fillText(text, width / 2, height / 2 + 2);
   return new THREE.CanvasTexture(canvas);
 }
