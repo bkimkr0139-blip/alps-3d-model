@@ -254,8 +254,9 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "236px 1fr", gap: 12, alignItems: "start" }}>
-        {/* ── Work-centered 9-stage menu ── */}
-        <div style={{ ...card, padding: 8 }}>
+        {/* ── Work-centered 9-stage menu (sticky — the stage panel flows the
+            full page now, so the nav must follow the scroll) ── */}
+        <div style={{ ...card, padding: 8, position: "sticky", top: 8 }}>
           {STAGES.map((s) => {
             const g = gates[s.id];
             const active = stage === s.id;

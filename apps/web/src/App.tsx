@@ -394,10 +394,13 @@ function Workbench() {
           gridTemplateColumns: !isMobile && !standaloneMode ? "320px 1fr 340px" : "1fr",
           gap: 16,
           // Tab bar moved up into the nav bar — 62vh keeps the same viewport
-          // share the center column had when it still carried the tabs. On
-          // phones the rows stack (CSS flattens the columns) so heights move
-          // onto the children and the page scrolls naturally.
-          height: isMobile ? undefined : "62vh",
+          // share the center column had when it still carried the tabs. That
+          // clamp is a 3-column dashboard concern only: standalone modules
+          // (ASIC/EDA/docs) own the full page and flow naturally — the page
+          // scrolls with the content open, like every other tab's lower
+          // sections. On phones the rows stack (CSS flattens the columns) so
+          // heights move onto the children and the page scrolls anyway.
+          height: !isMobile && !standaloneMode ? "62vh" : undefined,
         }}
       >
         {!standaloneMode && (
@@ -405,7 +408,7 @@ function Workbench() {
             <RequirementsPanel requirements={requirements} onSelect={selectRequirement} />
           </div>
         )}
-        <div style={{ minHeight: 0, overflow: "hidden", ...(isMobile && { height: "58vh", order: 1, overflowY: "auto" }) }}>
+        <div style={{ minHeight: 0, overflow: "hidden", ...(isMobile && !standaloneMode && { height: "58vh", order: 1, overflowY: "auto" }) }}>
           {centerTab === "model" ? (
               <ThreeViewer components={components} />
             ) : centerTab === "bench" ? (
