@@ -21,6 +21,7 @@ import { GatePanel } from "./components/GatePanel";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { CockpitHud } from "./components/cockpit/CockpitHud";
 import { GlassDrawer } from "./ui/GlassDrawer";
+import { useIsMobile } from "./ui/useIsMobile";
 import { bg, border, text, tabColor } from "./ui/tokens";
 
 type CenterTab = "model" | "bench" | "sysmodel" | "proc" | "air" | "eda" | "asic" | "docs";
@@ -148,16 +149,6 @@ function TabButton({
 // Keep the breakpoint in sync with the mobile media query in index.css,
 // which flattens the inline grids — this hook handles what CSS cannot:
 // heights and panel ordering of the top-level layout.
-function useIsMobile() {
-  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 820px)").matches);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 820px)");
-    const onChange = () => setMobile(mq.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return mobile;
-}
 
 function useTwinData(variantId: string | null) {
   const [requirements, setRequirements] = useState<Requirement[]>([]);

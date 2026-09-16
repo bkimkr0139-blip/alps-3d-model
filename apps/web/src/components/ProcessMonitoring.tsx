@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import {
@@ -165,13 +165,16 @@ function HypothesisCard({ chart }: { chart: ControlChart }) {
  * server note under the chart says so verbatim), out-of-window points stay
  * on the chart but are excluded from the limit basis, and the AI answer is
  * an investigation hypothesis, never a confirmed cause. */
-export function ProcessMonitoring({ variantId }: { variantId: string }) {
+export function ProcessMonitoring({ variantId, initialParameter }: { variantId: string; initialParameter?: string }) {
   const { t, i18n } = useTranslation();
   // chart.note is a composed backend string (control-limit basis note).
   const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const [params, setParams] = useState<ProcessParameterInfo[]>([]);
   const [parameter, setParameter] = useState<string | null>(null);
   const [chart, setChart] = useState<ControlChart | null>(null);
+  // initialParameter is a mount-time hint (factory station drawer remounts
+  // this chart per open) — captured once so the effect stays variant-scoped.
+  const initialHint = useRef(initialParameter);
 
   useEffect(() => {
     let cancelled = false;
@@ -183,7 +186,13 @@ export function ProcessMonitoring({ variantId }: { variantId: string }) {
       .then((ps) => {
         if (cancelled) return;
         setParams(ps);
-        setParameter(ps[0]?.parameter ?? null);
+        // initialParameter preselects once at load (factory station drawer);
+        // unknown or absent falls back to the first parameter as before.
+        setParameter(
+          (initialHint.current && ps.find((p) => p.parameter === initialHint.current)?.parameter) ??
+            ps[0]?.parameter ??
+            null
+        );
       })
       .catch(() => {});
     return () => {

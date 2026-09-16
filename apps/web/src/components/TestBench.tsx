@@ -7,6 +7,7 @@ import type { Product, SimulationRun } from "../lib/api";
 import { useTwinStore, useBenchStore } from "../store";
 import { ViewerEnvironment } from "./ThreeViewer";
 import { FSOverlay } from "./FSOverlay";
+import { canvasTextTexture } from "../ui/canvasText";
 
 // Virtual dev/test board (S04 second tab): an industry-standard-parts board —
 // FR4 PCB, the DUT (the selected product's part), 0603 pull-up/decoupling, an
@@ -31,18 +32,10 @@ function benchFamilyOf(product: Product | null): BenchFamily {
 /* ------------------------------ board parts ------------------------------ */
 
 // Silkscreen labels without a font CDN: rasterize text into a local canvas
-// and use it as an alpha-mapped plane lying flat on the PCB.
+// and use it as an alpha-mapped plane lying flat on the PCB. (The rasterizer
+// itself now lives in ui/canvasText.ts, shared with the factory station signs.)
 function silkTexture(text: string): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 64;
-  const ctx = canvas.getContext("2d")!;
-  ctx.font = "bold 38px system-ui, sans-serif";
-  ctx.fillStyle = "#e2e8f0";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, 128, 34);
-  return new THREE.CanvasTexture(canvas);
+  return canvasTextTexture(text);
 }
 
 function SilkLabel({ text, position, width = 6 }: { text: string; position: [number, number, number]; width?: number }) {

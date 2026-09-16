@@ -368,6 +368,14 @@ const en = {
     correlation_computed: "Correlation computed",
     correlation_within_tolerance: "Correlation within tolerance",
   },
+  factory: {
+    legend: "Station status",
+    lots: "Lot flow · disposition",
+    clickHint: "Click a station for its control chart",
+    params: "Parameters",
+    noParams: "No charted parameters",
+    doeJump: "DOE analysis",
+  },
   proc: {
     title: "Process Twin — Lots · Cavities · Genealogy (TS03–05)",
     cavity: {

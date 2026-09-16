@@ -366,6 +366,14 @@ const ko: Resources = {
     correlation_computed: "상관계수 산출 완료",
     correlation_within_tolerance: "상관계수 허용범위 내",
   },
+  factory: {
+    legend: "스테이션 상태",
+    lots: "로트 흐름 · 판정",
+    clickHint: "스테이션을 클릭하면 관리도가 열립니다",
+    params: "파라미터",
+    noParams: "차트 데이터 없음",
+    doeJump: "DOE 분석",
+  },
   proc: {
     title: "공정 트윈 — Lot·Cavity·계보 (TS03~05)",
     cavity: {

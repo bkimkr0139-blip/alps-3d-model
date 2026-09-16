@@ -366,6 +366,14 @@ const ja: Resources = {
     correlation_computed: "相関計算済み",
     correlation_within_tolerance: "相関が許容範囲内",
   },
+  factory: {
+    legend: "ステーション状態",
+    lots: "ロットフロー・判定",
+    clickHint: "ステーションをクリックすると管理図が開きます",
+    params: "パラメータ",
+    noParams: "チャートデータなし",
+    doeJump: "DOE解析",
+  },
   proc: {
     title: "プロセスツイン — ロット・キャビティ・系譜 (TS03–05)",
     cavity: {

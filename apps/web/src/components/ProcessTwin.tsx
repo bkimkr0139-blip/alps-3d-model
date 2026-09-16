@@ -15,6 +15,11 @@ import {
 import { DoeStudyPanel } from "./DoeStudyPanel";
 import { ProcessMonitoring } from "./ProcessMonitoring";
 import { seedTr } from "../lib/seedL10n";
+import { FactoryViewer, stationToKitStatus } from "./proc/FactoryViewer";
+import { aggregateStations, type FactoryStation } from "./proc/factoryScene";
+import { GlassDrawer } from "../ui/GlassDrawer";
+import { useIsMobile } from "../ui/useIsMobile";
+import { StatusBadge, type KitStatus } from "../ui/kit";
 
 const inputStyle: React.CSSProperties = {
   background: "#0f172a",
@@ -594,9 +599,15 @@ export function ProcessTwin({
   productBusinessId?: string;
 }) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const [lots, setLots] = useState<LotCard[]>([]);
   const [comparison, setComparison] = useState<CavityComparison | null>(null);
   const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
+  // Production-line 3D twin: stations from the global operation route, health
+  // from the variant's control charts (worst parameter wins), conveyor dots
+  // from the lot list. Silent degradation matches the rest of the tab.
+  const [stations, setStations] = useState<FactoryStation[]>([]);
+  const [selectedStation, setSelectedStation] = useState<string | null>(null);
   const specBand = productBusinessId === "PROD-TACT-SWITCH" ? TACT_SPEC_BAND : undefined;
 
   useEffect(() => {
@@ -606,12 +617,67 @@ export function ProcessTwin({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variantId, productBusinessId]);
 
+  useEffect(() => {
+    if (!variantId) {
+      setStations([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [ops, paramInfos] = await Promise.all([api.listProcessOperations(), api.listProcessParameters(variantId)]);
+        const settled = await Promise.allSettled(paramInfos.map((pi) => api.controlChart(variantId, pi.parameter)));
+        const charts = new Map<string, import("../lib/api").ControlChart>();
+        paramInfos.forEach((pi, i) => {
+          const r = settled[i];
+          if (r.status === "fulfilled") charts.set(pi.parameter, r.value);
+        });
+        if (!cancelled) setStations(aggregateStations(ops, paramInfos, charts));
+      } catch {
+        /* the tab degrades to the table views, as before */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [variantId]);
+
   if (!variantId) return null;
   const selectedLot = lots.find((l) => l.id === selectedLotId) ?? null;
+  const drawerStation = selectedStation ? (stations.find((s) => s.key === selectedStation) ?? null) : null;
+  const stationDrawer = drawerStation ? (
+    <StationDrawer variantId={variantId} station={drawerStation} comparison={comparison} onClose={() => setSelectedStation(null)} />
+  ) : null;
 
   return (
     <div style={{ height: "100%", overflowY: "auto", padding: 4 }}>
       <h3 style={{ margin: "0 0 10px", fontSize: 15 }}>{t("proc.title")}</h3>
+
+      {/* Production-line 3D twin — the tab's new primary surface. The real
+          data panels below stay exactly where they were; the line anchors
+          them. Clicking a station opens the chart drawer over the canvas. */}
+      {stations.length > 0 && (
+        <div
+          style={{
+            position: "relative",
+            height: "clamp(300px, 46vh, 480px)",
+            marginBottom: 12,
+            border: "1px solid #334155",
+            borderRadius: 8,
+            overflow: "hidden",
+          }}
+        >
+          <FactoryViewer
+            stations={stations}
+            lots={lots}
+            selectedKey={selectedStation}
+            onSelect={setSelectedStation}
+            onJumpDoe={() => document.getElementById("doe-panel")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          />
+          {!isMobile && stationDrawer}
+        </div>
+      )}
+      {isMobile && stationDrawer}
 
       <ProcessMonitoring variantId={variantId} />
 
@@ -671,13 +737,86 @@ export function ProcessTwin({
 
       {selectedLot && <LotDetail key={selectedLot.id} lot={selectedLot} />}
 
-      <DoeStudyPanel
-        key={variantId}
-        variantId={variantId}
-        defaultTargetBand={specBand ? { min: specBand.lsl, max: specBand.usl, unit: "mN" } : undefined}
-      />
+      <div id="doe-panel">
+        <DoeStudyPanel
+          key={variantId}
+          variantId={variantId}
+          defaultTargetBand={specBand ? { min: specBand.lsl, max: specBand.usl, unit: "mN" } : undefined}
+        />
+      </div>
 
       <div style={{ marginTop: 12, fontSize: 11, opacity: 0.55 }}>{t("proc.disclaimer")}</div>
     </div>
+  );
+}
+
+// Station detail drawer — opened by clicking a machine on the production
+// line. Reuses the real data surfaces (control chart, cavity strip) instead
+// of inventing a parallel display; the worst parameter preselects the chart.
+function StationDrawer({
+  variantId,
+  station,
+  comparison,
+  onClose,
+}: {
+  variantId: string;
+  station: FactoryStation;
+  comparison: CavityComparison | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const kit: KitStatus = stationToKitStatus(station.status);
+  const statusLabel =
+    station.status === "in_control"
+      ? t("proc.mon.legend.inControl")
+      : station.status === "rule_hit"
+        ? t("proc.mon.legend.violation")
+        : station.status === "excluded"
+          ? t("proc.mon.legend.excluded")
+          : t("factory.noParams");
+  // Worst parameter (excluded points outrank rule hits) preselects the chart.
+  const worst = [...station.params].sort((a, b) => b.excluded - a.excluded || b.ruleHits - a.ruleHits)[0];
+  // The cavity comparison belongs to the molding station (mold equipment id).
+  const isMolding = /mold/i.test(station.equipment ?? "");
+
+  return (
+    <GlassDrawer
+      side="right"
+      width={390}
+      title={`${station.name}${station.equipment ? ` · ${station.equipment}` : ""}`}
+      onClose={onClose}
+    >
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+        <StatusBadge status={kit} label={statusLabel} />
+        <span style={{ fontSize: 11, opacity: 0.6 }}>{station.key}</span>
+      </div>
+
+      <div style={{ fontSize: 11.5, fontWeight: 700, margin: "4px 0 4px" }}>{t("factory.params")}</div>
+      {station.params.length === 0 ? (
+        <div style={{ fontSize: 11.5, opacity: 0.6, marginBottom: 6 }}>{t("factory.noParams")}</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 8 }}>
+          {station.params.map((p) => (
+            <div key={p.parameter} style={{ display: "flex", gap: 8, fontSize: 11, fontFamily: "monospace", alignItems: "baseline" }}>
+              <span style={{ color: "#7dd3fc" }}>{p.parameter}</span>
+              <span style={{ opacity: 0.55 }}>{p.unit ?? ""}</span>
+              <span style={{ marginLeft: "auto", color: p.ruleHits > 0 ? "#fbbf24" : undefined }}>▲{p.ruleHits}</span>
+              <span style={{ color: p.excluded > 0 ? "#f87171" : undefined }}>✕{p.excluded}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isMolding && comparison && (
+        <>
+          <div style={{ fontSize: 11.5, fontWeight: 700, margin: "4px 0 4px" }}>{t("proc.cavity.title")}</div>
+          <div style={{ marginBottom: 8 }}>
+            <CavityStrip comparison={comparison} />
+          </div>
+        </>
+      )}
+
+      <ProcessMonitoring variantId={variantId} initialParameter={worst?.parameter} />
+    </GlassDrawer>
   );
 }
