@@ -19,6 +19,7 @@ import { SweepChart } from "./components/SweepChart";
 import { TestCorrelationPanel } from "./components/TestCorrelationPanel";
 import { GatePanel } from "./components/GatePanel";
 import { AssistantPanel } from "./components/AssistantPanel";
+import { bg, border, text, tabColor } from "./ui/tokens";
 
 type CenterTab = "model" | "bench" | "sysmodel" | "proc" | "air" | "eda" | "asic" | "docs";
 
@@ -29,19 +30,19 @@ type CenterTab = "model" | "bench" | "sysmodel" | "proc" | "air" | "eda" | "asic
 // dividers (see STANDALONE_TABS / DOCS_TABS) are NOT views onto the selected
 // product/variant — standalone modules and reference docs.
 const PRODUCT_TWIN_TABS: { tab: CenterTab; color: string }[] = [
-  { tab: "model", color: "#60a5fa" },
-  { tab: "bench", color: "#fbbf24" },
-  { tab: "sysmodel", color: "#a78bfa" },
-  { tab: "proc", color: "#4ade80" },
-  { tab: "air", color: "#22d3ee" },
+  { tab: "model", color: tabColor.model },
+  { tab: "bench", color: tabColor.bench },
+  { tab: "sysmodel", color: tabColor.sysmodel },
+  { tab: "proc", color: tabColor.proc },
+  { tab: "air", color: tabColor.air },
 ];
 const STANDALONE_TABS: { tab: CenterTab; color: string }[] = [
-  { tab: "eda", color: "#f97316" },
-  { tab: "asic", color: "#e879f9" },
+  { tab: "eda", color: tabColor.eda },
+  { tab: "asic", color: tabColor.asic },
 ];
 // Reference material, not a work module — slate on purpose so it reads as
 // "meta" next to the colored functional tabs.
-const DOCS_TABS: { tab: CenterTab; color: string }[] = [{ tab: "docs", color: "#94a3b8" }];
+const DOCS_TABS: { tab: CenterTab; color: string }[] = [{ tab: "docs", color: tabColor.docs }];
 
 function tabLabel(tab: CenterTab, t: (key: string) => string): string {
   switch (tab) {
@@ -67,16 +68,16 @@ function tabLabel(tab: CenterTab, t: (key: string) => string): string {
 // Shared micro-caption for the control bar — the same label style on the
 // context selects and on the two tab groups is what makes the bar read as
 // one navigation system rather than two separate widgets.
-const captionStyle: React.CSSProperties = { fontSize: 9, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 };
+const captionStyle: React.CSSProperties = { fontSize: 9, color: text.faint, textTransform: "uppercase", letterSpacing: 0.5 };
 
 // One shared control spec (height / radius / font) for every control in the
 // bar — selects and tab pills were previously two different widget families.
 const selectStyle: React.CSSProperties = {
   padding: "6px 10px",
   borderRadius: 6,
-  background: "#1e293b",
+  background: bg.raise,
   color: "white",
-  border: "1px solid #334155",
+  border: `1px solid ${border.strong}`,
   fontFamily: "inherit",
   fontSize: 13,
 };
@@ -128,7 +129,7 @@ function TabButton({
         border: "1px solid",
         borderColor: active ? color : "transparent",
         background: active ? `${color}22` : "transparent",
-        color: active ? "#f1f5f9" : "#94a3b8",
+        color: active ? text.bright : text.muted,
         fontFamily: "inherit",
         fontWeight: active ? 600 : 400,
         fontSize: 13,
@@ -257,7 +258,7 @@ function Workbench() {
   const standaloneMode = centerTab === "eda" || centerTab === "asic" || centerTab === "docs";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#020617", color: "#e2e8f0", padding: isMobile ? 12 : 20, fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: bg.page, color: text.body, padding: isMobile ? 12 : 20, fontFamily: "system-ui, sans-serif" }}>
       <header style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 20 }}>{t("app.title")}</h1>
@@ -318,7 +319,7 @@ function Workbench() {
             </select>
           </Field>
         </span>
-        <div className="nav-divider" style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
+        <div className="nav-divider" style={{ width: 1, alignSelf: "stretch", background: border.strong }} />
         <NavGroup label={t("nav.views")}>
           <div role="tablist" aria-label={t("nav.views")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {PRODUCT_TWIN_TABS.map(({ tab, color }) => (
@@ -334,7 +335,7 @@ function Workbench() {
         </NavGroup>
         {/* Everything right of this divider is a standalone module that
             ignores the product/variant context on the left. */}
-        <div className="nav-divider" style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
+        <div className="nav-divider" style={{ width: 1, alignSelf: "stretch", background: border.strong }} />
         <NavGroup label={t("nav.modules")}>
           <div role="tablist" aria-label={t("nav.modules")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {STANDALONE_TABS.map(({ tab, color }) => (
@@ -350,7 +351,7 @@ function Workbench() {
         </NavGroup>
         {/* Reference material is its own group: readable at any time, still
             independent of the product/variant context. */}
-        <div className="nav-divider" style={{ width: 1, alignSelf: "stretch", background: "#334155" }} />
+        <div className="nav-divider" style={{ width: 1, alignSelf: "stretch", background: border.strong }} />
         <NavGroup label={t("nav.docs")}>
           <div role="tablist" aria-label={t("nav.docs")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {DOCS_TABS.map(({ tab, color }) => (
@@ -366,7 +367,7 @@ function Workbench() {
         </NavGroup>
         <div style={{ flex: 1 }} />
         {standaloneMode && (
-          <span style={{ fontSize: 12, color: "#64748b", paddingBottom: 8, maxWidth: 340 }}>
+          <span style={{ fontSize: 12, color: text.faint, paddingBottom: 8, maxWidth: 340 }}>
             ⓘ {t("nav.standaloneHint")}
           </span>
         )}
@@ -442,18 +443,18 @@ function Workbench() {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
             {compareRuns.length > 0 && (
-              <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 12 }}>
+              <div style={{ border: `1px solid ${border.strong}`, borderRadius: 8, padding: 12 }}>
                 <h3 style={{ marginTop: 0 }}>{t("panels.sweep")}</h3>
                 <SweepChart runsByVariant={compareRuns} />
               </div>
             )}
-            <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 12 }}>
+            <div style={{ border: `1px solid ${border.strong}`, borderRadius: 8, padding: 12 }}>
               <h3 style={{ marginTop: 0 }}>{t("panels.correlation")}</h3>
               <TestCorrelationPanel mechRun={mechRun} />
             </div>
           </div>
 
-          <div style={{ marginTop: 16, border: "1px solid #334155", borderRadius: 8, padding: 12 }}>
+          <div style={{ marginTop: 16, border: `1px solid ${border.strong}`, borderRadius: 8, padding: 12 }}>
             <h3 style={{ marginTop: 0 }}>{t("panels.gate")}</h3>
             <GatePanel variantId={variantId} />
           </div>

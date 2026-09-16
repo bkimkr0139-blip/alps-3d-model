@@ -1,6 +1,26 @@
 :root {
   color-scheme: dark;
   font: 14px/1.5 system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* Mirrors of src/ui/tokens.ts — CSS-side copies so plain CSS (this file)
+     and any future non-inline styling share the same palette. The TS tokens
+     stay the source of truth for the inline styles the app is built with. */
+  --alps-bg-page: #020617;
+  --alps-bg-card: #0b1220;
+  --alps-bg-panel: #0f172a;
+  --alps-bg-raise: #1e293b;
+  --alps-border: #1e293b;
+  --alps-border-strong: #334155;
+  --alps-text: #e2e8f0;
+  --alps-text-bright: #f1f5f9;
+  --alps-text-muted: #94a3b8;
+  --alps-text-faint: #64748b;
+  --alps-ok: #34d399;
+  --alps-attention: #fbbf24;
+  --alps-violation: #f87171;
+  --alps-synthetic: #a78bfa;
+  --alps-info: #38bdf8;
+  --alps-accent: #ff6b35;
 }
 
 * {
@@ -18,9 +38,9 @@ body {
 button {
   font: inherit;
   cursor: pointer;
-  background: #1e293b;
+  background: var(--alps-bg-raise);
   color: white;
-  border: 1px solid #334155;
+  border: 1px solid var(--alps-border-strong);
 }
 
 /* ── Mobile (breakpoint matches useIsMobile() in App.tsx) ──
