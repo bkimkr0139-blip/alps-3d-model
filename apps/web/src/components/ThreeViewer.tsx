@@ -1,4 +1,4 @@
-import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Component, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
@@ -11,6 +11,8 @@ import { api } from "../lib/api";
 import { stressHsl, stressOf } from "../lib/stress";
 import { useTwinStore } from "../store";
 import { TwinControls } from "./TwinControls";
+import { HudChip, btn } from "../ui/kit";
+import { accent, bg, border, status as S, text as T } from "../ui/tokens";
 
 // GLB node name → digital-twin part kind. Drives both actuation (which meshes
 // move when the switch is pressed) and the stress overlay (which meshes tint
@@ -133,7 +135,12 @@ function useAssemblyModels(components: ComponentDto[]): Record<string, AssemblyE
 // partKindOf(), never the internal mechanism (dome, plunger, contact, …).
 const BODY_KINDS = new Set(["housing", "package"]);
 
-function AssemblyModel({ scene }: { scene: Group }) {
+// FR-03 design-review modes. "off" is the clean default experience; the rest
+// reroute part clicks away from selection/actuation (measuring must never
+// press the switch).
+export type ReviewMode = "off" | "section" | "measure" | "annotate";
+
+function AssemblyModel({ scene, mode, onPoint }: { scene: Group; mode: ReviewMode; onPoint: (p: [number, number, number]) => void }) {
   const selectedComponentId = useTwinStore((s) => s.selectedComponentId);
   const setSelected = useTwinStore((s) => s.setSelectedComponentId);
   const actuated = useTwinStore((s) => s.actuated);
@@ -182,6 +189,11 @@ function AssemblyModel({ scene }: { scene: Group }) {
       object={scene}
       onClick={(e: any) => {
         e.stopPropagation();
+        // Review tools consume the click: pick a point, not a part.
+        if (mode === "measure" || mode === "annotate") {
+          onPoint([e.point.x, e.point.y, e.point.z]);
+          return;
+        }
         // Clicking the actuator IS the interaction: pressing the plunger (or
         // its epoxy cap) toggles the switch, alongside the usual selection.
         const kind = e.object.userData?.partKind;
@@ -192,7 +204,7 @@ function AssemblyModel({ scene }: { scene: Group }) {
         while (o && !o.userData?.componentId) o = o.parent;
         setSelected(o?.userData?.componentId ?? null);
       }}
-      onPointerOver={(e: any) => (e.object.cursor = "pointer")}
+      onPointerOver={(e: any) => (e.object.cursor = mode === "off" ? "pointer" : "crosshair")}
     />
   );
 }
@@ -448,6 +460,180 @@ function ViewerErrorText() {
   );
 }
 
+// FR-03 section plane: cuts every assembly mesh with one world-space plane
+// (axis + fractional position across the model bbox). DoubleSide while
+// active so the cut interior renders instead of caving in hollow.
+function SectionPlane({ scenes, bbox, axis, frac }: { scenes: Group[]; bbox: THREE.Box3 | null; axis: "x" | "y" | "z"; frac: number }) {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    if (!bbox) return;
+    // oxlint-disable-next-line react/immutability -- renderer flag, same idiom as ViewerEnvironment
+    gl.localClippingEnabled = true;
+    const min = bbox.min[axis];
+    const max = bbox.max[axis];
+    const pos = min + (max - min) * frac;
+    const normals: Record<"x" | "y" | "z", THREE.Vector3> = {
+      x: new THREE.Vector3(-1, 0, 0),
+      y: new THREE.Vector3(0, -1, 0),
+      z: new THREE.Vector3(0, 0, -1),
+    };
+    const plane = new THREE.Plane(normals[axis], pos); // keeps p ≤ pos on the axis
+    const touched: THREE.MeshStandardMaterial[] = [];
+    for (const scene of scenes) {
+      scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const material of materials) {
+          const std = material as THREE.MeshStandardMaterial;
+          std.clippingPlanes = [plane];
+          std.side = THREE.DoubleSide;
+          std.needsUpdate = true;
+          touched.push(std);
+        }
+      });
+    }
+    return () => {
+      for (const std of touched) {
+        std.clippingPlanes = null;
+        std.side = THREE.FrontSide;
+        std.needsUpdate = true;
+      }
+      gl.localClippingEnabled = false;
+    };
+  }, [gl, scenes, bbox, axis, frac]);
+  return null;
+}
+
+// FR-03 review toolbar (DOM overlay, top-right): section / measure /
+// annotation. Hidden behind a toggle — the default experience stays clean.
+// Annotations are client-local and marked ◈ accordingly; persistence is
+// explicitly deferred, not silently pretended.
+function ReviewToolbar({
+  mode,
+  setMode,
+  axis,
+  setAxis,
+  frac,
+  setFrac,
+  measure,
+  annotations,
+  onClearMeasure,
+  onClearAnnotations,
+  onDeleteAnnotation,
+}: {
+  mode: ReviewMode;
+  setMode: (m: ReviewMode) => void;
+  axis: "x" | "y" | "z";
+  setAxis: (a: "x" | "y" | "z") => void;
+  frac: number;
+  setFrac: (f: number) => void;
+  measure: { a: [number, number, number] | null; b: [number, number, number] | null; mm: number | null };
+  annotations: { id: number; p: [number, number, number] }[];
+  onClearMeasure: () => void;
+  onClearAnnotations: () => void;
+  onDeleteAnnotation: (id: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const mm = measure.mm;
+  // Bottom-right: TwinControls owns the top-right corner, and the canvas
+  // bottom stays free in both the cockpit and grid layouts.
+  return (
+    <div style={{ position: "absolute", bottom: 10, right: 10, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, zIndex: 5 }}>
+      {open && (
+        <div
+          style={{
+            background: bg.hud,
+            border: `1px solid ${border.strong}`,
+            borderRadius: 8,
+            backdropFilter: "blur(6px)",
+            padding: 10,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            width: 240,
+          }}
+        >
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["section", "measure", "annotate"] as const).map((m) => (
+              <button key={m} style={{ ...btn(mode === m, accent.primary), flex: 1 }} onClick={() => setMode(mode === m ? "off" : m)} aria-pressed={mode === m}>
+                {t(`viewer.${m}`)}
+              </button>
+            ))}
+          </div>
+
+          {mode === "section" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 11, color: T.muted }}>
+              <div style={{ display: "flex", gap: 6 }}>
+                {(["x", "y", "z"] as const).map((a) => (
+                  <button key={a} style={{ ...btn(axis === a, accent.kpi), flex: 1, textTransform: "uppercase" }} onClick={() => setAxis(a)} aria-pressed={axis === a}>
+                    {a}
+                  </button>
+                ))}
+              </div>
+              <input type="range" min={0} max={1} step={0.01} value={frac} onChange={(e) => setFrac(Number(e.target.value))} style={{ accentColor: accent.kpi }} aria-label={t("viewer.section")} />
+              <span>{t("viewer.sectionHint")}</span>
+            </div>
+          )}
+
+          {mode === "measure" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 11, color: T.muted }}>
+              <HudChip color={S.info}>{t("viewer.measureHint")}</HudChip>
+              {mm !== null && (
+                <div style={{ fontSize: 15, fontFamily: "monospace", color: T.bright, textAlign: "center" }}>
+                  {mm.toFixed(2)} mm
+                </div>
+              )}
+              <button style={btn(false, S.idle)} onClick={onClearMeasure}>
+                {t("viewer.clear")}
+              </button>
+            </div>
+          )}
+
+          {mode === "annotate" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 11, color: T.muted }}>
+              <HudChip color={S.info}>{t("viewer.annotateHint")}</HudChip>
+              <span>◈ {t("viewer.annotateLocal")}</span>
+              {annotations.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  {annotations.map((a, i) => (
+                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontFamily: "monospace", color: T.body }}>#{i + 1}</span>
+                      <button
+                        aria-label={`${t("viewer.clear")} #${i + 1}`}
+                        onClick={() => onDeleteAnnotation(a.id)}
+                        style={{ marginLeft: "auto", padding: "1px 7px", borderRadius: 6, border: `1px solid ${border.base}`, background: bg.raise, color: T.body, cursor: "pointer" }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <button style={btn(false, S.idle)} onClick={onClearAnnotations}>
+                    {t("viewer.clear")}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      <button
+        style={btn(open, S.info)}
+        onClick={() => {
+          // Closing the panel also stands the tool down — a leftover active
+          // section/measure/annotate mode would silently eat part clicks.
+          if (open) setMode("off");
+          setOpen(!open);
+        }}
+        aria-expanded={open}
+      >
+        {t("viewer.review")}
+      </button>
+    </div>
+  );
+}
+
 export function ThreeViewer({ components, controlsTop = 10 }: { components: ComponentDto[]; controlsTop?: number }) {
   const setSelected = useTwinStore((s) => s.setSelectedComponentId);
   const entries = useAssemblyModels(components);
@@ -461,6 +647,39 @@ export function ThreeViewer({ components, controlsTop = 10 }: { components: Comp
   // the new model inherits the previous product's fitted camera (a 5 mm
   // sensor rendered as a speck after a tall encoder).
   const sceneKey = loaded.map(([versionId]) => versionId).sort().join("|") || "empty";
+
+  // FR-03 review-tool state (all client-local; default mode "off" = clean).
+  const [mode, setMode] = useState<ReviewMode>("off");
+  const [axis, setAxis] = useState<"x" | "y" | "z">("y");
+  const [frac, setFrac] = useState(0.5);
+  const [measure, setMeasure] = useState<{ a: [number, number, number] | null; b: [number, number, number] | null; mm: number | null }>({ a: null, b: null, mm: null });
+  const [annotations, setAnnotations] = useState<{ id: number; p: [number, number, number] }[]>([]);
+  const scenes = useMemo(() => loaded.map(([, entry]) => entry.scene), [loaded]);
+  const nextAnnotationId = useRef(1);
+
+  // World bbox of the assembled model — anchors the section slider range,
+  // the pin size, and keeps measurements in STEP mm (world unit = mm).
+  const groupRef = useRef<Group>(null);
+  const [bbox, setBbox] = useState<THREE.Box3 | null>(null);
+  useLayoutEffect(() => {
+    const g = groupRef.current;
+    if (!g) return;
+    g.updateWorldMatrix(true, true);
+    setBbox(new THREE.Box3().setFromObject(g));
+  }, [sceneKey]);
+
+  const onReviewPoint = (p: [number, number, number]) => {
+    if (mode === "measure") {
+      setMeasure((m) => {
+        if (!m.a || m.b) return { a: p, b: null, mm: null };
+        const mm = Math.hypot(p[0] - m.a[0], p[1] - m.a[1], p[2] - m.a[2]);
+        return { a: m.a, b: p, mm };
+      });
+    } else if (mode === "annotate") {
+      setAnnotations((list) => [...list, { id: nextAnnotationId.current++, p }]);
+    }
+  };
+  const pinScale = bbox ? Math.max(bbox.getSize(new THREE.Vector3()).length() * 0.014, 0.06) : 0.1;
 
   return (
     <div style={{ position: "relative", height: "100%" }}>
@@ -490,9 +709,9 @@ export function ThreeViewer({ components, controlsTop = 10 }: { components: Comp
               fit already targets the measured box center, and Center's
               late-applied offset raced the fit (camera aimed at the
               pre-center position → bottom of the model cropped). */}
-          <group rotation={[-Math.PI / 2, 0, 0]}>
+          <group rotation={[-Math.PI / 2, 0, 0]} ref={groupRef}>
             {loaded.map(([versionId, entry]) => (
-              <AssemblyModel key={versionId} scene={entry.scene} />
+              <AssemblyModel key={versionId} scene={entry.scene} mode={mode} onPoint={onReviewPoint} />
             ))}
             {components.map((c, i) =>
               !c.artifact_version_id || failed.has(c.artifact_version_id) ? (
@@ -501,6 +720,26 @@ export function ThreeViewer({ components, controlsTop = 10 }: { components: Comp
             )}
           </group>
         </Bounds>
+        {mode === "section" && <SectionPlane scenes={scenes} bbox={bbox} axis={axis} frac={frac} />}
+        {/* measurement endpoints + annotation pins, sized off the model bbox */}
+        {measure.a && (
+          <mesh position={measure.a}>
+            <sphereGeometry args={[pinScale, 12, 12]} />
+            <meshBasicMaterial color={accent.kpi} />
+          </mesh>
+        )}
+        {measure.b && (
+          <mesh position={measure.b}>
+            <sphereGeometry args={[pinScale, 12, 12]} />
+            <meshBasicMaterial color={accent.kpi} />
+          </mesh>
+        )}
+        {annotations.map((a) => (
+          <mesh key={a.id} position={a.p}>
+            <sphereGeometry args={[pinScale, 12, 12]} />
+            <meshBasicMaterial color={accent.primary} />
+          </mesh>
+        ))}
         {/* model rests on y=0 after the rotation (was z=0 in STEP coords) */}
         <ContactShadows
           position={[0, -0.02, 0]}
@@ -514,6 +753,19 @@ export function ThreeViewer({ components, controlsTop = 10 }: { components: Comp
         <TwinAnimator scenes={loaded.map(([, entry]) => entry.scene)} />
       </Canvas>
       <TwinControls top={controlsTop} />
+      <ReviewToolbar
+        mode={mode}
+        setMode={setMode}
+        axis={axis}
+        setAxis={setAxis}
+        frac={frac}
+        setFrac={setFrac}
+        measure={measure}
+        annotations={annotations}
+        onClearMeasure={() => setMeasure({ a: null, b: null, mm: null })}
+        onClearAnnotations={() => setAnnotations([])}
+        onDeleteAnnotation={(id) => setAnnotations((list) => list.filter((x) => x.id !== id))}
+      />
     </ViewerErrorBoundary>
     </div>
   );

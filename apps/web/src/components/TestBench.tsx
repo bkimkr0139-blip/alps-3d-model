@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import * as THREE from "three";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import type { Product, SimulationRun } from "../lib/api";
+import type { ComponentDto, Product, SimulationRun } from "../lib/api";
 import { useTwinStore, useBenchStore } from "../store";
 import { ViewerEnvironment } from "./ThreeViewer";
 import { FSOverlay } from "./FSOverlay";
@@ -26,6 +26,15 @@ function benchFamilyOf(product: Product | null): BenchFamily {
   if (n.includes("mems") || n.includes("pressure") || n.includes("sensor")) return "mems";
   return "tact";
 }
+
+// Which 3D-component names ARE this bench's part family — the L187 selection
+// sync only lights the DUT when the selected component really is the part on
+// the bench, never when an unrelated part happens to be selected.
+const FAMILY_KIND: Record<BenchFamily, RegExp> = {
+  tact: /switch|tact|dome|plunger/i,
+  encoder: /encoder|rotary|shaft|detent/i,
+  mems: /pressure|sensor|mems|bridge|diaphragm/i,
+};
 
 // Bench-local controls (encoder rotation) live in the shared store module so
 // both the board overlay and the F–S cursor overlay read the same state
@@ -184,11 +193,22 @@ function ChipResistor({ position, bodyColor = "#3f3f46" }: { position: [number, 
 
 // Tact DUT: black 6×6 body, silver cap. Click toggles the shared actuated
 // state — the same store the S04 3D viewer uses, so both views stay in sync.
-function TactDut() {
+// The bench DUT lights (accent-orange pulse) only while the selected 3D
+// component belongs to this bench's part family.
+function useDutHighlight(matched: boolean) {
+  const body = useRef<THREE.MeshStandardMaterial>(null);
+  useFrame(({ clock }) => {
+    if (body.current) body.current.emissiveIntensity = matched ? 0.5 + 0.25 * Math.sin(clock.elapsedTime * 3.2) : 0;
+  });
+  return body;
+}
+
+function TactDut({ matched }: { matched: boolean }) {
   const actuated = useTwinStore((s) => s.actuated);
   const setActuated = useTwinStore((s) => s.setActuated);
   const cap = useRef<THREE.Mesh>(null);
   const act = useRef(0);
+  const bodyMat = useDutHighlight(matched);
 
   useFrame((_, dt) => {
     act.current += ((actuated ? 1 : 0) - act.current) * Math.min(1, dt * 22);
@@ -206,7 +226,7 @@ function TactDut() {
     >
       <mesh position={[0, 2.15, 0]}>
         <boxGeometry args={[6, 4.3, 6]} />
-        <meshStandardMaterial color="#111114" roughness={0.55} />
+        <meshStandardMaterial ref={bodyMat} color="#111114" emissive="#f97316" emissiveIntensity={0} roughness={0.55} />
       </mesh>
       <mesh ref={cap} position={[0, 4.6, 0]}>
         <cylinderGeometry args={[1.6, 1.6, 0.7, 24]} />
@@ -222,10 +242,11 @@ function TactDut() {
   );
 }
 
-function EncoderDut() {
+function EncoderDut({ matched }: { matched: boolean }) {
   const rotating = useBenchStore((s) => s.rotating);
   const setRotating = useBenchStore((s) => s.setRotating);
   const shaft = useRef<THREE.Mesh>(null);
+  const bodyMat = useDutHighlight(matched);
   useFrame((_, dt) => {
     if (shaft.current && rotating) shaft.current.rotation.y += dt * 5;
   });
@@ -240,7 +261,7 @@ function EncoderDut() {
     >
       <mesh position={[0, 6.5, 0]}>
         <boxGeometry args={[10, 13, 10]} />
-        <meshStandardMaterial color="#52525b" metalness={0.85} roughness={0.4} />
+        <meshStandardMaterial ref={bodyMat} color="#52525b" emissive="#f97316" emissiveIntensity={0} metalness={0.85} roughness={0.4} />
       </mesh>
       <mesh ref={shaft} position={[0, 15.5, 0]}>
         <cylinderGeometry args={[3.4, 3.4, 6.5, 12]} />
@@ -256,8 +277,9 @@ function EncoderDut() {
   );
 }
 
-function MemsDut({ pressure }: { pressure: number }) {
+function MemsDut({ pressure, matched }: { pressure: number; matched: boolean }) {
   const port = useRef<THREE.Mesh>(null);
+  const bodyMat = useDutHighlight(matched);
   // Port "pressurizes": the tiny port insert darkens as drive pressure rises.
   useFrame(() => {
     if (port.current) {
@@ -269,7 +291,7 @@ function MemsDut({ pressure }: { pressure: number }) {
     <group position={[-9, 0, 0]}>
       <mesh position={[0, 0.85, 0]}>
         <boxGeometry args={[6, 1.7, 6]} />
-        <meshStandardMaterial color="#111114" roughness={0.5} />
+        <meshStandardMaterial ref={bodyMat} color="#111114" emissive="#f97316" emissiveIntensity={0} roughness={0.5} />
       </mesh>
       <mesh position={[0, 1.95, 0]}>
         <boxGeometry args={[5.4, 0.5, 5.4]} />
@@ -369,7 +391,7 @@ function ProbeWire({ color, points, clipAt }: { color: string; points: [number, 
   );
 }
 
-function Board({ family, pressure }: { family: BenchFamily; pressure: number }) {
+function Board({ family, pressure, dutMatched }: { family: BenchFamily; pressure: number; dutMatched: boolean }) {
   const actuated = useTwinStore((s) => s.actuated);
   const rotating = useBenchStore((s) => s.rotating);
   const ledLevel = family === "tact" ? (actuated ? 1 : 0) : family === "encoder" ? (rotating ? 1 : 0) : pressure / 400;
@@ -387,9 +409,9 @@ function Board({ family, pressure }: { family: BenchFamily; pressure: number }) 
         </mesh>
       ))}
 
-      {family === "tact" && <TactDut />}
-      {family === "encoder" && <EncoderDut />}
-      {family === "mems" && <MemsDut pressure={pressure} />}
+      {family === "tact" && <TactDut matched={dutMatched} />}
+      {family === "encoder" && <EncoderDut matched={dutMatched} />}
+      {family === "mems" && <MemsDut pressure={pressure} matched={dutMatched} />}
 
       <Mcu />
       <PinHeader />
@@ -729,16 +751,21 @@ function CircuitTest({ spiceRun }: { spiceRun: SimulationRun | null }) {
 
 /* --------------------------------- panel --------------------------------- */
 
-export function TestBench({ product, runs }: { product: Product | null; runs: SimulationRun[] }) {
+export function TestBench({ product, runs, components }: { product: Product | null; runs: SimulationRun[]; components: ComponentDto[] }) {
   const { t } = useTranslation();
   const family = benchFamilyOf(product);
   const actuated = useTwinStore((s) => s.actuated);
   const setActuated = useTwinStore((s) => s.setActuated);
   const rotating = useBenchStore((s) => s.rotating);
   const setRotating = useBenchStore((s) => s.setRotating);
+  const selectedComponentId = useTwinStore((s) => s.selectedComponentId);
   const [pressure, setPressure] = useState(200);
   // Bench-scope RUN/STOP: STOP freezes the acquisition window (bezel LEDs dim).
   const [scopeRunning, setScopeRunning] = useState(true);
+  // L187 sync, bench side: the DUT lights only when the selected component
+  // IS the benched part; otherwise the chip says so instead of pretending.
+  const selectedComponent = components.find((c) => c.id === selectedComponentId) ?? null;
+  const dutMatched = !!selectedComponent && FAMILY_KIND[family].test(selectedComponent.name);
 
   // Switching product swaps the DUT — never carry a pressed/rotating state
   // from one physical part into the next.
@@ -761,7 +788,7 @@ export function TestBench({ product, runs }: { product: Product | null; runs: Si
           <ambientLight intensity={0.35} />
           <directionalLight position={[10, 24, 12]} intensity={1.3} />
           <directionalLight position={[-12, 10, -8]} intensity={0.3} />
-          <Board family={family} pressure={pressure} />
+          <Board family={family} pressure={pressure} dutMatched={dutMatched} />
           <OrbitControls makeDefault target={[0, 2, 0]} maxPolarAngle={Math.PI / 2.05} />
         </Canvas>
         <div
@@ -789,6 +816,12 @@ export function TestBench({ product, runs }: { product: Product | null; runs: Si
             </HudChip>
             <HudChip color={S.okAlt}>◈ SPICE · {spiceRun ? `${spiceRun.business_id} · ${spiceRun.tool_version ?? "—"}` : t("bench.noSpice")}</HudChip>
           </div>
+          {selectedComponent &&
+            (dutMatched ? (
+              <HudChip color={accent.orange}>◆ {t("bench.dutMatched", { name: selectedComponent.name })}</HudChip>
+            ) : (
+              <HudChip color={S.idle}>{t("bench.dutWhole")}</HudChip>
+            ))}
           <button
             onClick={() => setScopeRunning(!scopeRunning)}
             aria-pressed={scopeRunning}
