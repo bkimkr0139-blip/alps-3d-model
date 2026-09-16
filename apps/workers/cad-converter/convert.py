@@ -104,6 +104,19 @@ MATERIAL_BY_KEYWORD: list[tuple[str, PBRMaterial]] = [
                             metallicFactor=0.0, roughnessFactor=0.42)),
     ("base", PBRMaterial(name="pbt_black", baseColorFactor=[0.06, 0.06, 0.065, 1.0],
                          metallicFactor=0.0, roughnessFactor=0.42)),
+    # Rotary-encoder mechanism stack (RK09-style): the dial is the user-facing
+    # molded knob, the rotor hub is stainless like the shaft it drives, the
+    # stand-offs are the same molded PBT family as the base, the retaining
+    # washer is spring steel like the detent. "Wiper Contacts" already hits
+    # "contact" → gold further up, so no entry is needed for it here.
+    ("dial", PBRMaterial(name="pom_black", baseColorFactor=[0.05, 0.05, 0.055, 1.0],
+                         metallicFactor=0.0, roughnessFactor=0.45)),
+    ("rotor hub", PBRMaterial(name="stainless_steel", baseColorFactor=[0.78, 0.79, 0.81, 1.0],
+                              metallicFactor=1.0, roughnessFactor=0.25)),
+    ("stand-off", PBRMaterial(name="pbt_molded", baseColorFactor=[0.06, 0.06, 0.065, 1.0],
+                              metallicFactor=0.0, roughnessFactor=0.45)),
+    ("washer", PBRMaterial(name="spring_steel", baseColorFactor=[0.55, 0.58, 0.66, 1.0],
+                           metallicFactor=1.0, roughnessFactor=0.3)),
 ]
 NEUTRAL_MATERIAL = PBRMaterial(name="neutral", baseColorFactor=[0.62, 0.65, 0.68, 1.0],
                                metallicFactor=0.1, roughnessFactor=0.5)
