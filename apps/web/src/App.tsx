@@ -581,7 +581,7 @@ function Workbench() {
           {centerTab === "model" ? (
               <ThreeViewer components={components} />
             ) : centerTab === "bench" ? (
-              <TestBench product={product} runs={runs} components={components} />
+              <TestBench product={product} variantName={variants.find((v) => v.id === variantId)?.name} runs={runs} components={components} />
             ) : centerTab === "sysmodel" ? (
               <SystemModelView key={variantId ?? "none"} variantId={variantId} />
             ) : centerTab === "air" ? (

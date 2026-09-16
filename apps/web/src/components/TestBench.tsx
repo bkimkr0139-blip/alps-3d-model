@@ -10,6 +10,7 @@ import { FSOverlay } from "./FSOverlay";
 import { canvasTextTexture } from "../ui/canvasText";
 import { HudChip } from "../ui/kit";
 import { accent, border, bg, status as S } from "../ui/tokens";
+import { AIR_STATE_COLOR } from "../lib/air";
 
 // Virtual dev/test board (S04 second tab): an industry-standard-parts board —
 // FR4 PCB, the DUT (the selected product's part), 0603 pull-up/decoupling, an
@@ -18,10 +19,13 @@ import { accent, border, bg, status as S } from "../ui/tokens";
 // anchor to the variant's REAL latest SPICE run (v_out_rc_* worst case vs the
 // 1.0 V logic-low limit); the waveforms themselves are demo visualization.
 
-export type BenchFamily = "tact" | "encoder" | "mems";
+export type BenchFamily = "tact" | "encoder" | "mems" | "air";
 
 function benchFamilyOf(product: Product | null): BenchFamily {
   const n = `${product?.name ?? ""} ${product?.business_id ?? ""}`.toLowerCase();
+  // airinput BEFORE the generic "sensor"→mems catch: "AirInput Proximity
+  // Sensor" must bench its own module, not the MEMS pressure board.
+  if (n.includes("airinput") || n.includes("proximity")) return "air";
   if (n.includes("encoder")) return "encoder";
   if (n.includes("mems") || n.includes("pressure") || n.includes("sensor")) return "mems";
   return "tact";
@@ -29,11 +33,14 @@ function benchFamilyOf(product: Product | null): BenchFamily {
 
 // Which 3D-component names ARE this bench's part family — the L187 selection
 // sync only lights the DUT when the selected component really is the part on
-// the bench, never when an unrelated part happens to be selected.
+// the bench, never when an unrelated part happens to be selected. The air
+// module benches as a whole (housing/electrode/ASIC/cover are one potted
+// puck), so any of its BOM names counts as "the benched part".
 const FAMILY_KIND: Record<BenchFamily, RegExp> = {
   tact: /switch|tact|dome|plunger/i,
   encoder: /encoder|rotary|shaft|detent/i,
   mems: /pressure|sensor|mems|bridge|diaphragm/i,
+  air: /airinput|electrode|cover|housing|capacitive|proximity/i,
 };
 
 // Bench-local controls (encoder rotation) live in the shared store module so
@@ -164,6 +171,9 @@ const DUT_PADS: Record<BenchFamily, { right: XY[]; left: XY[]; pad: [number, num
   tact: { right: [[-6.4, 2.6], [-6.4, -2.6]], left: [[-11.6, 2.6], [-11.6, -2.6]], pad: [1.9, 1.5] },
   encoder: { right: [[-4.4, 0]], left: [[-13.6, 0]], pad: [1.8, 6.4] },
   mems: { right: [[-6.6, 2.4], [-6.6, -2.4]], left: [[-11.4, 2.4], [-11.4, -2.4]], pad: [1.6, 1.6] },
+  // AirInput module's four castellated terminals at the scaled puck's edges
+  // (body spans x −15.1…−2.9 — pads tuck half under the edge like tact's).
+  air: { right: [[-3.5, 2], [-3.5, -2]], left: [[-14.5, 2], [-14.5, -2]], pad: [1.6, 1.6] },
 };
 // Which MCU input pin each DUT terminal lands on (SW node shares a pin with
 // the C1 decoupling route — a real junction, covered by the pin's pad).
@@ -171,6 +181,7 @@ const DUT_TO_PIN: Record<BenchFamily, XY[]> = {
   tact: [[3.4, 2.4], [3.4, -0.8]],
   encoder: [[3.4, -0.8]],
   mems: [[3.4, 2.4], [3.4, -2.4]],
+  air: [[3.4, 2.4], [3.4, -2.4]],
 };
 
 function ChipResistor({ position, bodyColor = "#3f3f46" }: { position: [number, number, number]; bodyColor?: string }) {
@@ -311,6 +322,89 @@ function MemsDut({ pressure, matched }: { pressure: number; matched: boolean }) 
   );
 }
 
+// AirInput DUT: the puck-style capacitive proximity module — housing shell,
+// PCB, electrode, ASIC paddle and cover glass — with the same materials and
+// proportions as the air tab's field twin (AirScene) and the CAD GLB, so the
+// dev view and this test view read as the same physical part. The real module
+// is 34×28×6.5 mm; the demo bench board is 32×22 units, so the puck renders
+// at bench scale 0.36. Electrode follows the variant: Layout B shows the
+// split ring (the name in the seed carries "Layout B / split-ring").
+const AIR_SCALE = 0.36;
+const AIR_ELEC_X = 5 * AIR_SCALE;
+const AIR_PAD_R = Math.sqrt(100 / Math.PI) * AIR_SCALE; // solid 100 mm² pad
+const AIR_RING_OUTER = 8.5 * AIR_SCALE; // LAYOUT_B_OUTER_R_MM
+const AIR_RING_INNER = Math.sqrt(8.5 ** 2 - 160 / Math.PI) * AIR_SCALE; // 160 mm² annulus
+const AIR_PCB_TOP = 2.8 * AIR_SCALE;
+const AIR_HOUSE_TOP = 6.5 * AIR_SCALE;
+
+function AirDut({ near, matched, splitRing }: { near: boolean; matched: boolean; splitRing: boolean }) {
+  const bodyMat = useDutHighlight(matched);
+  const tip = useRef<THREE.Mesh>(null);
+  const elec = useRef<THREE.MeshStandardMaterial>(null);
+  useFrame(({ clock }, dt) => {
+    // fingertip stimulus lowers onto the cover; electrode pulses the live
+    // TOUCH color while near (same palette as the air tab's state legend)
+    if (tip.current) tip.current.position.y += ((near ? AIR_HOUSE_TOP + 1.6 : 6.2) - tip.current.position.y) * Math.min(1, dt * 14);
+    if (elec.current) elec.current.emissiveIntensity = near ? 0.55 + 0.25 * Math.sin(clock.elapsedTime * 3.2) : 0;
+  });
+
+  const electrodeMats = {
+    color: "#facc15",
+    metalness: 0.8,
+    roughness: 0.3,
+  } as const;
+
+  return (
+    <group position={[-9, 0, 0]}>
+      <mesh ref={tip} position={[AIR_ELEC_X, 6.2, 0]}>
+        <sphereGeometry args={[1.5, 20, 16]} />
+        <meshStandardMaterial color="#e8b08c" roughness={0.65} />
+      </mesh>
+      {/* translucent housing shell (same X-ray read as AirScene) */}
+      <mesh position={[0, AIR_HOUSE_TOP / 2, 0]}>
+        <boxGeometry args={[34 * AIR_SCALE, AIR_HOUSE_TOP, 28 * AIR_SCALE]} />
+        <meshStandardMaterial ref={bodyMat} color="#334155" transparent opacity={0.5} roughness={0.5} emissive="#f97316" emissiveIntensity={0} depthWrite={false} />
+      </mesh>
+      {/* PCB */}
+      <mesh position={[0, 2 * AIR_SCALE, 0]}>
+        <boxGeometry args={[30 * AIR_SCALE, 1.6 * AIR_SCALE, 24 * AIR_SCALE]} />
+        <meshStandardMaterial color="#14532d" roughness={0.7} />
+      </mesh>
+      {splitRing ? (
+        // Layout B: two half-rings split at z = 0 (AirScene's E1/E2 read)
+        ([false, true] as const).map((flip) => (
+          <mesh key={flip ? "e1" : "e2"} position={[0, AIR_PCB_TOP + 0.02, flip ? 0.02 : -0.02]} rotation={[-Math.PI / 2, 0, flip ? Math.PI : 0]}>
+            <ringGeometry args={[AIR_RING_INNER, AIR_RING_OUTER, 40, 1, 0, Math.PI]} />
+            <meshStandardMaterial ref={flip ? elec : undefined} {...electrodeMats} emissive={AIR_STATE_COLOR.TOUCH} emissiveIntensity={0} />
+          </mesh>
+        ))
+      ) : (
+        <mesh position={[AIR_ELEC_X, AIR_PCB_TOP + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[AIR_PAD_R, 40]} />
+          <meshStandardMaterial ref={elec} {...electrodeMats} emissive={AIR_STATE_COLOR.TOUCH} emissiveIntensity={0} />
+        </mesh>
+      )}
+      {/* ASIC QFN paddle (grounded shield mass, at the worker's (−9, 4)) */}
+      <mesh position={[-9 * AIR_SCALE, AIR_PCB_TOP + 0.02, -4 * AIR_SCALE]}>
+        <boxGeometry args={[5 * AIR_SCALE, 0.05, 5 * AIR_SCALE]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.2} />
+      </mesh>
+      {/* cover glass (touch surface) */}
+      <mesh position={[0, AIR_HOUSE_TOP - 0.5 * AIR_SCALE, 0]}>
+        <boxGeometry args={[30.6 * AIR_SCALE, 1.0 * AIR_SCALE, 27.6 * AIR_SCALE]} />
+        <meshStandardMaterial color="#7dd3fc" transparent opacity={0.25} depthWrite={false} />
+      </mesh>
+      {/* castellated corner terminals */}
+      {[[-5, -3.9], [5, -3.9], [-5, 3.9], [5, 3.9]].map(([x, z]) => (
+        <mesh key={`${x}${z}`} position={[x, 0.2, z]}>
+          <boxGeometry args={[1.3, 0.4, 1.3]} />
+          <meshStandardMaterial color="#d1d5db" metalness={0.8} roughness={0.35} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function IndicatorLed({ level }: { level: number }) {
   const led = useRef<THREE.MeshStandardMaterial>(null);
   useFrame(() => {
@@ -391,10 +485,11 @@ function ProbeWire({ color, points, clipAt }: { color: string; points: [number, 
   );
 }
 
-function Board({ family, pressure, dutMatched }: { family: BenchFamily; pressure: number; dutMatched: boolean }) {
+function Board({ family, pressure, near, splitRing, dutMatched }: { family: BenchFamily; pressure: number; near: boolean; splitRing: boolean; dutMatched: boolean }) {
   const actuated = useTwinStore((s) => s.actuated);
   const rotating = useBenchStore((s) => s.rotating);
-  const ledLevel = family === "tact" ? (actuated ? 1 : 0) : family === "encoder" ? (rotating ? 1 : 0) : pressure / 400;
+  const ledLevel =
+    family === "tact" ? (actuated ? 1 : 0) : family === "encoder" ? (rotating ? 1 : 0) : family === "air" ? (near ? 1 : 0) : pressure / 400;
 
   return (
     <group>
@@ -412,6 +507,7 @@ function Board({ family, pressure, dutMatched }: { family: BenchFamily; pressure
       {family === "tact" && <TactDut matched={dutMatched} />}
       {family === "encoder" && <EncoderDut matched={dutMatched} />}
       {family === "mems" && <MemsDut pressure={pressure} matched={dutMatched} />}
+      {family === "air" && <AirDut near={near} matched={dutMatched} splitRing={splitRing} />}
 
       <Mcu />
       <PinHeader />
@@ -456,7 +552,7 @@ function Board({ family, pressure, dutMatched }: { family: BenchFamily; pressure
       {/* VCC in from the header (power width) */}
       <TracePath points={routeMitered([14, J1_PIN_Z[2]], [MCU_RIGHT_X, 2.4], "h")} width={TRACE_W_POWER} />
 
-      <SilkLabel text="SW1" position={[-9, 0.03, 4.6]} />
+      <SilkLabel text={family === "air" ? "U1 PROX" : "SW1"} position={[-9, 0.03, family === "air" ? 6.8 : 4.6]} />
       <SilkLabel text="MCU" position={[7, 0.03, 5]} />
       <SilkLabel text="R1 10k" position={[-2, 0.03, -8.4]} width={4} />
       <SilkLabel text="C1 100n" position={[-2, 0.03, -4.9]} width={4.4} />
@@ -479,17 +575,17 @@ const WINDOW = 1200; // samples shown → 600 ms → 60 ms/div
 const VCC = 3.3;
 const LOGIC_LOW_LIMIT_V = 1.0;
 
-function Scope({ family, pressure, running }: { family: BenchFamily; pressure: number; running: boolean }) {
+function Scope({ family, pressure, near, running }: { family: BenchFamily; pressure: number; near: boolean; running: boolean }) {
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const buf = useRef({ v1: new Float32Array(WINDOW), v2: new Float32Array(WINDOW), head: 0, count: 0 });
   // Mutable latest inputs for the rAF loop (no re-subscribe on prop change).
-  const inputRef = useRef({ family, pressure, running });
+  const inputRef = useRef({ family, pressure, near, running });
   useEffect(() => {
-    inputRef.current = { family, pressure, running };
-  }, [family, pressure, running]);
+    inputRef.current = { family, pressure, near, running };
+  }, [family, pressure, near, running]);
   // Channel state machine
-  const sim = useRef({ phase: 0, bounceT: 0, v1: 1, v2: 1, lastAct: false });
+  const sim = useRef({ phase: 0, bounceT: 0, v1: 1, v2: 1, lastAct: false, touch: false });
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -524,6 +620,15 @@ function Scope({ family, pressure, running }: { family: BenchFamily; pressure: n
         const p = ((s.phase % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
         s.v1 = p < Math.PI ? 0.94 : 0.02;
         s.v2 = (p + Math.PI / 2) % (2 * Math.PI) < Math.PI ? 0.94 : 0.02;
+      } else if (fam === "air") {
+        // Capacitive proximity: CH1 = electrode sense level (charge-transfer
+        // output rises as the fingertip nears the cover), CH2 = touch IC's
+        // threshold comparator with hysteresis (asserts >0.62, releases <0.4).
+        const targetV = inputRef.current.near ? 0.82 : 0.06;
+        s.v1 += (targetV - s.v1) * Math.min(1, dt / 0.05);
+        if (!s.touch && s.v1 > 0.62) s.touch = true;
+        else if (s.touch && s.v1 < 0.4) s.touch = false;
+        s.v2 = s.touch ? 0.94 : 0.02;
       } else {
         const target = 0.08 + 0.85 * (pres / 400);
         const amp = s.v2; // amplified channel carries the lag state
@@ -690,7 +795,13 @@ function Scope({ family, pressure, running }: { family: BenchFamily; pressure: n
       <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
         <span style={{ color: "#facc15" }}>■</span> CH1 ·{" "}
         <span style={{ color: "#38bdf8" }}>■</span> CH2 —{" "}
-        {family === "tact" ? t("bench.scopeHintTact") : family === "encoder" ? t("bench.scopeHintEncoder") : t("bench.scopeHintMems")}
+        {family === "tact"
+          ? t("bench.scopeHintTact")
+          : family === "encoder"
+            ? t("bench.scopeHintEncoder")
+            : family === "air"
+              ? t("bench.scopeHintAir")
+              : t("bench.scopeHintMems")}
       </div>
     </div>
   );
@@ -751,7 +862,7 @@ function CircuitTest({ spiceRun }: { spiceRun: SimulationRun | null }) {
 
 /* --------------------------------- panel --------------------------------- */
 
-export function TestBench({ product, runs, components }: { product: Product | null; runs: SimulationRun[]; components: ComponentDto[] }) {
+export function TestBench({ product, variantName, runs, components }: { product: Product | null; variantName?: string | null; runs: SimulationRun[]; components: ComponentDto[] }) {
   const { t } = useTranslation();
   const family = benchFamilyOf(product);
   const actuated = useTwinStore((s) => s.actuated);
@@ -760,6 +871,12 @@ export function TestBench({ product, runs, components }: { product: Product | nu
   const setRotating = useBenchStore((s) => s.setRotating);
   const selectedComponentId = useTwinStore((s) => s.selectedComponentId);
   const [pressure, setPressure] = useState(200);
+  // AirInput bench stimulus: a fingertip at the cover (see AirDut).
+  const [near, setNear] = useState(false);
+  // The electrode layout is a per-variant geometry (seed names carry
+  // "Layout A/B"), so the benched puck matches the selected variant — the
+  // same rule the air tab's field twin derives from its artifacts.
+  const splitRing = /layout\s*b|split-ring/i.test(variantName ?? "");
   // Bench-scope RUN/STOP: STOP freezes the acquisition window (bezel LEDs dim).
   const [scopeRunning, setScopeRunning] = useState(true);
   // L187 sync, bench side: the DUT lights only when the selected component
@@ -772,13 +889,20 @@ export function TestBench({ product, runs, components }: { product: Product | nu
   useEffect(() => {
     setActuated(false);
     setRotating(false);
+    setNear(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [family]);
 
   const spiceRun = runs.find((r) => r.run_type === "spice_analysis" && r.status === "succeeded") ?? null;
 
   const hint =
-    family === "tact" ? t("bench.hintTact") : family === "encoder" ? t("bench.hintEncoder") : t("bench.hintMems");
+    family === "tact"
+      ? t("bench.hintTact")
+      : family === "encoder"
+        ? t("bench.hintEncoder")
+        : family === "air"
+          ? t("bench.hintAir")
+          : t("bench.hintMems");
 
   return (
     <div style={{ height: "100%", display: "grid", gridTemplateColumns: "1fr 340px", gap: 12 }}>
@@ -788,7 +912,7 @@ export function TestBench({ product, runs, components }: { product: Product | nu
           <ambientLight intensity={0.35} />
           <directionalLight position={[10, 24, 12]} intensity={1.3} />
           <directionalLight position={[-12, 10, -8]} intensity={0.3} />
-          <Board family={family} pressure={pressure} dutMatched={dutMatched} />
+          <Board family={family} pressure={pressure} near={near} splitRing={splitRing} dutMatched={dutMatched} />
           <OrbitControls makeDefault target={[0, 2, 0]} maxPolarAngle={Math.PI / 2.05} />
         </Canvas>
         <div
@@ -871,6 +995,22 @@ export function TestBench({ product, runs, components }: { product: Product | nu
               />
             </label>
           )}
+          {family === "air" && (
+            <button
+              onClick={() => setNear(!near)}
+              style={{
+                padding: "5px 10px",
+                borderRadius: 6,
+                border: "1px solid",
+                borderColor: near ? "#f97316" : "var(--alps-border-strong)",
+                background: near ? "#7c2d12" : "var(--alps-bg-raise)",
+                color: near ? "white" : "var(--alps-text)",
+                cursor: "pointer",
+              }}
+            >
+              {near ? t("bench.fingerAway") : t("bench.fingerNear")}
+            </button>
+          )}
           {family === "tact" && (
             <button
               onClick={() => setActuated(!actuated)}
@@ -890,8 +1030,8 @@ export function TestBench({ product, runs, components }: { product: Product | nu
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0, overflowY: "auto" }}>
-        <Scope family={family} pressure={pressure} running={scopeRunning} />
-        <FSOverlay mechRun={runs.find((r) => r.run_type === "mech_model") ?? null} family={family} pressure={pressure} />
+        <Scope family={family} pressure={pressure} near={near} running={scopeRunning} />
+        <FSOverlay mechRun={runs.find((r) => r.run_type === "mech_model") ?? null} family={family} pressure={pressure} near={near} />
         <CircuitTest spiceRun={spiceRun} />
       </div>
     </div>

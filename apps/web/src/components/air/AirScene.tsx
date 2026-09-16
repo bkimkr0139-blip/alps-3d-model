@@ -42,11 +42,14 @@ function Electrode({ splitRing, state }: { splitRing: boolean; state: AirState |
       </mesh>
     );
   }
-  // Layout B: half-ring split at y = 0 (E1 y ≥ 0 → z_three ≤ 0).
+  // Layout B: half-ring split at y = 0 (E1 y ≥ 0 → z_three ≤ 0). Centered on
+  // ELECTRODE_CENTER_X like the solver's _electrode_cells and the CAD's
+  // _build_electrode both are — the ring drifts to x=0 otherwise and stops
+  // matching the model-tab GLB.
   const half = (flip: boolean, key: string) => (
     <mesh
       key={key}
-      position={[0, PCB_TOP + 0.04, flip ? 0.05 : -0.05]}
+      position={[ELEC_X, PCB_TOP + 0.04, flip ? 0.05 : -0.05]}
       rotation={[-Math.PI / 2, 0, flip ? Math.PI : 0]}
     >
       <ringGeometry args={[RING_INNER_R, RING_OUTER_R, 48, 1, 0, Math.PI]} />

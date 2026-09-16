@@ -49,10 +49,12 @@ export function FSOverlay({
   mechRun,
   family,
   pressure,
+  near,
 }: {
   mechRun: SimulationRun | null;
-  family: "tact" | "encoder" | "mems";
+  family: "tact" | "encoder" | "mems" | "air";
   pressure: number;
+  near: boolean;
 }) {
   const { t } = useTranslation();
   const actuated = useTwinStore((s) => s.actuated);
@@ -122,7 +124,8 @@ export function FSOverlay({
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       // Same approach curve as TwinAnimator — bench animation and 3D twin
-      // stay in lockstep. MEMS has no animation: pressure IS the input.
+      // stay in lockstep. MEMS has no animation: pressure IS the input. Same
+      // for the AirInput puck: fingertip near/away drives the ΔC(d) sweep.
       if (family === "encoder" && rotating) {
         // looping sweep while the shaft spins
         actRef.current = (actRef.current + dt * 0.35) % 1.15;
@@ -130,14 +133,15 @@ export function FSOverlay({
         raf = requestAnimationFrame(tick);
         return;
       }
-      const target = family === "tact" ? (actuated ? 1 : 0) : family === "encoder" ? 0 : (pressure - 40) / 360;
+      const target =
+        family === "tact" ? (actuated ? 1 : 0) : family === "encoder" ? 0 : family === "air" ? (near ? 1 : 0) : (pressure - 40) / 360;
       actRef.current += (target - actRef.current) * Math.min(1, dt * 22);
       drawFraction(actRef.current);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [predicted, family, actuated, rotating, pressure]);
+  }, [predicted, family, actuated, rotating, pressure, near]);
 
   if (!mechRun || predicted.length < 2) return null;
 
