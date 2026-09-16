@@ -676,10 +676,14 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
   const CORE_W = Math.max(2.0, DIE_W - 2 * (CORE_INSET + utilMargin));
   const CORE_D = Math.max(2.0, DIE_D - 2 * (CORE_INSET + utilMargin));
 
-  // 1. Die substrate
+  // 1. Die substrate — silicon base + lapped lid (beveled die edge)
   boxes.push({
     name: "eda_die_Substrate", layer: "die", pos: [0, LAYER_Y.die, 0],
-    size: [DIE_W, 0.15, DIE_D], color: [0.05, 0.06, 0.09], roughness: 0.95,
+    size: [DIE_W, 0.15, DIE_D], color: [0.09, 0.11, 0.16], metalness: 0.4, roughness: 0.5,
+  });
+  boxes.push({
+    name: "eda_die_Lid", layer: "die", pos: [0, LAYER_Y.die + 0.1, 0],
+    size: [DIE_W - 0.3, 0.05, DIE_D - 0.3], color: [0.14, 0.17, 0.25], metalness: 0.5, roughness: 0.38,
   });
 
   // 2. Pad ring (gold) — count from pad_density
@@ -693,7 +697,7 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
       boxes.push({
         name: `eda_pad_${String(padIdx++).padStart(3, "0")}`, layer: "pad",
         pos: [x, LAYER_Y.pad, z], size: [PAD_SIZE, 0.1, PAD_SIZE],
-        color: [0.96, 0.78, 0.31], metalness: 0.85, roughness: 0.32, emissive: 0.1,
+        color: [0.96, 0.78, 0.31], metalness: 0.95, roughness: 0.24, emissive: 0.06,
       });
     }
   }
@@ -704,7 +708,7 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
       boxes.push({
         name: `eda_pad_${String(padIdx++).padStart(3, "0")}`, layer: "pad",
         pos: [x, LAYER_Y.pad, z], size: [PAD_SIZE, 0.1, PAD_SIZE],
-        color: [0.96, 0.78, 0.31], metalness: 0.85, roughness: 0.32, emissive: 0.1,
+        color: [0.96, 0.78, 0.31], metalness: 0.95, roughness: 0.24, emissive: 0.06,
       });
     }
   }
@@ -722,14 +726,14 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
   ).forEach(([px, pz, sx, sz], i) => {
     boxes.push({
       name: `eda_seal_${i}`, layer: "seal", pos: [px, LAYER_Y.seal, pz],
-      size: [sx, 0.04, sz], color: [0.66, 0.55, 0.22], metalness: 0.7, roughness: 0.45,
+      size: [sx, 0.04, sz], color: [0.95, 0.78, 0.3], metalness: 0.92, roughness: 0.25, emissive: 0.08,
     });
   });
 
   // 4. Core
   boxes.push({
     name: "eda_core_Area", layer: "core", pos: [0, LAYER_Y.core, 0],
-    size: [CORE_W, 0.04, CORE_D], color: [0.07, 0.1, 0.18], roughness: 0.85,
+    size: [CORE_W, 0.04, CORE_D], color: [0.07, 0.1, 0.18], metalness: 0.3, roughness: 0.6,
   });
 
   // 5. Macros — the mission's real functional blocks (silProfileOf: an AFE
@@ -745,9 +749,18 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
   });
   const macroBboxes: [number, number, number, number][] = [];
   for (const m of macros) {
+    // darker plinth tray grounds the block on the core slab (reads as a
+    // solid hard macro, like the synthesis placement trays)
+    boxes.push({
+      name: `eda_macroBase_${m.label}`, layer: "macro",
+      pos: [m.mx, LAYER_Y.macro - 0.12, m.mz],
+      size: [m.mw + 0.2, 0.05, m.md + 0.2],
+      color: [m.color[0] * 0.4, m.color[1] * 0.4, m.color[2] * 0.4],
+      metalness: 0.4, roughness: 0.5, emissive: 0.05,
+    });
     boxes.push({
       name: `eda_macro_${m.label}`, layer: "macro", pos: [m.mx, LAYER_Y.macro, m.mz],
-      size: [m.mw, 0.2, m.md], color: m.color, metalness: 0.25, roughness: 0.55, emissive: 0.08,
+      size: [m.mw, 0.2, m.md], color: m.color, metalness: 0.45, roughness: 0.4, emissive: 0.08,
     });
     macroBboxes.push([m.mx, m.mz, m.mw, m.md]);
   }
@@ -773,7 +786,7 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
     boxes.push({
       name: `eda_diff_Row_${String(r).padStart(2, "0")}`, layer: "diff",
       pos: [0, LAYER_Y.diff, zRow], size: [CORE_W - 0.4, 0.02, ROW_H - 0.05],
-      color: [0.55, 0.32, 0.18], roughness: 0.92,
+      color: [0.55, 0.32, 0.18], metalness: 0.25, roughness: 0.85,
     });
 
     const xLeft = -CORE_W / 2 + 0.2;
@@ -797,7 +810,7 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
       boxes.push({
         name: `eda_cell_${String(cellIdx).padStart(3, "0")}`, layer: "cell",
         pos: [x + cw / 2, LAYER_Y.cell, zRow], size: [cw - 0.025, 0.1, ROW_H - 0.04],
-        color: well, roughness: 0.6,
+        color: well, metalness: 0.4, roughness: 0.42,
       });
       const nUnits = Math.max(1, Math.round(cw / UNIT_W));
       for (let u = 0; u < nUnits; u++) {
@@ -821,7 +834,7 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
       boxes.push({
         name: `eda_M1_Rail_${String(r).padStart(2, "0")}_${which}`, layer: "M1",
         pos: [0, LAYER_Y.M1, railZ], size: [railLen, 0.02, 0.025],
-        color: railColor as RGB, metalness: 0.55, roughness: 0.32, emissive: 0.22,
+        color: railColor as RGB, metalness: 0.85, roughness: 0.26, emissive: 0.12,
       });
     }
   }
@@ -857,19 +870,19 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
       name: `eda_${hLayer}_RouteH_${String(ri).padStart(3, "0")}`, layer: hLayer,
       pos: [(sx + dx) / 2, LAYER_Y[hLayer], sz],
       size: [Math.max(0.12, Math.abs(dx - sx)), 0.018, "M5" === hLayer ? 0.05 : 0.04],
-      color: LAYER_COLOR[hLayer], metalness: 0.55, roughness: 0.32, emissive: 0.22,
+      color: LAYER_COLOR[hLayer], metalness: 0.9, roughness: 0.24, emissive: 0.12,
     });
     boxes.push({
       name: `eda_${vLayer}_RouteV_${String(ri).padStart(3, "0")}`, layer: vLayer,
       pos: [dx, LAYER_Y[vLayer], (sz + dz) / 2],
       size: [vLayer === "M4" ? 0.05 : 0.04, 0.018, Math.max(0.12, Math.abs(dz - sz))],
-      color: LAYER_COLOR[vLayer], metalness: 0.55, roughness: 0.32, emissive: 0.22,
+      color: LAYER_COLOR[vLayer], metalness: 0.9, roughness: 0.24, emissive: 0.12,
     });
     boxes.push({
       name: `eda_${viaLayer}_${String(viaIdx++).padStart(3, "0")}`, layer: viaLayer,
       pos: [dx, (LAYER_Y[hLayer] + LAYER_Y[vLayer]) / 2, sz],
       size: [0.08, 0.1, 0.08], cyl: true,
-      color: [0.96, 0.85, 0.32], metalness: 0.95, roughness: 0.2, emissive: 0.3,
+      color: [0.96, 0.85, 0.32], metalness: 0.95, roughness: 0.2, emissive: 0.2,
     });
   }
 
@@ -883,7 +896,7 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
       name: `eda_M4_PowerV_${String(i).padStart(2, "0")}`, layer: "M4",
       pos: [-CORE_W / 2 + (i + 1) * pgXStep, LAYER_Y.M4, 0],
       size: [0.07, 0.025, CORE_D - 0.4], color: [0.95, 0.65, 0.25],
-      metalness: 0.55, roughness: 0.32, emissive: 0.22,
+      metalness: 0.9, roughness: 0.24, emissive: 0.12,
     });
   }
   for (let i = 0; i < nHPg; i++) {
@@ -891,7 +904,7 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
       name: `eda_M5_PowerH_${String(i).padStart(2, "0")}`, layer: "M5",
       pos: [0, LAYER_Y.M5, -CORE_D / 2 + (i + 1) * pgZStep],
       size: [CORE_W - 0.4, 0.025, 0.07], color: [0.55, 0.3, 0.85],
-      metalness: 0.55, roughness: 0.32, emissive: 0.22,
+      metalness: 0.9, roughness: 0.24, emissive: 0.12,
     });
   }
 
@@ -919,8 +932,12 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
     mode: "layout",
     boxes,
     legend,
+    studio: true,
     target: [0, 0.3, 0],
     distance: Math.max(DIE_W, DIE_D) * 1.9 + 3,
+    // pin each layer's lift-off to its registered height so the added
+    // sub-boxes (lid, macro plinths) don't shift the explode order
+    explodeAnchors: Object.fromEntries([...counts.keys()].map((k) => [k, LAYER_Y[k] ?? 0])),
   };
 }
 
