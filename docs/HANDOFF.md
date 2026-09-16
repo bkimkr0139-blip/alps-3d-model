@@ -106,6 +106,15 @@ verify:seedl10n 101/0 + Playwright 헤드리스 CLEAN):
    레지스트리 Y 고정(추가 서브박스가 리프트 순서를 바꾸지 않음). 검증:
    eda_e2e+eda_sil_e2e+w6_sweep CLEAN.
 
+13. `dc82079` **공정 3D도 동일 실사 트리트먼트**(사용자 지시) — `buildProcessScene`:
+   스텝 디테일 유지 + `studio: true`(3D 씬 3종 전부 스튜디오 환경광), 신규
+   `EdaScene.shadowY`(기본 −0.32, 웨이퍼 슬라브가 y −0.5까지 내려가 공정만
+   −0.55 — 그림자 평면이 슬라브를 가로지르지 않음). 재질 정합: 패드 metalness
+   1.0/rough 0.24·실링=Au 톤 통일(0.92/0.25), M1~M6·비트라인/실드 0.88~0.92+
+   emissive 낮춰 환경 반사 담당, via1 0.95/0.22, STI=CMP 광택(rough 0.45),
+   패시베이션=유리(rough 0.25), 웨이퍼 노치/플랫 금속 마감. 검증: eda_e2e+
+   eda_sil_e2e+w6_sweep CLEAN.
+
 **검증 스크립트**(`/tmp/alps-logs/`, 전부 PASS): cockpit_e2e(W2),
 proc_e2e/proc_mobile_e2e(W3), bench_e2e(W4), review_e2e(W5), w6_sweep(8탭
 ko + en/ja 스모크 + 390×844 모바일), pkg_e2e(템플릿 A~D × ⑤단계 캔버스+
