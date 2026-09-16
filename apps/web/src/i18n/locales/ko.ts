@@ -99,6 +99,11 @@ const ko: Resources = {
     logicLowLimit: "한계 1.0 V",
     spiceSource: "출처:",
     noSpice: "아직 SPICE 런이 없습니다 — 눌림 노드 측정에는 런 1회가 필요합니다 (결과 비교에서 실행).",
+    equip: {
+      dut: "DUT",
+      run: "측정 재개",
+      stop: "측정 정지",
+    },
     fsTitle: "모델 곡선 (벤치 연동)",
     fsSyncHint: "커서가 DUT 움직임과 동기화",
     kanseiTitle: "감성 지표",
@@ -692,6 +697,13 @@ const ko: Resources = {
   asic: {
     title: "ASIC 개발 9단계",
     subtitle: "Alps Alpine ASIC 개발·샘플 평가·신뢰성 검증·양산 관리 작업 센터 (개발지시서 v1.0)",
+    rack: {
+      calIn: "교정까지 {{days}}일",
+      calExpired: "교정 만료",
+      calUnknown: "교정 정보 없음",
+      findings: "발견 항목",
+      scale: "교정 바 눈금 180일",
+    },
     menuHint: "왼쪽 도트 = 완료 게이트 상태 (초록 통과 / 빨강 blocker). 단계를 클릭하면 작업 화면이 열립니다.",
     conf: {
       educational_estimate: "educational estimate (브라우저 합성)",

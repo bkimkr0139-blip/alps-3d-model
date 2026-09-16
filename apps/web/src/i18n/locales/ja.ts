@@ -99,6 +99,11 @@ const ja: Resources = {
     logicLowLimit: "限界 1.0 V",
     spiceSource: "出典:",
     noSpice: "SPICEランがまだありません — 押下ノード測定にはラン 1 回が必要です（結果比較から実行）。",
+    equip: {
+      dut: "DUT",
+      run: "測定再開",
+      stop: "測定停止",
+    },
     fsTitle: "モデル曲線（ベンチ連動）",
     fsSyncHint: "カーソルはDUT動きと同期",
     kanseiTitle: "感性指標",
@@ -692,6 +697,13 @@ const ja: Resources = {
   asic: {
     title: "ASIC開発 9段階",
     subtitle: "Alps Alpine ASIC開発・サンプル評価・信頼性検証・量産管理ワークセンター (開発指示書 v1.0)",
+    rack: {
+      calIn: "校正まで {{days}}日",
+      calExpired: "校正期限切れ",
+      calUnknown: "校正情報なし",
+      findings: "検出事項",
+      scale: "校正バー目盛 180日",
+    },
     menuHint: "左のドット = 完了ゲート状態 (緑パス / 赤ブロッカー)。段階をクリックするとワークスペースが開きます。",
     conf: {
       educational_estimate: "educational estimate (ブラウザ合成)",

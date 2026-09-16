@@ -100,6 +100,11 @@ const en = {
     logicLowLimit: "limit 1.0 V",
     spiceSource: "Source:",
     noSpice: "No SPICE run yet — the pressed-node reading needs one (run it from Result Compare).",
+    equip: {
+      dut: "DUT",
+      run: "Resume acquisition",
+      stop: "Stop acquisition",
+    },
     fsTitle: "Model curve (bench-linked)",
     fsSyncHint: "cursor follows the DUT motion",
     kanseiTitle: "Kansei (illustrative)",
@@ -694,6 +699,13 @@ const en = {
   asic: {
     title: "ASIC Development — 9 Stages",
     subtitle: "Alps Alpine ASIC development · sample evaluation · reliability · production work center (directive v1.0)",
+    rack: {
+      calIn: "cal due in {{days}}d",
+      calExpired: "cal expired",
+      calUnknown: "no calibration info",
+      findings: "Findings",
+      scale: "cal bar scale 180d",
+    },
     menuHint: "Left dot = completion-gate status (green pass / red blocker). Click a stage to open its workspace.",
     conf: {
       educational_estimate: "educational estimate (in-browser)",

@@ -398,6 +398,96 @@ function histValues(edges: number[], counts: number[]): number[] {
 }
 
 // ── ⑤ equipment measurement runs (EPIC E) ───────────────────────────────────
+
+// Rack strip above the runs table: one slot per piece of equipment with a
+// status LED and a calibration countdown. Deliberately DOM, not 3D — no rack
+// geometry exists in any imported evidence, and the twin must not invent one
+// (§ honesty: only model what the data describes). The bar's 180-day scale is
+// presentation, disclosed in the footnote; the true due date stays printed.
+export function EquipmentRackStrip({ runs }: { runs: AsicMeasurementRun[] }) {
+  const { t } = useTranslation();
+  const [now] = useState(() => Date.now()); // mount-time snapshot; day granularity
+  const DAY = 86400000;
+  const SCALE = 180; // days shown at full bar width
+  const slot = (r: AsicMeasurementRun) => {
+    const expires = r.calibration_expires_at ? new Date(r.calibration_expires_at).getTime() : null;
+    const daysLeft = expires !== null ? Math.ceil((expires - now) / DAY) : null;
+    const expired = daysLeft !== null && daysLeft <= 0;
+    const calColor = expired ? "#f87171" : daysLeft !== null && daysLeft <= 90 ? "#fbbf24" : "#34d399";
+    const ledColor = r.status === "verified_ingest" ? "#34d399" : r.status === "rejected" ? "#f87171" : "#fbbf24";
+    const fill = expired ? 100 : daysLeft !== null ? Math.min(100, (daysLeft / SCALE) * 100) : 0;
+    return (
+      <div
+        key={r.id}
+        title={`${r.business_id} · ${r.equipment_type}${r.equipment_model ? ` · ${r.equipment_model}` : ""}`}
+        style={{
+          border: "1px solid #334155",
+          borderRadius: 8,
+          padding: "7px 9px",
+          minWidth: 148,
+          flex: "1 1 148px",
+          background: "#0b1220",
+          display: "flex",
+          flexDirection: "column",
+          gap: 5,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "monospace" }}>
+          <span
+            aria-hidden
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              flexShrink: 0,
+              background: ledColor,
+              boxShadow: `0 0 6px ${ledColor}`,
+            }}
+          />
+          <span style={{ color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.equipment_id}</span>
+        </div>
+        <div style={{ fontSize: 9.5, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {r.equipment_type}
+          {r.equipment_model ? ` · ${r.equipment_model}` : ""}
+        </div>
+        <div style={{ height: 4, borderRadius: 2, background: "#1e293b", overflow: "hidden" }}>
+          <div style={{ width: `${fill}%`, height: "100%", background: calColor, borderRadius: 2 }} />
+        </div>
+        <div style={{ fontSize: 9.5, color: expired ? "#f87171" : "#94a3b8" }}>
+          {daysLeft === null
+            ? t("asic.rack.calUnknown")
+            : expired
+              ? t("asic.rack.calExpired")
+              : t("asic.rack.calIn", { days: daysLeft })}
+        </div>
+      </div>
+    );
+  };
+  // Findings rolled up across runs — chips mirror the per-row codes below.
+  const findingCounts = new Map<string, number>();
+  for (const r of runs) for (const f of r.findings ?? []) findingCounts.set(f.code, (findingCounts.get(f.code) ?? 0) + 1);
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{runs.map(slot)}</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+        <span style={{ fontSize: 9.5, color: "#475569" }}>{t("asic.rack.scale")}</span>
+        {findingCounts.size > 0 && (
+          <>
+            <span style={{ fontSize: 9.5, color: "#475569" }}>·</span>
+            <span style={{ fontSize: 9.5, color: "#475569" }}>{t("asic.rack.findings")}:</span>
+            {[...findingCounts.entries()].map(([code, n]) => (
+              <Chip key={code} color="#fbbf24">
+                {code}
+                {n > 1 ? ` ×${n}` : ""}
+              </Chip>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function EquipmentRunsPanel({ live, liveState }: { live: Live; liveState: LiveState }) {
   const { i18n } = useTranslation();
   const tr = makeSeedTr(i18n.resolvedLanguage);
@@ -411,6 +501,7 @@ export function EquipmentRunsPanel({ live, liveState }: { live: Live; liveState:
   }
   return (
     <SectionCard title="Equipment measurement runs (EPIC E)" right={<LiveChip state={liveState} />}>
+      <EquipmentRackStrip runs={live.runs} />
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>

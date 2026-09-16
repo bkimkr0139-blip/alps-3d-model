@@ -8,6 +8,8 @@ import { useTwinStore, useBenchStore } from "../store";
 import { ViewerEnvironment } from "./ThreeViewer";
 import { FSOverlay } from "./FSOverlay";
 import { canvasTextTexture } from "../ui/canvasText";
+import { HudChip } from "../ui/kit";
+import { accent, border, bg, status as S } from "../ui/tokens";
 
 // Virtual dev/test board (S04 second tab): an industry-standard-parts board —
 // FR4 PCB, the DUT (the selected product's part), 0603 pull-up/decoupling, an
@@ -455,15 +457,15 @@ const WINDOW = 1200; // samples shown → 600 ms → 60 ms/div
 const VCC = 3.3;
 const LOGIC_LOW_LIMIT_V = 1.0;
 
-function Scope({ family, pressure }: { family: BenchFamily; pressure: number }) {
+function Scope({ family, pressure, running }: { family: BenchFamily; pressure: number; running: boolean }) {
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const buf = useRef({ v1: new Float32Array(WINDOW), v2: new Float32Array(WINDOW), head: 0, count: 0 });
   // Mutable latest inputs for the rAF loop (no re-subscribe on prop change).
-  const inputRef = useRef({ family, pressure });
+  const inputRef = useRef({ family, pressure, running });
   useEffect(() => {
-    inputRef.current = { family, pressure };
-  }, [family, pressure]);
+    inputRef.current = { family, pressure, running };
+  }, [family, pressure, running]);
   // Channel state machine
   const sim = useRef({ phase: 0, bounceT: 0, v1: 1, v2: 1, lastAct: false });
 
@@ -604,18 +606,24 @@ function Scope({ family, pressure }: { family: BenchFamily; pressure: number }) 
       for (let i = 0; i <= cols; i += 2) {
         ctx.fillText(`${((cols - i) * 60) / 10}ms`, mL + (pw * i) / cols, h - 6);
       }
-      ctx.fillStyle = "#22c55e";
+      ctx.fillStyle = inputRef.current.running ? "#22c55e" : "#64748b";
       ctx.textAlign = "left";
-      ctx.fillText("● RUN", 6, 14);
+      ctx.fillText(inputRef.current.running ? "● RUN" : "○ STOP", 6, 14);
     };
 
     const loop = () => {
       const now = performance.now();
       acc += Math.min(0.05, (now - last) / 1000); // clamp tab-switch jumps
       last = now;
-      while (acc >= SAMPLE_DT) {
-        acc -= SAMPLE_DT;
-        step(SAMPLE_DT);
+      // STOP freezes acquisition like a bench scope: the last window stays
+      // on screen (still redrawn — resize-safe) but time stops advancing.
+      if (inputRef.current.running) {
+        while (acc >= SAMPLE_DT) {
+          acc -= SAMPLE_DT;
+          step(SAMPLE_DT);
+        }
+      } else {
+        acc = 0;
       }
       draw();
       raf = requestAnimationFrame(loop);
@@ -624,9 +632,38 @@ function Scope({ family, pressure }: { family: BenchFamily; pressure: number }) 
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // Channel LEDs in the bezel — lit in the channel colour while acquiring,
+  // dim when stopped; the CH1/CH2 labels carry the meaning, never colour alone.
+  const led = (color: string, lit: boolean) => (
+    <span
+      aria-hidden
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        display: "inline-block",
+        background: lit ? color : "#334155",
+        boxShadow: lit ? `0 0 6px ${color}` : "none",
+      }}
+    />
+  );
+
   return (
     <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 8, background: "#0b1220" }}>
-      <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>{t("bench.scopeTitle")}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <span style={{ fontSize: 12, opacity: 0.7 }}>{t("bench.scopeTitle")}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontFamily: "monospace" }}>
+          {led("#facc15", running)}
+          <span style={{ color: "#facc15" }}>CH1</span>
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontFamily: "monospace" }}>
+          {led("#38bdf8", running)}
+          <span style={{ color: "#38bdf8" }}>CH2</span>
+        </span>
+        <span style={{ marginLeft: "auto", fontSize: 10.5, fontFamily: "monospace", color: running ? "#22c55e" : "#64748b" }}>
+          {running ? "● RUN" : "○ STOP"}
+        </span>
+      </div>
       <canvas ref={canvasRef} style={{ width: "100%", height: 200, display: "block", borderRadius: 6 }} />
       <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
         <span style={{ color: "#facc15" }}>■</span> CH1 ·{" "}
@@ -700,6 +737,8 @@ export function TestBench({ product, runs }: { product: Product | null; runs: Si
   const rotating = useBenchStore((s) => s.rotating);
   const setRotating = useBenchStore((s) => s.setRotating);
   const [pressure, setPressure] = useState(200);
+  // Bench-scope RUN/STOP: STOP freezes the acquisition window (bezel LEDs dim).
+  const [scopeRunning, setScopeRunning] = useState(true);
 
   // Switching product swaps the DUT — never carry a pressed/rotating state
   // from one physical part into the next.
@@ -742,6 +781,31 @@ export function TestBench({ product, runs }: { product: Product | null; runs: Si
           }}
         >
           <div style={{ opacity: 0.7 }}>{hint}</div>
+          {/* equipment identity: which DUT is on the bench + the SPICE run
+              the circuit-test verdicts are provenance-bound to */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <HudChip color={accent.id}>
+              {t("bench.equip.dut")} · {product?.name ?? family}
+            </HudChip>
+            <HudChip color={S.okAlt}>◈ SPICE · {spiceRun ? `${spiceRun.business_id} · ${spiceRun.tool_version ?? "—"}` : t("bench.noSpice")}</HudChip>
+          </div>
+          <button
+            onClick={() => setScopeRunning(!scopeRunning)}
+            aria-pressed={scopeRunning}
+            style={{
+              padding: "5px 10px",
+              borderRadius: 6,
+              border: `1px solid ${scopeRunning ? border.base : accent.orange}`,
+              background: scopeRunning ? bg.raise : "#7c2d12",
+              color: "white",
+              cursor: "pointer",
+              fontSize: 12,
+              fontFamily: "monospace",
+              textAlign: "left",
+            }}
+          >
+            {scopeRunning ? `● ${t("bench.equip.stop")}` : `▶ ${t("bench.equip.run")}`}
+          </button>
           {family === "encoder" && (
             <button
               onClick={() => setRotating(!rotating)}
@@ -793,7 +857,7 @@ export function TestBench({ product, runs }: { product: Product | null; runs: Si
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0, overflowY: "auto" }}>
-        <Scope family={family} pressure={pressure} />
+        <Scope family={family} pressure={pressure} running={scopeRunning} />
         <FSOverlay mechRun={runs.find((r) => r.run_type === "mech_model") ?? null} family={family} pressure={pressure} />
         <CircuitTest spiceRun={spiceRun} />
       </div>
