@@ -1,10 +1,12 @@
 # ALPS ALPINE Engineering Twin Workbench — System Documentation
 
-**Version v1.0 · as of 2026-09-15 · Complete feature inventory**
+**Version v1.1 · as of 2026-09-17 · Complete feature inventory**
 
 This reference document inventories every feature, screen and characteristic currently implemented in the workbench, the differentiators versus existing solutions, the applicability within Alps Alpine, and the roadmap. It can be read at any time in the in-app **System Docs tab**, and downloaded as an `.md` file for meeting attachments, reporting, and onboarding material.
 
 > **Honesty principle (the design philosophy of this system)** — every educational estimate on screen carries a △ educational estimate badge, every synthetic dataset a ◇ synthetic fixture badge. In-browser mock run results can never become sign-off evidence, and the gate JSON always shows the `MOCK_RESULT_PRESENT` blocker. Approved evidence is never overwritten — only new revisions are created. Status is conveyed by icon + wording, never color alone. The feature descriptions in this document follow the same principle.
+
+> **v1.1 (2026-09-17) highlights** — premium instrument UI (design tokens, embossed shell, premium chart themes), an app-wide dark/light theme toggle (instrument 3D and scope glass stay dark; both modes pass the WCAG contrast audit), the language switcher pinned to the header top-right, the 3D cockpit landing (model tab), the 3D production-line twin (FactoryViewer), 3D review tools (section / measure / annotate), part-ID selection sync across panels, ASIC package-family 3D models with 1:1 bond-map fanout and realistic Au wires, product-chipset-flavored EDA missions and 3D scenes, and a dedicated AirInput test bench board (puck-module DUT).
 
 ---
 
@@ -41,8 +43,9 @@ All 3D scenes (part geometry, wave propagation and waveforms, package cross-sect
 
 ### 3.1 Unified navigation bar (shared across all screens)
 
-- **One-row hierarchy**: `PRODUCT ▸ VARIANT` selects → `VIEWS` (product-twin views) → `STANDALONE MODULES` → language switch.
+- **One-row hierarchy**: `PRODUCT ▸ VARIANT` selects → `VIEWS` (product-twin views) → `STANDALONE MODULES`. The language switcher and the dark/light theme toggle are **pinned to the header top-right** — reachable from every screen.
 - Every control shares the same height, rounding, font and micro-caption — one control system.
+- **Premium instrument design**: `--alps-*` design tokens, an embossed-button metallic-panel shell and premium ECharts/SVG/canvas chart themes applied consistently across every screen. An app-wide **dark/light theme toggle** (instrument 3D and scope glass stay dark), with both modes passing the WCAG contrast audit.
 - Entering a standalone module (EDA training · ASIC center · system docs) dims and disables the product/variant selects and shows the "ⓘ standalone modules ignore the product/variant selection" hint — **the UI never lies**.
 - Side panels and the bottom compare/correlation/gate frames collapse into **focus mode**, giving standalone modules the full width.
 - The onboarding guide ("Where you are") walks through progress as a checklist.
@@ -56,14 +59,20 @@ All 3D scenes (part geometry, wave propagation and waveforms, package cross-sect
 ### 3.3 3D Design Review (S04)
 
 - CAD-concept 3D viewer: click a part ↔ reverse-lookup its requirements.
+- **3D cockpit landing**: on the model tab the 3D view takes the full width and a glass HUD strip (product · variant | gate readiness GateDot | latest simulation runs | requirement↔part link chip) floats above the canvas; the requirement/simulation panels retreat into collapsible glass drawers.
+- **Review toolbar (FR-03)**: section clipping (axis · offset), 2-point distance measurement (mm, STEP units), annotation pins (◈ client-local). With the toolbar off, the default experience stays clean.
+- **Part-ID sync across panels (directive L187)**: the 3D view, circuit-verification rows and system-model nodes all highlight the same part ID together (both directions).
 - **Exploded view** slider, **X-ray (body opacity)** slider.
 - Assembly-simulation playback: a cycle slider plays the press action and vehicle-vibration frames.
 - Stress hot-spot display (explicitly labeled educational visualization — not life prediction).
 
 ### 3.4 Dev/Test Board (S05)
 
-- Virtual test bench: push-switch / vehicle-vibration inputs → measured (synthetic) data channels.
-- Side-by-side comparison with prediction-model results (Result Compare, S08).
+- **Per-family DUT modules**: the bench PCB carries a family-specific DUT — tactile (push switch), encoder (slotted disk), MEMS (pressure gauge), AirInput (electrode puck module).
+- 2-channel oscilloscope (real signal-chain state machine, RUN/STOP · bezel LEDs) with the F–S curve overlay cursor in sync.
+- **AirInput puck board**: housing, PCB, electrode (variant A round pad / B split ring), cover glass and castellated terminals are mounted, and a fingertip stimulus (near/away) drives scope CH1 sense level, the CH2 touch hysteresis comparator and the board LED.
+- **Circuit Test table**: compared side-by-side with real SPICE run results (source chip: business_id · tool_version) — Result Compare (S08).
+- The bench DUT gets an emissive highlight only when it matches the selected part kind; on mismatch the HUD shows the honest "bench DUT = whole product" chip.
 
 ### 3.5 System Model (E02)
 
@@ -74,6 +83,8 @@ All 3D scenes (part geometry, wave propagation and waveforms, package cross-sect
 
 - Manufacturing process twin: process steps, monitoring charts (follows the §5.1 legend rules).
 - **3D fab-flow view**: wafer → front-end → packaging flow visualized in 3D.
+- **3D production-line twin (FactoryViewer)**: a 3D line of stations laid out in process order (seq_no) glows with control-chart status colors (in-control / attention / violation / idle); clicking a station opens a drawer with its control chart, cavity drift and lot details. Conveyor dots carry lot disposition colors.
+- Photoreal-style equipment silhouettes (annular lamp · press · molding machine · robot cell) plus a status-legend / OOW-counter / DOE-scroll HUD.
 
 ### 3.7 AirInput Field Twin (3D) — capacitive sensing module
 
@@ -82,12 +93,14 @@ All 3D scenes (part geometry, wave propagation and waveforms, package cross-sect
 - Per-electrode capacitance (ΔC) curves, sensing-volume / dead-zone / false-detection heat volumes.
 - **ASIC ↔ algorithm decision chain**: v1 fixed-threshold vs v2 baseline-hysteresis (IDLE/NEAR/TOUCH, debounce) comparison.
 - Robot-scan prediction-vs-measurement verification, GOLD-01..06 scenario table, Surrogate/Solver tier panel.
+- **Variant-following electrode geometry**: variant A (round pad) / B (split-ring) electrode shapes match across the solver, CAD, viewer and the test-bench puck at the same electrode center — no per-tab model mismatch.
 
 ### 3.8 EDA Training (IC Design & Circuit Test)
 
 - Lint → circuit simulation (waveform viewer) → synthesis → Place&Route 3D: a hands-on EDA flow.
-- Missions: 4-bit counter, 4-bit ALU, synchronous FIFO, UART TX, **32-bit RISC** (544 FF).
+- Five missions flavored as Alps product chipsets: tact debounce counter, touch ALU, AFE sample FIFO, sensor UART TX and the **AFE SoC 32-bit RISC** (544 FF) — `silProfileOf` assigns a chipset profile per product template.
 - Synthesis KPIs (FF/LUT counts), 3D layout (layered die, exploded view), educational waveforms.
+- **Three 3D scene types (process / synthesis / layout)**: the synthesis scene is rendered photoreal-style down to standard-cell rows, M1 rails, Cu/Al wiring, Au vias and a seal ring.
 
 ### 3.9 ASIC Program — 9-stage work center (directive v1.0 §2 mapping)
 
@@ -97,7 +110,7 @@ All 3D scenes (part geometry, wave propagation and waveforms, package cross-sect
 | ② Feasibility & Architecture | approve process/package options (OPT), risk and lead time | OPT_CONFIRMED |
 | ③ Program Baseline | baseline e-signature | BASELINE_SIGNED |
 | ④ ASIC Design | run lint / simulation / synthesis / P&R (reuses the EDA runners) | DESIGN_COMPLETE |
-| ⑤ Engineering Sample | **package 3D twin** (die, bond wires, mold, solder, MEMS) + measurement-vs-prediction correlation (R², bias/MAE/RMSE) | CORRELATION_OK |
+| ⑤ Engineering Sample | **package 3D twin** — package-family models (QFN/WLCSP/LGA/SOIC/LQFP) parsed from the template options, 1:1 bond-map fanout, **Au bond wires** (ball/stitch bonds → silver-plated fingers), sensor stack / cavity integration, explode anchors and a mold-off view + measurement-vs-prediction correlation (R², bias/MAE/RMSE) | CORRELATION_OK |
 | ⑥ ECO & Test Program | change-impact analysis → ECO close → **mask/test-program revision bump + forced evidence re-approval** (§14.3) | ECO_CLOSED |
 | ⑦ CS & Qualification | AEC-Q100 per-grade temperature table (`alps-asic-v1.0` policy), evidence/CAPA/waiver | QUAL_PASS |
 | ⑧ Release & Evidence | evidence e-signature, readiness ladder (education_only→released), gate JSON | EVIDENCE_APPROVALS |
@@ -105,6 +118,7 @@ All 3D scenes (part geometry, wave propagation and waveforms, package cross-sect
 
 - 4 product templates (cap-touch AFE / current sensor / motor ripple / environmental sensor) × distinct gate states, missions and correlation parameters.
 - Stage cockpit: current stage n/9, next gate, coverage, qualification rate and R² at a glance.
+- **Equipment rack strip**: run-status LEDs + a calibration countdown bar (calibration_expires_at) + findings chips above the equipment-runs panel.
 - The gate JSON honestly reports blockers (`MOCK_RESULT_PRESENT`, `EVIDENCE_APPROVALS`, …) and `decision_required` — **a release is never rubber-stamped**.
 
 **v1.1 enhancement (backend-connected — spec v1.1 §4/§7/§8, current-sensor ASIC PoC)**
@@ -150,6 +164,7 @@ All 3D scenes (part geometry, wave propagation and waveforms, package cross-sect
 | Variant & product scale | product × variant template structure, same-axis comparison | lower derived-model management cost |
 | Deterministic replay | seeded runners, state-machine gates | reproducible training and regression testing |
 | 3-locale UI | ko/en/ja fully synchronized | Japan HQ – Korea – overseas sites working simultaneously |
+| Premium instrument UI & theme | design-token shell (embossed buttons, metallic panels), premium chart themes, app-wide dark/light toggle (instrument glass stays dark) | commercial-grade screen quality; readability under any lighting |
 | SSO & role approval | Keycloak, e-signature approvals (approver recorded) | clear audit trail and accountability |
 
 ---
@@ -201,5 +216,7 @@ The core differentiator is that **honesty is built into the system** — the pat
 - **Frontend**: React 19 + TS + Vite · zustand · react-three-fiber 9/three 0.186 · i18next · Keycloak JS adapter
 - **Backend**: FastAPI · PostgreSQL · Temporal workflows
 - **3D scene contract**: `EdaScene` (mode: synthesis/layout/process/package) + the `EdaBox` primitive — EDA training, the ASIC package twin and the process flow all reuse the same viewer (`Eda3DViewer`)
+- **Design system**: `--alps-*` CSS variable tokens + `ui/tokens.ts`·`ui/kit.tsx` (HudPanel/Chip/GateDot) + `useChartTheme` (canvas)·`useSvgPalette` (SVG)·the premium ECharts theme; dark/light via `ui/useTheme.ts` + `:root[data-theme]` overrides
+- **Production-line 3D**: `proc/factoryScene.ts` (pure builder over a plain-array scene spec) + `FactoryViewer` — station status colors, conveyor lot dots, click drawers
 - **Determinism**: `strSeed` + mulberry32; same seed → same waveform/KPI
 - **Document**: this file `apps/web/src/assets/systemDoc.en.md` (bundled at build time, `?raw` import)
