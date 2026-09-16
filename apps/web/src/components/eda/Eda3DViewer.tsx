@@ -144,7 +144,7 @@ export function Eda3DViewer({ scene }: { scene: EdaScene | null }) {
                 <Lightformer intensity={0.45} rotation-x={Math.PI / 2} position={[0, -6, 0]} scale={[16, 16, 1]} color="#2c3d58" />
               </Environment>
               <ContactShadows
-                position={[0, -0.32, 0]}
+                position={[0, scene.shadowY ?? -0.32, 0]}
                 scale={scene.distance * 1.15}
                 far={10}
                 opacity={0.5}

@@ -36,6 +36,8 @@ export type EdaScene = {
   /** studio lighting — generated env map + contact shadow so polished
    *  metal reads as metal (photoreal scenes; no HDR assets, all local) */
   studio?: boolean;
+  /** contact-shadow plane height (default −0.32; scenes with deep slabs set lower) */
+  shadowY?: number;
   /** suggested orbit target + camera distance for framing */
   target: [number, number, number];
   distance: number;
@@ -1032,8 +1034,8 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
   {
     const s = stepOf("S00 wafer");
     put(s, "substrate", [0, -0.25, 0], [W, 0.5, D], s.color, { metalness: 0.35, roughness: 0.6 });
-    put(s, "notch", [-W / 2 + 0.3, -0.25, D / 2 - 0.3], [0.5, 0.5, 0.5], [0.3, 0.33, 0.38], { cyl: true });
-    put(s, "flat", [W / 2 - 0.12, -0.1, 0], [0.24, 0.3, D - 0.6], [0.3, 0.33, 0.38], { metalness: 0.4 });
+    put(s, "notch", [-W / 2 + 0.3, -0.25, D / 2 - 0.3], [0.5, 0.5, 0.5], [0.3, 0.33, 0.38], { cyl: true, metalness: 0.5, roughness: 0.35 });
+    put(s, "flat", [W / 2 - 0.12, -0.1, 0], [0.24, 0.3, D - 0.6], [0.3, 0.33, 0.38], { metalness: 0.5, roughness: 0.35 });
     for (let i = 0; i < 10; i++)
       put(s, `scribe${i}`, [-3.6 + i * 0.42, 0.005, D / 2 - 0.5], [0.2, 0.02, 0.1], [0.08, 0.09, 0.12]); // laser-scribe serial digits
     // stepper reticle field: this product's die repeats in a 2×2 field grid
@@ -1047,7 +1049,7 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
     for (let r = 0; r < ROWS; r++)
       for (let c = 0; c < COLS; c++) {
         const h = 0.1 + (rng() - 0.5) * 0.012; // post-CMP dishing jitter
-        put(s, `sti_${r}_${c}`, [colX(c), 0.05 + h / 2, rowZ(r)], [0.92, h, 0.62], s.color, { roughness: 0.7 });
+        put(s, `sti_${r}_${c}`, [colX(c), 0.05 + h / 2, rowZ(r)], [0.92, h, 0.62], s.color, { roughness: 0.45 }); // CMP-polished oxide sheen
       }
     put(s, "cmp_check", [0, 0.14, -D / 2 + 0.28], [W - 1.0, 0.06, 0.16], [0.13, 0.83, 0.93], { emissive: 0.5 });
   }
@@ -1139,10 +1141,10 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
   {
     const s = stepOf("S07 M1");
     for (let r = 0; r <= ROWS; r++)
-      put(s, `rail_${r}`, [0, 0.78, rowZ(r) - (D - 2.0) / ROWS / 2], [W - 1.2, 0.13, 0.26], s.color, { metalness: 0.8, roughness: 0.35 });
+      put(s, `rail_${r}`, [0, 0.78, rowZ(r) - (D - 2.0) / ROWS / 2], [W - 1.2, 0.13, 0.26], s.color, { metalness: 0.88, roughness: 0.26 });
     for (let r = 0; r < ROWS; r++)
       for (let c = 0; c < COLS - 1; c++)
-        put(s, `m1_${r}_${c}`, [(colX(c) + colX(c + 1)) / 2, 0.78, rowZ(r)], [0.22, 0.13, 0.22], s.color, { metalness: 0.8, roughness: 0.35 });
+        put(s, `m1_${r}_${c}`, [(colX(c) + colX(c + 1)) / 2, 0.78, rowZ(r)], [0.22, 0.13, 0.22], s.color, { metalness: 0.88, roughness: 0.26 });
     const ar = anaRect();
     if (ar) {
       // guard/shield ring closing the analog island off from the digital sea
@@ -1152,12 +1154,12 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
         [ar.cx - ar.w / 2 - 0.1, ar.cz, 0.1, ar.d + 0.5],
         [ar.cx + ar.w / 2 + 0.1, ar.cz, 0.1, ar.d + 0.5],
       ] as const)
-        put(s, "ana_shield", [px, 0.78, pz], [sx, 0.13, sz], [0.3, 0.85, 0.75], { metalness: 0.8, roughness: 0.35, emissive: 0.15 });
+        put(s, "ana_shield", [px, 0.78, pz], [sx, 0.13, sz], [0.3, 0.85, 0.75], { metalness: 0.9, roughness: 0.26, emissive: 0.15 });
     }
     const mr = memRect();
     if (mr)
       for (let c = 0; c < Math.min(mr.m.cols, 10); c++)
-        put(s, `membit${c}`, [mr.cx - (mr.w - 0.3) / 2 + c * 0.24, 0.78, mr.cz], [0.06, 0.13, mr.d + 0.2], [0.3, 0.55, 0.95], { metalness: 0.8, roughness: 0.35 }); // bitlines
+        put(s, `membit${c}`, [mr.cx - (mr.w - 0.3) / 2 + c * 0.24, 0.78, mr.cz], [0.06, 0.13, mr.d + 0.2], [0.3, 0.55, 0.95], { metalness: 0.9, roughness: 0.26 }); // bitlines
     reticleFrame(s, 1.9);
   }
 
@@ -1166,9 +1168,9 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
     const s = stepOf("S08 via/M2");
     for (let r = 0; r < ROWS; r += 2)
       for (let c = 0; c < COLS - 1; c += 2)
-        put(s, `via1_${r}_${c}`, [(colX(c) + colX(c + 1)) / 2, 0.98, rowZ(r)], [0.16, 0.22, 0.16], [0.96, 0.85, 0.32], { cyl: true, metalness: 0.85 });
+        put(s, `via1_${r}_${c}`, [(colX(c) + colX(c + 1)) / 2, 0.98, rowZ(r)], [0.16, 0.22, 0.16], [0.96, 0.85, 0.32], { cyl: true, metalness: 0.95, roughness: 0.22, emissive: 0.15 });
     for (let c = 0; c < 8; c++)
-      put(s, `m2_${c}`, [-W / 2 + 1.6 + (c * (W - 3.2)) / 7, 1.1, 0], [0.38, 0.13, D - 1.6], s.color, { metalness: 0.8, roughness: 0.35 });
+      put(s, `m2_${c}`, [-W / 2 + 1.6 + (c * (W - 3.2)) / 7, 1.1, 0], [0.38, 0.13, D - 1.6], s.color, { metalness: 0.9, roughness: 0.26 });
     reticleFrame(s, 2.05);
   }
 
@@ -1176,13 +1178,13 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
   {
     const s = stepOf("S09 top metal");
     for (let r = 0; r < 5; r++)
-      put(s, `m3_${r}`, [0, 1.34, -D / 2 + 1.2 + (r * (D - 2.4)) / 4], [W - 1.0, 0.15, 0.42], [0.3, 0.85, 0.55], { metalness: 0.8, roughness: 0.35 });
+      put(s, `m3_${r}`, [0, 1.34, -D / 2 + 1.2 + (r * (D - 2.4)) / 4], [W - 1.0, 0.15, 0.42], [0.3, 0.85, 0.55], { metalness: 0.9, roughness: 0.26 });
     for (let c = 0; c < 5; c++)
-      put(s, `m4_${c}`, [-W / 2 + 1.8 + (c * (W - 3.6)) / 4, 1.58, 0], [0.5, 0.17, D - 1.2], [0.95, 0.65, 0.25], { metalness: 0.8, roughness: 0.35 });
+      put(s, `m4_${c}`, [-W / 2 + 1.8 + (c * (W - 3.6)) / 4, 1.58, 0], [0.5, 0.17, D - 1.2], [0.95, 0.65, 0.25], { metalness: 0.9, roughness: 0.26 });
     for (const [zz, sx, sz] of [[-D / 2 + 0.7, W - 0.4, 0.75], [D / 2 - 0.7, W - 0.4, 0.75]] as const)
-      put(s, `m5_vdd${zz > 0 ? "p" : "n"}`, [0, 1.84, zz], [sx, 0.2, sz], [0.55, 0.3, 0.85], { metalness: 0.85, roughness: 0.3 });
+      put(s, `m5_vdd${zz > 0 ? "p" : "n"}`, [0, 1.84, zz], [sx, 0.2, sz], [0.55, 0.3, 0.85], { metalness: 0.92, roughness: 0.24 });
     for (const xx of [-W / 2 + 0.8, 0, W / 2 - 0.8])
-      put(s, `m6_${xx < 0 ? "n" : xx > 0 ? "p" : "m"}`, [xx, 2.08, 0], [0.8, 0.22, D - 0.4], [0.85, 0.85, 0.3], { metalness: 0.85, roughness: 0.3 });
+      put(s, `m6_${xx < 0 ? "n" : xx > 0 ? "p" : "m"}`, [xx, 2.08, 0], [0.8, 0.22, D - 0.4], [0.85, 0.85, 0.3], { metalness: 0.92, roughness: 0.24 });
     const ar = anaRect();
     if (ar && ar.a.electrodes > 0) {
       // touch front-end: electrode comb array over the AFE island (top metal)
@@ -1194,7 +1196,7 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
   // ── S10 passivation + die-ID dot matrix (traceability) ──
   {
     const s = stepOf("S10 passivation");
-    put(s, "passivation", [0, 2.28, 0], [W - 0.3, 0.08, D - 0.3], s.color, { opacity: 0.45, roughness: 0.4 });
+    put(s, "passivation", [0, 2.28, 0], [W - 0.3, 0.08, D - 0.3], s.color, { opacity: 0.45, roughness: 0.25 }); // glassy overcoat
     for (let iy = 0; iy < 7; iy++)
       for (let ix = 0; ix < 5; ix++)
         if (rng() > 0.35)
@@ -1204,7 +1206,7 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
   // ── S11 bond pads + seal ring + scribe street + PCM test structures ──
   {
     const s = stepOf("S11 pad/seal/PCM");
-    const pad: Partial<EdaBox> = { metalness: 1.0, roughness: 0.28, emissive: 0.08 };
+    const pad: Partial<EdaBox> = { metalness: 1.0, roughness: 0.24, emissive: 0.08 };
     // periphery bond pads — count from the product's pad ring (profile)
     for (let i = 0; i < prof.pads.tb; i++) {
       const x = -W / 2 + 1.4 + (i * (W - 2.8)) / Math.max(1, prof.pads.tb - 1);
@@ -1221,7 +1223,7 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
       [0, -D / 2 + 0.12, W - 0.1, 0.22], [0, D / 2 - 0.12, W - 0.1, 0.22],
       [-W / 2 + 0.12, 0, 0.22, D - 0.1], [W / 2 - 0.12, 0, 0.22, D - 0.1],
     ] as const)
-      put(seal, "seal", [px, 2.36, pz], [sx, 0.16, sz], [0.66, 0.55, 0.22], { metalness: 0.7, roughness: 0.4 });
+      put(seal, "seal", [px, 2.36, pz], [sx, 0.16, sz], [0.95, 0.78, 0.3], { metalness: 0.92, roughness: 0.25, emissive: 0.08 });
     // scribe street crosses between seal and pad ring
     for (const xx of [-3, 0, 3]) put(s, `street_${xx}`, [xx, 2.37, -D / 2 + 0.32], [0.18, 0.02, 0.18], [0.75, 0.78, 0.82], { emissive: 0.15 });
     // PCM (process control monitor) test structures in the street corner:
@@ -1251,6 +1253,9 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
     boxes,
     legend,
     steps: PROC_STEPS.map((s) => s.key),
+    studio: true,
+    // the wafer slab hangs to y −0.5 — keep the shadow plane below it
+    shadowY: -0.55,
     target: [0, 1.2, 0],
     distance: Math.max(W, D) * 1.75 + 3,
   };
