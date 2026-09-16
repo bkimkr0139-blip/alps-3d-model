@@ -390,51 +390,70 @@ function PlaceholderPart({ component, index }: { component: ComponentDto; index:
   );
 }
 
-// Image-based lighting from a generated dark studio — the same recipe as the
-// EDA scenes' drei <Environment>: a few bright area panels on a near-black
-// shell, PMREM'd into an env map. RoomEnvironment (a uniformly white room)
-// was tried first and washed dark plastics into a milky mid-gray — an LCP
-// housing at 4% albedo still picked up so much white-room irradiance that it
-// rendered like untextured clay. Area lights on black keep molded black
-// black and give metals crisp, believable highlights, with zero external
-// assets (drei's Environment presets fetch remote HDRIs, which this
-// deployment can't reach).
+// Image-based lighting from a generated studio — the same recipe as the EDA
+// scenes' drei <Environment>: a few bright area panels on a shell, PMREM'd
+// into an env map. RoomEnvironment (a uniformly white room) was tried first
+// and washed dark plastics into a milky mid-gray — an LCP housing at 4%
+// albedo still picked up so much white-room irradiance that it rendered like
+// untextured clay. Area lights on a controlled backdrop keep molded black
+// black (dark mode) and give metals crisp, believable highlights, with zero
+// external assets (drei's Environment presets fetch remote HDRIs, which this
+// deployment can't reach). The light mode is the same set with brighter
+// panels and a bright floor — a "product photo on white" look that separates
+// dark-cased parts from the backdrop.
 // Exported for the Test Bench board — its metallic parts need the same
 // image-based lighting or metalness=1 renders black.
+const BG_THEMES = {
+  dark: {
+    canvas: "#0f172a",
+    shell: "#05070d",
+    panels: [
+      { color: "#eaf1ff", intensity: 2.6, size: [16, 16] as const, pos: [0, 8, 0] as const },
+      // Side panels run TALL (studio strip lights): a curved metal part — the
+      // encoder's stainless shaft — picks up a long vertical highlight, the
+      // way product photography lights a turned surface.
+      { color: "#cfe0ff", intensity: 1.3, size: [10, 9] as const, pos: [9, 4, 6] as const },
+      { color: "#ffe7c4", intensity: 0.9, size: [10, 7] as const, pos: [-9, 3, -5] as const },
+      // Back fill: without it, faces angled away from the strips mirror pure
+      // black and polished metal reads as black plastic.
+      { color: "#aac4e8", intensity: 0.6, size: [12, 8] as const, pos: [0, 3, -9] as const },
+      { color: "#2c3d58", intensity: 0.55, size: [16, 16] as const, pos: [0, -8, 0] as const },
+    ],
+  },
+  light: {
+    canvas: "#e8ecf2",
+    shell: "#dfe5ee",
+    panels: [
+      { color: "#ffffff", intensity: 3.1, size: [16, 16] as const, pos: [0, 8, 0] as const },
+      { color: "#eaf1ff", intensity: 1.7, size: [10, 9] as const, pos: [9, 4, 6] as const },
+      { color: "#fff1da", intensity: 1.2, size: [10, 7] as const, pos: [-9, 3, -5] as const },
+      { color: "#e6edf6", intensity: 1.0, size: [12, 8] as const, pos: [0, 3, -9] as const },
+      { color: "#f2f5f9", intensity: 0.95, size: [16, 16] as const, pos: [0, -8, 0] as const },
+    ],
+  },
+} as const;
+
 export function ViewerEnvironment() {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
+  const viewerBg = useTwinStore((s) => s.viewerBg);
 
   useEffect(() => {
+    const theme = BG_THEMES[viewerBg];
     const pmrem = new THREE.PMREMGenerator(gl);
     const studio = new THREE.Scene();
-    studio.background = new THREE.Color("#05070d");
+    studio.background = new THREE.Color(theme.shell);
     // MeshBasicMaterial color channels exceed 1.0 on purpose — PMREM captures
     // that as HDR area lights, no texture needed.
-    const panel = (
-      color: string,
-      intensity: number,
-      size: [number, number],
-      position: [number, number, number]
-    ) => {
+    for (const p of theme.panels) {
       const mesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(size[0], size[1]),
-        new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity) })
+        new THREE.PlaneGeometry(p.size[0], p.size[1]),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(p.color).multiplyScalar(p.intensity) })
       );
-      mesh.position.set(...position);
+      mesh.position.set(p.pos[0], p.pos[1], p.pos[2]);
       mesh.lookAt(0, 0, 0);
       studio.add(mesh);
-    };
-    panel("#eaf1ff", 2.6, [16, 16], [0, 8, 0]); // overhead softbox
-    // Side panels run TALL (studio strip lights): a curved metal part — the
-    // encoder's stainless shaft — picks up a long vertical highlight, the way
-    // product photography lights a turned surface.
-    panel("#cfe0ff", 1.3, [10, 9], [9, 4, 6]); // cool strip, camera-right
-    panel("#ffe7c4", 0.9, [10, 7], [-9, 3, -5]); // warm strip, camera-left
-    // Back fill: without it, faces angled away from the strips mirror pure
-    // black and polished metal reads as black plastic.
-    panel("#aac4e8", 0.6, [12, 8], [0, 3, -9]);
-    panel("#2c3d58", 0.55, [16, 16], [0, -8, 0]); // dim floor bounce
+    }
     const target = pmrem.fromScene(studio, 0.04);
     // Assigning the env map to the R3F-managed scene is the documented
     // pattern (drei's own Environment does exactly this inside an effect).
@@ -454,7 +473,7 @@ export function ViewerEnvironment() {
       });
       pmrem.dispose();
     };
-  }, [gl, scene]);
+  }, [gl, scene, viewerBg]);
 
   return null;
 }
@@ -674,6 +693,7 @@ function ReviewToolbar({
 
 export function ThreeViewer({ components, controlsTop = 10 }: { components: ComponentDto[]; controlsTop?: number }) {
   const setSelected = useTwinStore((s) => s.setSelectedComponentId);
+  const viewerBg = useTwinStore((s) => s.viewerBg);
   const entries = useAssemblyModels(components);
 
   const loaded = Object.entries(entries).filter((e): e is [string, AssemblyEntry] => e[1] !== null);
@@ -735,7 +755,7 @@ export function ThreeViewer({ components, controlsTop = 10 }: { components: Comp
         camera={{ position: [6, 11, 8], fov: 40 }}
         onPointerMissed={() => setSelected(null)}
         gl={{ antialias: true }}
-        style={{ background: "#0f172a", borderRadius: 8 }}
+        style={{ background: BG_THEMES[viewerBg].canvas, borderRadius: 8, transition: "background 0.25s" }}
       >
         <ViewerEnvironment />
         {/* env map supplies the fill; keep direct lights for shape definition.

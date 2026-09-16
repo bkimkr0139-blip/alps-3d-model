@@ -58,6 +58,8 @@ const ja: Resources = {
     explodeStop: "組立シミュレーション停止",
     vibration: "車両振動",
     vibrationAccumulating: "振動 ON — サイクルが進むとはんだ接合部の疲労が速くなります。",
+    bgLight: "明るい背景",
+    bgDark: "暗い背景",
     cycles: "サイクル",
     reset: "リセット",
     stressTitle: "ストレス集中部位",

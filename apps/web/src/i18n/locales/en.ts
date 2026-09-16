@@ -59,6 +59,8 @@ const en = {
     explodeStop: "Stop assembly simulation",
     vibration: "Vehicle vibration",
     vibrationAccumulating: "Vibration ON — cycles accumulate and solder joints fatigue faster.",
+    bgLight: "Light backdrop",
+    bgDark: "Dark backdrop",
     cycles: "Cycles",
     reset: "Reset",
     stressTitle: "Stress hotspots",

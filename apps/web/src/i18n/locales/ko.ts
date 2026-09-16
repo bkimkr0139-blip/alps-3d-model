@@ -58,6 +58,8 @@ const ko: Resources = {
     explodeStop: "조립 시뮬레이션 정지",
     vibration: "차량 진동",
     vibrationAccumulating: "진동 ON — 사이클이 증가하며 땜납 접합부 피로가 빨라집니다.",
+    bgLight: "밝은 배경",
+    bgDark: "어두운 배경",
     cycles: "사이클",
     reset: "초기화",
     stressTitle: "스트레스 집중 부위",

@@ -15,6 +15,11 @@ interface TwinStore {
   // preference, not twin state, so it deliberately survives a variant
   // switch instead of resetting with the rest of the block below.
   bodyOpacity: number;
+  // Backdrop brightness for the S04 3D viewer ("dark" | "light"). Dark
+  // housings on the dark studio backdrop used to melt into the background;
+  // a light photo-set backdrop separates them. Same class of preference as
+  // bodyOpacity — survives a variant switch.
+  viewerBg: "dark" | "light";
   // Exploded-view: 0 = assembled, 1 = fully separated. Manual scrub value
   // (used whenever explodePlaying is false); the animated play/reassemble
   // loop itself runs off a local ref inside TwinAnimator, not through the
@@ -30,6 +35,7 @@ interface TwinStore {
   setVibration: (on: boolean) => void;
   setCycles: (n: number) => void;
   setBodyOpacity: (v: number) => void;
+  setViewerBg: (bg: "dark" | "light") => void;
   setExplodeAmount: (v: number) => void;
   setExplodePlaying: (on: boolean) => void;
 }
@@ -44,6 +50,7 @@ export const useTwinStore = create<TwinStore>((set) => ({
   vibration: false,
   cycles: 0,
   bodyOpacity: 1,
+  viewerBg: "dark",
   explodeAmount: 0,
   explodePlaying: false,
   // Switching variant swaps in a different physical product — its twin state
@@ -65,6 +72,7 @@ export const useTwinStore = create<TwinStore>((set) => ({
   setVibration: (on) => set({ vibration: on }),
   setCycles: (n) => set({ cycles: n }),
   setBodyOpacity: (v) => set({ bodyOpacity: v }),
+  setViewerBg: (bg) => set({ viewerBg: bg }),
   setExplodeAmount: (v) => set({ explodeAmount: v }),
   setExplodePlaying: (on) => set({ explodePlaying: on }),
 }));

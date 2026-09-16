@@ -16,12 +16,14 @@ export function TwinControls({ top = 10 }: { top?: number }) {
   const vibration = useTwinStore((s) => s.vibration);
   const cycles = useTwinStore((s) => s.cycles);
   const bodyOpacity = useTwinStore((s) => s.bodyOpacity);
+  const viewerBg = useTwinStore((s) => s.viewerBg);
   const explodeAmount = useTwinStore((s) => s.explodeAmount);
   const explodePlaying = useTwinStore((s) => s.explodePlaying);
   const setActuated = useTwinStore((s) => s.setActuated);
   const setVibration = useTwinStore((s) => s.setVibration);
   const setCycles = useTwinStore((s) => s.setCycles);
   const setBodyOpacity = useTwinStore((s) => s.setBodyOpacity);
+  const setViewerBg = useTwinStore((s) => s.setViewerBg);
   const setExplodeAmount = useTwinStore((s) => s.setExplodeAmount);
   const setExplodePlaying = useTwinStore((s) => s.setExplodePlaying);
 
@@ -64,6 +66,15 @@ export function TwinControls({ top = 10 }: { top?: number }) {
           {t("twin.vibration")}
         </button>
       </div>
+      {/* Backdrop brightness: a dark-cased part disappears against the dark
+          studio backdrop — the label names the backdrop clicking switches TO. */}
+      <button
+        style={buttonStyle(viewerBg === "light")}
+        onClick={() => setViewerBg(viewerBg === "light" ? "dark" : "light")}
+        aria-pressed={viewerBg === "light"}
+      >
+        {viewerBg === "light" ? t("twin.bgDark") : t("twin.bgLight")}
+      </button>
       <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <span style={{ opacity: 0.8 }}>
           {t("twin.cycles")}: {cycles.toLocaleString()}
