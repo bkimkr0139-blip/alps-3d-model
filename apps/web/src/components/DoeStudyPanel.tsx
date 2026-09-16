@@ -3,6 +3,7 @@ import ReactECharts from "echarts-for-react";
 import { useTranslation } from "react-i18next";
 import { api, type DoeStudy, type ProcessOperationDto } from "../lib/api";
 import { seedTr } from "../lib/seedL10n";
+import { chartAxis, chartBase } from "../ui/chartTheme";
 
 /** One (operation, parameter) pair a DOE study can be run against — every
  * operation window bound is a candidate regression target. */
@@ -134,11 +135,10 @@ function DoeStudyResult({ study }: { study: DoeStudy }) {
   ];
 
   const option = {
-    backgroundColor: "transparent",
-    textStyle: { color: "#e2e8f0" },
+    ...chartBase,
     legend: {
+      ...chartBase.legend,
       data: [t("doe.chart.observed"), t("doe.chart.fitted")],
-      textStyle: { color: "#e2e8f0", fontSize: 11 },
       top: 0,
     },
     grid: { left: 50, right: 20, top: 30, bottom: 36 },
@@ -147,32 +147,28 @@ function DoeStudyResult({ study }: { study: DoeStudy }) {
       name: `${study.parameter}${study.parameter_unit ? ` (${study.parameter_unit})` : ""}`,
       nameLocation: "middle",
       nameGap: 26,
-      nameTextStyle: { color: "#94a3b8", fontSize: 10 },
-      axisLine: { lineStyle: { color: "#64748b" } },
-      axisLabel: { color: "#94a3b8", fontSize: 10 },
+      ...chartAxis(),
     },
     yAxis: {
       type: "value",
       name: study.metric_unit ?? study.metric,
-      nameTextStyle: { color: "#94a3b8", fontSize: 10 },
-      axisLine: { lineStyle: { color: "#64748b" } },
-      axisLabel: { color: "#94a3b8", fontSize: 10 },
+      ...chartAxis(),
     },
-    tooltip: { trigger: "item" },
+    tooltip: { ...chartBase.tooltip, trigger: "item" },
     series: [
       {
         name: t("doe.chart.observed"),
         type: "scatter",
         symbolSize: 8,
         data: study.observations.map((o) => [o.parameter_value, o.ctq_value]),
-        itemStyle: { color: "#7dd3fc" },
+        itemStyle: { color: "#7dd3fc", borderColor: "rgba(2, 6, 23, 0.6)", borderWidth: 1 },
       },
       {
         name: t("doe.chart.fitted"),
         type: "line",
         data: trendLine,
         symbol: "none",
-        lineStyle: { color: "#fbbf24", width: 1.6, type: "dashed" },
+        lineStyle: { color: "#fbbf24", width: 1.6, type: "dashed" as const, shadowColor: "#fbbf2455", shadowBlur: 5 },
       },
     ],
   };

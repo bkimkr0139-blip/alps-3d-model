@@ -1,6 +1,7 @@
 import ReactECharts from "echarts-for-react";
 import { useTranslation } from "react-i18next";
 import type { SimulationRun } from "../lib/api";
+import { chartAxis, chartBase, traceColor, traceGlow } from "../ui/chartTheme";
 
 const SWEEP_METRIC = /^v_out_rc_([\d.]+)$/;
 
@@ -19,13 +20,16 @@ function sweepSeries(run: SimulationRun) {
 export function SweepChart({ runsByVariant }: { runsByVariant: { label: string; run: SimulationRun }[] }) {
   const { t } = useTranslation();
   const series = runsByVariant
-    .map(({ label, run }) => {
+    .map(({ label, run }, i) => {
       const points = sweepSeries(run);
       if (points.length === 0) return null;
+      const color = traceColor(i);
       return {
         name: label,
         type: "line" as const,
         data: points.map((p) => [p.rc, p.v]),
+        itemStyle: { color },
+        ...traceGlow(color),
       };
     })
     .filter(Boolean);
@@ -33,21 +37,20 @@ export function SweepChart({ runsByVariant }: { runsByVariant: { label: string; 
   if (series.length === 0) return null;
 
   const option = {
-    backgroundColor: "transparent",
-    textStyle: { color: "#e2e8f0" },
-    legend: { data: runsByVariant.map((r) => r.label), textStyle: { color: "#e2e8f0" } },
+    ...chartBase,
+    legend: { ...chartBase.legend, data: runsByVariant.map((r) => r.label) },
     grid: { left: 50, right: 20, top: 40, bottom: 40 },
     xAxis: {
       type: "log",
       name: t("sweep.xAxis"),
       nameLocation: "middle",
       nameGap: 28,
-      axisLine: { lineStyle: { color: "#64748b" } },
+      ...chartAxis(),
     },
     yAxis: {
       type: "value",
       name: t("sweep.yAxis"),
-      axisLine: { lineStyle: { color: "#64748b" } },
+      ...chartAxis(),
     },
     series,
   };

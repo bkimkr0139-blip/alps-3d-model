@@ -9,6 +9,7 @@ import {
   type ProcessParameterInfo,
 } from "../lib/api";
 import { seedTr } from "../lib/seedL10n";
+import { bg, emboss, fontMono, radius } from "../ui/tokens";
 
 const RULE_KEYS: Record<
   string,
@@ -72,11 +73,34 @@ function ChartSvg({ chart }: { chart: ControlChart }) {
   const path = chart.points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i)},${y(p.value)}`).join(" ");
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: 760, display: "block" }} role="img">
+    // The chart sits in a sunken readout well — same bezel family as the KPI
+    // tiles — with the in-control band faintly tinted and the trace glowing
+    // softly above it (matches the ECharts trace-glow look in ui/chartTheme).
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      style={{
+        width: "100%",
+        maxWidth: 760,
+        display: "block",
+        background: bg.metalWell,
+        borderRadius: radius.sm,
+        boxShadow: emboss.well,
+      }}
+      role="img"
+    >
+      {chart.lcl !== null && chart.ucl !== null && (
+        <rect
+          x={PAD.l}
+          y={y(chart.ucl)}
+          width={W - PAD.l - PAD.r}
+          height={Math.max(y(chart.lcl) - y(chart.ucl), 0)}
+          fill="rgba(251, 191, 36, 0.045)"
+        />
+      )}
       {[hi, lo].map((v, i) => (
         <g key={i}>
           <line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke="#1e293b" strokeWidth={1} />
-          <text x={PAD.l - 6} y={y(v) + 3.5} textAnchor="end" fontSize={10} fill="#64748b">{fmt(v)}</text>
+          <text x={PAD.l - 6} y={y(v) + 3.5} textAnchor="end" fontSize={10} fill="#64748b" fontFamily={fontMono}>{fmt(v)}</text>
         </g>
       ))}
       {chart.center_line !== null && (
@@ -87,7 +111,14 @@ function ChartSvg({ chart }: { chart: ControlChart }) {
           <line key={i} x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke="#fbbf24" strokeWidth={1.2} strokeDasharray="6 4" />
         ) : null,
       )}
-      <path d={path} fill="none" stroke="#60a5fa" strokeWidth={1.4} opacity={0.75} />
+      <path
+        d={path}
+        fill="none"
+        stroke="#60a5fa"
+        strokeWidth={1.4}
+        opacity={0.85}
+        style={{ filter: "drop-shadow(0 0 3px rgba(96, 165, 250, 0.45))" }}
+      />
       {chart.points.map((p, i) => (
         <PointMark key={p.process_run_business_id} p={p} cx={x(i)} cy={y(p.value)} />
       ))}

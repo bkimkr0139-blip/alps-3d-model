@@ -8,6 +8,7 @@ import { api, type CorrelationRecord, type GapAnalysisDto, type Measurement, typ
 // app/correlation.py CURVE_FAMILIES — keep the three tables in sync).
 import { CURVE_FAMILIES, parseCurveMetric, predictedCurve, type CurveFamily } from "../lib/curve";
 import { seedTr } from "../lib/seedL10n";
+import { chartAxis, chartBase, traceGlow } from "../ui/chartTheme";
 
 /** Residual-cause candidates (§AI-05 lite): read-only view over the stored
  * correlation's residuals. Output is explicitly "check required" hints —
@@ -24,23 +25,23 @@ function GapSection({ correlationId }: { correlationId: string }) {
 
   if (!gap) return null;
   const option = {
+    ...chartBase,
     grid: { left: 46, right: 12, top: 18, bottom: 24 },
-    xAxis: { type: "value", name: gap.stats.x_unit, nameTextStyle: { color: "#94a3b8" }, axisLabel: { color: "#94a3b8", fontSize: 9 } },
+    xAxis: { type: "value", name: gap.stats.x_unit, ...chartAxis() },
     yAxis: {
       type: "value",
       name: "Δ",
-      nameTextStyle: { color: "#94a3b8" },
-      axisLabel: { color: "#94a3b8", fontSize: 9 },
+      ...chartAxis(),
     },
-    tooltip: { trigger: "axis" },
+    tooltip: { ...chartBase.tooltip, trigger: "axis" },
     series: [
       {
         type: "line",
         data: gap.residuals.x.map((x, i) => [x, gap.residuals.residual[i]]),
         symbol: "circle",
         symbolSize: 5,
-        lineStyle: { color: "#f87171", width: 1.4 },
         itemStyle: { color: "#f87171" },
+        ...traceGlow("#f87171", 1.4),
       },
     ],
   };
@@ -124,19 +125,21 @@ export function TestCorrelationPanel({ mechRun }: { mechRun: SimulationRun | nul
   const errorUnit = family.errorUnit;
 
   const option = {
-    backgroundColor: "transparent",
-    textStyle: { color: "#e2e8f0" },
-    legend: { data: [t("correlation.legendPredicted"), t("correlation.legendMeasured")], textStyle: { color: "#e2e8f0" } },
+    ...chartBase,
+    legend: { ...chartBase.legend, data: [t("correlation.legendPredicted"), t("correlation.legendMeasured")] },
     grid: { left: 55, right: 20, top: 40, bottom: 40 },
-    xAxis: { type: "value", name: t(family.xAxis), nameLocation: "middle", nameGap: 28, axisLine: { lineStyle: { color: "#64748b" } } },
-    yAxis: { type: "value", name: t(family.yAxis), axisLine: { lineStyle: { color: "#64748b" } } },
+    xAxis: { type: "value", name: t(family.xAxis), nameLocation: "middle", nameGap: 28, ...chartAxis() },
+    yAxis: { type: "value", name: t(family.yAxis), ...chartAxis() },
     series: [
-      { name: t("correlation.legendPredicted"), type: "line", data: predicted.map((p) => [p.x, p.y]), smooth: true },
+      // Model vs measurement: the model trace glows in signal cyan, measured
+      // points sit on top as amber markers (color = signal, ISA-101).
+      { name: t("correlation.legendPredicted"), type: "line", data: predicted.map((p) => [p.x, p.y]), smooth: true, itemStyle: { color: "#38bdf8" }, ...traceGlow("#38bdf8") },
       {
         name: t("correlation.legendMeasured"),
         type: "scatter",
         symbolSize: 8,
         data: measurements.map((m) => [m.x_value, m.y_value]),
+        itemStyle: { color: "#fbbf24", borderColor: "rgba(2, 6, 23, 0.6)", borderWidth: 1 },
       },
     ],
   };
