@@ -2,55 +2,66 @@
 
 > **이 문서의 목적**: 이 저장소에서 개발 세션(사람 또는 Claude)이 맥락 없이
 > 병렬로 작업을 이어받을 수 있도록 현재 상태·실행 방법·규칙·남은 작업을 한
-> 문서에 정리한다. 최종 갱신: 2026-09-16 (ASIC Twin v1.1 R3 완료 시점 —
+> 문서에 정리한다. 최종 갱신: 2026-09-16 (UI/UX 3D-트윈 퍼스트 고도화 완료 —
 > 사용자 브라우저 테스트 대기 중, **아래 §0 핸드오프 상태 먼저 읽을 것**).
 
 ## 0. 지금 세션 핸드오프 상태 (2026-09-16, 다음 세션이 먼저 읽을 것)
 
-**ASIC Twin v1.1 R3 완료** (EPIC I 동시설계 제어판 + EPIC J 근거 중심 AI
-Copilot + shadow evaluation) — 이번 세션 커밋은 로컬 `main`에만 있음.
-push는 사용자가 직접: `cd /Users/wizbase/works/alps && git push`
-(classifier가 main push를 차단). R1+R2는 `8af4a5e`로 origin까지
-push 완료 상태.
+**UI/UX 3D-트윈 퍼스트 고도화 완료** — 사용자 지시("텍스트·숫자 위주 대신
+실제 제품·부품·장비의 3D 디지털 트윈을 보고 체험하고 활용하는 화면으로")에
+따른 전면 개편. 계획 파일
+`~/.claude/plans/cosmic-riding-phoenix.md`의 W1~W6 전부 완료 + 실행 중
+사용자 추가 지시 2건(공정 트윈 실사화, ASIC ⑤ 단계 템플릿별 패키지 모델)
+까지 반영. **커밋은 로컬 `main`에만 있음 — push는 사용자가 직접**:
+`cd /Users/wizbase/works/alps && git push` (classifier가 main push 차단).
 
-이번 세션에 한 일 (전부 라이브 스택 반영 + DB 재시드 완료, pytest 175
-전부 통과 — **브라우저는 사용자가 직접 테스트할 예정**):
+이번 세션 커밋 (전부 웹 프론트, 라이브 스택 = vite dev :5173 → :8090 프록시에
+즉시 반영, 게이트 전부 통과: tsc/vite 빌드 + oxlint 27 warnings 베이스라인 +
+verify:seedl10n 101/0 + Playwright 헤드리스 CLEAN):
 
-1. **EPIC I 백엔드**: 가정 레지스터(AsicAssumption) + 영향 스캔/
-   findings-done/clear + 근거 첨부 resolve + 이벤트 원장 + 편차(DE)
-   워크플로. 게이트 블로커 2종 추가(UNRESOLVED_HIGH_RISK_ASSUMPTION,
-   ASSUMPTION_OVERDUE) — ASM-01은 일부러 OPEN으로 시드해 차단이 살아있는
-   데모가 됨. 마이그레이션 `d6deeb514240_r3_*`.
-2. **EPIC J 백엔드** (`app/asic_copilot.py`): 규칙 기반(비 LLM)
-   7-유스케이스 copilot — 사실은 DB에서만, 제안엔 근거 링크 필수, 증거
-   부족 시 사유 코드와 함께 abstain, 수용은 클라이언트가 보낸
-   `sha256(diff)`와 서버 재계산 대조 일치 시에만. copilot은 게이트/증적
-   테이블에 쓰는 경로 자체가 없음. shadow interaction으로 이력 저장.
-3. **프론트엔드**: 8단계 "동시설계 제어판" + 9단계 "Copilot" 패널
-   (`asicLive.tsx`), http LAN origin용 동기 sha256 (`lib/sha256.ts` —
-   `crypto.subtle`은 http에 없음).
-4. **시드** `seed_asic_r3()`: ASM-01(고위험 OPEN)·ASM-02(등록→해결 전체
-   경로)·DEV-01 편차 승인·copilot shadow 3건.
-5. **l10n**: seedL10n R3 오버레이 + **검증기 신설**
-   `apps/web/scripts/verify_seed_l10n.mjs` (`npm run verify:seedl10n`) —
-   DB(JSONB 재귀 `lax $.**` 포함) + 라이브 게이트 리포트에서 한글 문자열
-   101개 수집, `seedTr(s,'en'/'ja')` 후 잔여 한글 0 확인. tsc / vite /
-   oxlint clean.
+1. `57b262c` **W1** 디자인 토큰(`ui/tokens.ts`)+공유 UI 키트(`ui/kit.tsx` —
+   HudPanel/HudChip/StatusBadge 등 캔버스 오버레이 패밀리 포함).
+2. `07273ed` **W2** 3D 콕핏 셸 — model 탭이 풀폭 3D 첫 화면, HUD 스트립
+   (게이트·런·요구 연동 칩), 좌우 패널은 글래스 드로어(`ui/GlassDrawer.tsx`)
+   로 전환. 하단 sweep/correlation/gate/assistant 섹션 유지.
+3. `5e82de0` **W3** 공정 라인 3D 트윈 — proc 탭에 FactoryViewer(순수 데이터
+   레이어 `proc/factoryScene.ts` + 뷰어): 스테이션 상태는 관리도 데이터에서
+   산출(in_control/rule_hit/excluded/idle), 클릭 시 기존 관리도 드로어,
+   컨베이어 = Lot 타임라인. `ui/canvasText.ts` 추출.
+4. `05e8dd1` **W4** 장비 트윈 — 벤치 HUD(DUT 칩·SPICE 출처·스코프 RUN/STOP,
+   CH1/CH2 LED 베젤), ASIC 장비 런 랙 스트립(교정 카운트다운 바).
+5. `a9d1071` **W5** 부품 선택 동기(지시서 L187) 완결 + FR-03 검토 도구 —
+   model 탭 "검토" 툴바(단면 클리핑/2점 측정 mm/핀 주석 ◈로컬), 벤치 DUT가
+   3D 선택 부품 종류와 매칭될 때만 하이라이트.
+6. `4ec4d3b` **W3b** 공정 트윈 실사화(사용자 지시 "만화 같은 애니메이션 말고
+   실사 환경수준") — 스테이션별 실제 장비 실루엣(프레스 프레임/사출성형기/
+   로봇 조립 셀), 관리도 기반 안등(signal tower), 콘크리트 바닥+안전 레인
+   라인+천장 조명+안개, 컨베이어 벨트+토트(처분색 띠), 기기명판. 데이터
+   레이어(factoryScene.ts) 불변.
+7. `cfa72f2` **ASIC ⑤ Package/3D Twin 템플릿·옵션별 모델**(사용자 지시) —
+   `asic/packageScene.ts`가 ② 단계 선택 옵션의 pkg 문자열을 파싱해 패키지
+   패밀리별 실루엣 생성: QFN(랜드+epad)·WLCSP(범프+RDL, 와이어 없음)·LGA·
+   SOIC/SOP/TSSOP(양측 gull-wing 리드)·LQFP(4측), 몸체 비례·인덱스 노치·
+   pin1 점. 다이 레벨은 템플릿 고유 센서(MEMS 스택 vs GMR+coil) 유지.
+   계보 문자열·섹션 칩이 모델링된 pkg를 표시.
+
+**검증 스크립트**(`/tmp/alps-logs/`, 전부 PASS): cockpit_e2e(W2),
+proc_e2e/proc_mobile_e2e(W3), bench_e2e(W4), review_e2e(W5), w6_sweep(8탭
+ko + en/ja 스모크 + 390×844 모바일), pkg_e2e(템플릿 A~D × ⑤단계 캔버스+
+pkg 칩 + B OPT-2 → TSSOP-16 재표적).
 
 **다음 세션(또는 사용자)이 할 일**:
-- **`git push`** (사용자 직접 실행 필요, 위 참조)
+- **`git push`** (사용자 직접 실행 필요, 위 참조) + **웹 브라우저 검증** —
+  사용자가 "완성하면 내가 웹으로 검증해볼게"라고 한 상태. model 탭 첫 화면,
+  proc 탭 실사 라인, ASIC 탭 템플릿별 ⑤단계 모델 위주.
 - **Temporal 좀비 워크플로 정리** — 이전 세션에 1개만 terminate되고
   ~111개 Running이 남아 있음(재시드로 sim_run 행은 없는데 재시도만 반복).
   사용자가 터미널에서 직접:
   `! docker exec alps-twin-temporal-1 temporal workflow delete --query "ExecutionStatus='Running'" --address 172.22.0.10:7233 --namespace default --reason "zombie: sim_run rows wiped by reseed"`
-- **ASIC 브라우저 테스트는 사용자가 진행** — 8단계(가정/편차)·9단계
-  (copilot 7 유스케이스, ko/en/ja) 위주. **공개 URL
-  (`https://alps-twin.wizbase.ai.kr`) 헤드리스 선점검은 PASS**
-  (`/tmp/alps-logs/asic_r3_e2e.mjs` — s8/s9 렌더·ja 0한글·에러 0,
-  스크린샷 asic_r3-s8/s9-ko/ja.png). 문제 발생 시 AGENTS.md "ASIC
-  v1.1 R3" 절의 함정 목록 먼저 볼 것.
 - 남은 별개 과제(이 세션 범위 아님): TACT AI-02 변경 영향분석, AirInput
   나머지 위상, `seed_airinput_field_twin` UUID 직렬화 버그(선존재).
+- 주의: 캔버스 중앙 클릭은 모델을 빗나갈 수 있음(클릭 사다리 사용),
+  `drei <Html>` 금지 관례, 검토 툴바 닫기가 mode를 off로 되돌림(W5 참조).
 
 ---
 
