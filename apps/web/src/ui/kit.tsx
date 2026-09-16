@@ -173,7 +173,17 @@ export function HudPanel({
 }
 
 // Mono chip with an opaque-enough backdrop to stay readable over moving 3D.
-export function HudChip({ color, children, title }: { color: string; children: React.ReactNode; title?: string }) {
+export function HudChip({
+  color,
+  children,
+  title,
+  style,
+}: {
+  color: string;
+  children: React.ReactNode;
+  title?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <span
       title={title}
@@ -189,6 +199,7 @@ export function HudChip({ color, children, title }: { color: string; children: R
         display: "inline-flex",
         alignItems: "center",
         gap: 5,
+        ...style,
       }}
     >
       {children}

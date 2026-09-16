@@ -23,6 +23,17 @@ const en = {
     standaloneHint: "EDA training, the ASIC work center and the system docs run independently of the product/variant selection.",
   },
 
+  cockpit: {
+    close: "Close",
+    gate: "Gate",
+    evidenceMissing: "Evidence checklist has missing items",
+    sync: "Requirement sync",
+    synced: "{{req}} ↔ {{comp}}",
+    noSelection: "no part selected",
+    showRequirements: "Requirements",
+    showSimulation: "Results",
+  },
+
   panels: {
     requirements: "Requirements & Trace (S03)",
     viewer3d: "3D Design Review (S04)",

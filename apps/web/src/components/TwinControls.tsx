@@ -1,13 +1,16 @@
 import { useTranslation } from "react-i18next";
 import { CYCLES_TO_SATURATION, rankedStress, stressCss } from "../lib/stress";
 import { useTwinStore } from "../store";
+import { bg, border, accent } from "../ui/tokens";
 
 const MAX_CYCLES = 200_000;
 
 // Overlay for the S04 3D viewer: drive the digital twin (actuation, vehicle
 // vibration) and scrub the stress time-lapse. The 3D animator reads the same
 // zustand state each frame, so slider drags repaint the model live.
-export function TwinControls() {
+// `top` lets the cockpit shift the panel below its HUD chip strip without
+// moving the canvas (a resize would retrigger the Bounds fit).
+export function TwinControls({ top = 10 }: { top?: number }) {
   const { t } = useTranslation();
   const actuated = useTwinStore((s) => s.actuated);
   const vibration = useTwinStore((s) => s.vibration);
@@ -28,8 +31,8 @@ export function TwinControls() {
     padding: "5px 10px",
     borderRadius: 6,
     border: "1px solid",
-    borderColor: on ? "#f97316" : "#334155",
-    background: on ? "#7c2d12" : "#1e293b",
+    borderColor: on ? accent.orange : border.strong,
+    background: on ? "#7c2d12" : bg.raise,
     color: "white",
     fontSize: 12,
     cursor: "pointer",
@@ -39,11 +42,11 @@ export function TwinControls() {
     <div
       style={{
         position: "absolute",
-        top: 10,
+        top,
         right: 10,
         width: 230,
-        background: "rgba(15, 23, 42, 0.88)",
-        border: "1px solid #334155",
+        background: bg.hud,
+        border: `1px solid ${border.strong}`,
         borderRadius: 8,
         padding: 10,
         display: "flex",
@@ -72,7 +75,7 @@ export function TwinControls() {
           step={1000}
           value={Math.min(cycles, MAX_CYCLES)}
           onChange={(e) => setCycles(Number(e.target.value))}
-          style={{ accentColor: "#f97316" }}
+          style={{ accentColor: accent.orange }}
         />
       </label>
       <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -86,7 +89,7 @@ export function TwinControls() {
           step={0.05}
           value={bodyOpacity}
           onChange={(e) => setBodyOpacity(Number(e.target.value))}
-          style={{ accentColor: "#f97316" }}
+          style={{ accentColor: accent.orange }}
         />
       </label>
       <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -101,7 +104,7 @@ export function TwinControls() {
           value={explodeAmount}
           disabled={explodePlaying}
           onChange={(e) => setExplodeAmount(Number(e.target.value))}
-          style={{ accentColor: "#f97316" }}
+          style={{ accentColor: accent.orange }}
         />
       </label>
       <button
@@ -137,7 +140,7 @@ export function TwinControls() {
                   flex: 1,
                   height: 7,
                   borderRadius: 4,
-                  background: "#334155",
+                  background: border.strong,
                   overflow: "hidden",
                 }}
               >

@@ -22,6 +22,17 @@ const ja: Resources = {
     standaloneHint: "EDA教育・ASICワークセンター・システム文書は製品/バリアントの選択に依存しません。",
   },
 
+  cockpit: {
+    close: "閉じる",
+    gate: "ゲート",
+    evidenceMissing: "エビデンスチェックリストに未達項目があります",
+    sync: "要件連動",
+    synced: "{{req}} ↔ {{comp}}",
+    noSelection: "部品未選択",
+    showRequirements: "要件",
+    showSimulation: "結果",
+  },
+
   panels: {
     requirements: "要件とトレーサビリティ (S03)",
     viewer3d: "3D 設計レビュー (S04)",

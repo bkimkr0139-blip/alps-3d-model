@@ -448,7 +448,7 @@ function ViewerErrorText() {
   );
 }
 
-export function ThreeViewer({ components }: { components: ComponentDto[] }) {
+export function ThreeViewer({ components, controlsTop = 10 }: { components: ComponentDto[]; controlsTop?: number }) {
   const setSelected = useTwinStore((s) => s.setSelectedComponentId);
   const entries = useAssemblyModels(components);
 
@@ -513,7 +513,7 @@ export function ThreeViewer({ components }: { components: ComponentDto[] }) {
         <OrbitControls makeDefault />
         <TwinAnimator scenes={loaded.map(([, entry]) => entry.scene)} />
       </Canvas>
-      <TwinControls />
+      <TwinControls top={controlsTop} />
     </ViewerErrorBoundary>
     </div>
   );

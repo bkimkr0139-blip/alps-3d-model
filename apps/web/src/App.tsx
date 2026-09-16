@@ -19,6 +19,8 @@ import { SweepChart } from "./components/SweepChart";
 import { TestCorrelationPanel } from "./components/TestCorrelationPanel";
 import { GatePanel } from "./components/GatePanel";
 import { AssistantPanel } from "./components/AssistantPanel";
+import { CockpitHud } from "./components/cockpit/CockpitHud";
+import { GlassDrawer } from "./ui/GlassDrawer";
 import { bg, border, text, tabColor } from "./ui/tokens";
 
 type CenterTab = "model" | "bench" | "sysmodel" | "proc" | "air" | "eda" | "asic" | "docs";
@@ -186,6 +188,13 @@ function Workbench() {
   const [product, setProduct] = useState<Product | null>(null);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [centerTab, setCenterTab] = useState<CenterTab>("model");
+  // Cockpit drawers (model tab, desktop): requirements / simulation results
+  // float OVER the 3D canvas instead of flanking it as grid columns — a
+  // column toggle would resize the canvas and retrigger the Bounds fit,
+  // visibly jerking the camera. Default closed; the HUD sync chip keeps the
+  // requirement link visible either way.
+  const [leftDrawer, setLeftDrawer] = useState(false);
+  const [rightDrawer, setRightDrawer] = useState(false);
 
   // Selection from another product/variant must not leak into the new one —
   // ids would match no mesh/requirement and leave a stale highlight.
@@ -256,6 +265,10 @@ function Workbench() {
   // 무관한 자립 모듈이므로 좌우 사이드 패널·온보딩 가이드·하단 비교/상관/
   // 게이트 프레임·어시스턴트를 접어 중앙에 전폭을 내준다.
   const standaloneMode = centerTab === "eda" || centerTab === "asic" || centerTab === "docs";
+  // 3D-first cockpit: the model tab (desktop) gives the twin the whole first
+  // screen; every other product tab keeps the 3-column dashboard. Mobile
+  // keeps the stacked flow — overlay drawers don't work at 820px widths.
+  const cockpitMode = centerTab === "model" && !isMobile;
 
   return (
     <div style={{ minHeight: "100vh", background: bg.page, color: text.body, padding: isMobile ? 12 : 20, fontFamily: "system-ui, sans-serif" }}>
@@ -389,6 +402,39 @@ function Workbench() {
         />
       )}
 
+      {cockpitMode ? (
+        // The cockpit: the twin owns the first screen. Context (requirements,
+        // results) lives in glass drawers floating over the canvas; the HUD
+        // chip strip keeps gate/run/selection state on screen. The lower
+        // sections (sweep/correlation/gate/assistant) still flow below, so
+        // the page scrolls exactly like the other tabs.
+        <div style={{ position: "relative", height: "calc(100vh - 200px)", minHeight: 480 }}>
+          {/* controlsTop=52: TwinControls yields the top edge to the HUD chip strip */}
+          <ThreeViewer components={components} controlsTop={52} />
+          <CockpitHud
+            productName={product?.name}
+            variantName={variants.find((v) => v.id === variantId)?.name}
+            variantId={variantId}
+            runs={runs}
+            requirements={requirements}
+            components={components}
+            leftOpen={leftDrawer}
+            rightOpen={rightDrawer}
+            onToggleLeft={() => setLeftDrawer((o) => !o)}
+            onToggleRight={() => setRightDrawer((o) => !o)}
+          />
+          {leftDrawer && (
+            <GlassDrawer side="left" title={t("panels.requirements")} onClose={() => setLeftDrawer(false)}>
+              <RequirementsPanel requirements={requirements} onSelect={selectRequirement} />
+            </GlassDrawer>
+          )}
+          {rightDrawer && (
+            <GlassDrawer side="right" title={t("panels.simulation")} onClose={() => setRightDrawer(false)}>
+              <SimulationPanel runs={runs} />
+            </GlassDrawer>
+          )}
+        </div>
+      ) : (
       <div
         style={{
           display: "grid",
@@ -401,6 +447,8 @@ function Workbench() {
           // scrolls with the content open, like every other tab's lower
           // sections. On phones the rows stack (CSS flattens the columns) so
           // heights move onto the children and the page scrolls anyway.
+          // The model tab on desktop is exempt too — it renders the cockpit
+          // branch above instead of this grid.
           height: !isMobile && !standaloneMode ? "62vh" : undefined,
         }}
       >
@@ -438,6 +486,7 @@ function Workbench() {
           </div>
         )}
       </div>
+      )}
 
       {!standaloneMode && (
         <>

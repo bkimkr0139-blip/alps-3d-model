@@ -22,6 +22,17 @@ const ko: Resources = {
     standaloneHint: "EDA 교육·ASIC 작업 센터·시스템 문서는 제품/변량 선택과 무관하게 동작합니다.",
   },
 
+  cockpit: {
+    close: "닫기",
+    gate: "게이트",
+    evidenceMissing: "증적 체크리스트에 미충족 항목이 있습니다",
+    sync: "요구 연동",
+    synced: "{{req}} ↔ {{comp}}",
+    noSelection: "부품 미선택",
+    showRequirements: "요구사항",
+    showSimulation: "결과",
+  },
+
   panels: {
     requirements: "요구사항 및 트레이스 (S03)",
     viewer3d: "3D 설계 검토 (S04)",
