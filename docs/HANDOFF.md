@@ -96,6 +96,16 @@ verify:seedl10n 101/0 + Playwright 헤드리스 CLEAN):
    eda_synth_soc(신규, SoC 합성 뷰+폭발 스크린샷)+w6_sweep CLEAN, 빌드·lint
    27·seedl10n 101/0.
 
+12. `1a81582` **레이아웃 3D도 합성 3D와 동일 실사 트리트먼트**(사용자 지시
+   "레이아웃 3D도 합성 3D처럼 실사 스타일로") — `buildLayoutScene`: 케이크
+   구조 유지 + `studio: true`(합성과 같은 생성형 환경광+ContactShadows),
+   기판=베벨 엣지 있는 베이스+랩드 리드 2중, 매크로 블록=어두운 플린스 트레이
+   위 착지(합성 배치 트레이와 동일 어휘), 금속 전반 업그레이드 — 패드 0.95/
+   실링 0.92(Au 톤 통일)/M1 레일 0.85/M2~M6·전원 그리드 0.9·비아 0.95,
+   emissive 0.22→0.12로 낮춰 환경 반사가 하이라이트를 담당. 폭발 앵커=
+   레지스트리 Y 고정(추가 서브박스가 리프트 순서를 바꾸지 않음). 검증:
+   eda_e2e+eda_sil_e2e+w6_sweep CLEAN.
+
 **검증 스크립트**(`/tmp/alps-logs/`, 전부 PASS): cockpit_e2e(W2),
 proc_e2e/proc_mobile_e2e(W3), bench_e2e(W4), review_e2e(W5), w6_sweep(8탭
 ko + en/ja 스모크 + 390×844 모바일), pkg_e2e(템플릿 A~D × ⑤단계 캔버스+
