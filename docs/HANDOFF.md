@@ -44,7 +44,10 @@ push 완료 상태.
   사용자가 터미널에서 직접:
   `! docker exec alps-twin-temporal-1 temporal workflow delete --query "ExecutionStatus='Running'" --address 172.22.0.10:7233 --namespace default --reason "zombie: sim_run rows wiped by reseed"`
 - **ASIC 브라우저 테스트는 사용자가 진행** — 8단계(가정/편차)·9단계
-  (copilot 7 유스케이스, ko/en/ja) 위주. 문제 발생 시 AGENTS.md "ASIC
+  (copilot 7 유스케이스, ko/en/ja) 위주. **공개 URL
+  (`https://alps-twin.wizbase.ai.kr`) 헤드리스 선점검은 PASS**
+  (`/tmp/alps-logs/asic_r3_e2e.mjs` — s8/s9 렌더·ja 0한글·에러 0,
+  스크린샷 asic_r3-s8/s9-ko/ja.png). 문제 발생 시 AGENTS.md "ASIC
   v1.1 R3" 절의 함정 목록 먼저 볼 것.
 - 남은 별개 과제(이 세션 범위 아님): TACT AI-02 변경 영향분석, AirInput
   나머지 위상, `seed_airinput_field_twin` UUID 직렬화 버그(선존재).
