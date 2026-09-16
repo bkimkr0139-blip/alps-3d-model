@@ -80,6 +80,22 @@ verify:seedl10n 101/0 + Playwright 헤드리스 CLEAN):
    eda_e2e(TACT-DB4 무아날로그 vs TCH-ALU4 analog 칩 단정 추가)+
    eda_sil_e2e(SoC/FIFO/UART 공정·레이아웃 스크린샷)+w6_sweep CLEAN.
 
+11. `64bf2d0` **합성 3D를 장난감 큐브→배치된 산업 다이로**(사용자 지시 "합성
+   3D가 도형 스타일에서 실사 스타일 산업표준 모델로") — `buildSynthesisScene`
+   전면 재구성: 게이트 타입별 클러스터=표준셀 **로우** 배치 영역(플린스 트레이,
+   셀 0.72×0.12×0.63 flat strip, pitch 1.05) + M1 VDD/VSS 전원 레일(행 경계
+   공유, 청/적) + Cu M2(수평)/Ag M3(수직) BEOL 배선 + Au 비아 실린더 + 뚜껑
+   있는 다이 기판(베이스+랩드 리드, top y 0.18) + **Au 실링 링** + 포토 정합
+   키 4코너. 재질 전반 금속화(metalness 0.55~0.95) — `EdaScene.studio` 플래그
+   신설로 합성 씬만 drei `Environment`(Lightformer 4면, **생성형 env — HDR
+   에셋·네트워크 없음**)+`ContactShadows`(frames=1, 씬 키 재마운트) 적용.
+   폭발 슬라이더=명시 `explodeAnchors`(die→label→analog→cell→m1→m2→via→m3→
+   kpi→drc 제작 순 리프트). KPI 타워를 짧은 금속 게이지 포스트로 재조형(높이
+   캡 2.4, 0.42 각). CAP 160→96(로우+레일+배선≈셀당 1.4 메시 — SoC 3,346게이트
+   도 예산 내). 범례 칩에 m1/m2/m3/via 추가. 검증: eda_e2e+eda_sil_e2e+
+   eda_synth_soc(신규, SoC 합성 뷰+폭발 스크린샷)+w6_sweep CLEAN, 빌드·lint
+   27·seedl10n 101/0.
+
 **검증 스크립트**(`/tmp/alps-logs/`, 전부 PASS): cockpit_e2e(W2),
 proc_e2e/proc_mobile_e2e(W3), bench_e2e(W4), review_e2e(W5), w6_sweep(8탭
 ko + en/ja 스모크 + 390×844 모바일), pkg_e2e(템플릿 A~D × ⑤단계 캔버스+
