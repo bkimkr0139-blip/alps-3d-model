@@ -101,7 +101,7 @@ export function Eda3DViewer({ scene }: { scene: EdaScene | null }) {
       g.anchor = Math.min(g.anchor, b.pos[1]);
       g.boxes.push(b);
     }
-    return [...groups.entries()].map(([key, g]) => ({ key, ...g }));
+    return [...groups.entries()].map(([key, g]) => ({ key, ...g, anchor: scene.explodeAnchors?.[key] ?? g.anchor }));
   }, [scene]);
 
   useEffect(() => {

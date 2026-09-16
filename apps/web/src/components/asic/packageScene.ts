@@ -6,12 +6,16 @@ import type { AsicTemplate } from "./asicModel";
 // own package — QFN land grid + exposed pad, WLCSP bump array with RDL (no
 // bond wires — wafer-level), LGA lands, SOIC/SOP/TSSOP gull-wing leads on two
 // sides, LQFP leads on four — with family-appropriate body proportions. The
-// die level carries the template's own sensor element (MEMS stack for the
-// capacitive/environmental templates, GMR + coil for current/motor). Assembled
-// from the same EdaBox primitives the EDA scenes use, so the shared
-// Eda3DViewer (explode + layer chips) renders it unchanged. Geometry is an
-// educational schematic, not a sign-off model (§9.3: dims come from real CAD
-// in the enterprise flow).
+// internal construction follows industrial lead-frame/substrate practice: the
+// die sits on the paddle, the bond fingers ring the die in the moat, and each
+// wire arcs from one die pad to the nearest same-edge finger (a fan-out that
+// never crosses the die or the sensor footprint). The sensor element follows
+// the template: monolithic MEMS-on-CMOS (WLCSP/QFN), a separate wire-bonded
+// MEMS die (LGA), or a co-integrated GMR bridge on the die (narrow SOIC/SOP/
+// TSSOP current sensors). Assembled from the same EdaBox primitives the EDA
+// scenes use, so the shared Eda3DViewer (explode + layer chips) renders it
+// unchanged. Geometry is an educational schematic, not a sign-off model
+// (§9.3: dims come from real CAD in the enterprise flow).
 
 const GOLD: RGB = [0.96, 0.78, 0.31];
 const PCB: RGB = [0.08, 0.28, 0.16];
@@ -134,11 +138,18 @@ export function buildPackageScene(tpl: AsicTemplate, pkg = tpl.options[0]?.pkg ?
   const hasMems = tpl.id === "cap_afe" || tpl.id === "env_sensor";
 
   // ── Die footprint (WLCSP: the die IS the body; else on the substrate) ──
-  const dieW = family === "wlcsp" ? bodyW - 1.2 : 4.2;
-  const dieD = family === "wlcsp" ? bodyD - 1.2 : 3.2;
-  const dieX = family === "wlcsp" ? 0 : -bodyW * 0.14;
+  // QFN centres the die on the paddle (exposed-pad construction); LGA pulls
+  // the die west so the separate MEMS die fits east with a moat between.
+  const dieW = family === "wlcsp" ? bodyW - 1.2 : family === "lga" ? 3.0 : 4.2;
+  const dieD = family === "wlcsp" ? bodyD - 1.2 : family === "lga" ? 2.8 : 3.2;
+  const dieX = family === "wlcsp" || family === "qfn" ? 0 : -bodyW * (family === "lga" ? 0.18 : 0.14);
   const dieY = family === "wlcsp" ? 1.3 : 1.42;
   const dieTop = dieY + (family === "wlcsp" ? 0.3 : 0.2);
+
+  // Shared lead-frame pitch — lead, bond finger and wire stay on one line.
+  const leadPitch = Math.min(0.95, (dieW - 0.6) / (perSide - 1));
+  const leadX0 = dieX - ((perSide - 1) * leadPitch) / 2;
+  const leadZ0 = -((perSide - 1) * leadPitch) / 2;
 
   // ── Package body: substrate (lead-frame packages) + termination ──
   if (family !== "wlcsp")
@@ -179,15 +190,11 @@ export function buildPackageScene(tpl: AsicTemplate, pkg = tpl.options[0]?.pkg ?
     // gull-wing leads: PCB foot pad → sloped shoulder → lead finger under the
     // body edge; drawn on the two long sides (SOIC/SOP/TSSOP) or all four
     // (LQFP). Lead + finger go to the package layer; the PCB pads are solder.
-    // pitch/x0 are shared with the bond-finger layout below so lead, finger
-    // and wire stay in one line.
-    const pitch = Math.min(0.95, (dieW - 0.6) / (perSide - 1));
-    const x0 = dieX - ((perSide - 1) * pitch) / 2;
-    const z0 = -((perSide - 1) * pitch) / 2;
+    // The shared leadPitch/leadX0 above keep lead, finger and wire in one line.
     const side = (axis: "z" | "x", s: number) => {
       const edge = axis === "z" ? bodyD / 2 : bodyW / 2;
       for (let i = 0; i < perSide; i++) {
-        const a = axis === "z" ? x0 + i * pitch : z0 + i * pitch;
+        const a = axis === "z" ? leadX0 + i * leadPitch : leadZ0 + i * leadPitch;
         const pts: [number, number][] =
           axis === "z"
             ? [[a, s * (edge + 1.15)], [a, s * (edge + 0.45)], [a, s * (edge - 0.1)]]
@@ -243,21 +250,11 @@ export function buildPackageScene(tpl: AsicTemplate, pkg = tpl.options[0]?.pkg ?
     size: [0.5, 0.05, 0.5], color: [0.95, 0.95, 0.9], cyl: true,
   });
 
-  // ── Die + pad ring + metal stack ──
+  // ── Die + metal stack (bond pads are drawn by the bond map below — one
+  // pad per wire, exactly like an assembled & molded unit) ──
   put({ name: "die-attach", layer: "die", pos: [dieX, dieY - 0.26, 0], size: [dieW + 0.4, 0.12, dieD + 0.4], color: [0.55, 0.3, 0.2] });
   put({ name: "die", layer: "die", pos: [dieX, dieY, 0], size: [dieW, family === "wlcsp" ? 0.6 : 0.4, dieD], color: DIE, metalness: 0.35, roughness: 0.4 });
-  const pads: [number, number][] = [];
-  for (let i = 0; i < 10; i++) {
-    pads.push([dieX - dieW / 2 + 0.25 + (i * (dieW - 0.5)) / 9, -dieD / 2]);
-    pads.push([dieX - dieW / 2 + 0.25 + (i * (dieW - 0.5)) / 9, dieD / 2]);
-  }
-  for (let i = 0; i < 6; i++) {
-    pads.push([dieX - dieW / 2, -dieD / 2 + 0.3 + (i * (dieD - 0.6)) / 5]);
-    pads.push([dieX + dieW / 2, -dieD / 2 + 0.3 + (i * (dieD - 0.6)) / 5]);
-  }
   if (family !== "wlcsp") {
-    for (const [px, pz] of pads)
-      put({ name: "pad", layer: "die", pos: [px, dieY + 0.22, pz], size: [0.28, 0.05, 0.28], color: GOLD, metalness: 0.95, roughness: 0.2 });
     for (let i = 0; i < 5; i++)
       put({ name: `metal${i}`, layer: "die", pos: [dieX, dieY + 0.21, -0.9 + i * 0.45], size: [dieW - 0.8, 0.03, 0.1], color: [0.7, 0.75, 0.9], metalness: 0.6 });
   } else {
@@ -268,13 +265,16 @@ export function buildPackageScene(tpl: AsicTemplate, pkg = tpl.options[0]?.pkg ?
   }
 
   // ── Sensor element (the template's own ASIC silicon) ──
-  // MEMS stack for the capacitive/environmental templates, GMR + coil for
-  // current/motor. On the substrate beside the die — except WLCSP, where it
-  // is a stacked die on the main silicon (multi-die WLCSP).
-  const memsScale = Math.min(1, dieW / 4.5);
-  const sensX = family === "wlcsp" ? dieX - dieW * 0.22 : bodyW / 2 - 1.7;
-  const sDY = family === "wlcsp" ? dieTop - 1.1 : 0;
+  // Industrial constructions differ by package room: WLCSP/QFN integrate the
+  // MEMS monolithically on the CMOS die (one stacked silicon); LGA carries it
+  // as a separate wire-bonded MEMS die beside the ASIC (multi-die laminate,
+  // BME280 style); the narrow gull-wing current sensors co-integrate the GMR
+  // bridge on the die itself — no second die fits a 5 mm body.
+  const memsScale = family === "lga" ? 0.8 : Math.min(1, dieW / 4.5);
+  const stacked = family === "wlcsp" || family === "qfn";
+  const sDY = stacked ? dieTop - 1.1 : 0;
   const sm = (v: number) => v * memsScale;
+  const sensX = hasMems ? (stacked ? dieX + dieW * 0.05 : bodyW / 2 - 1.95) : dieX + dieW * 0.15;
   if (hasMems) {
     put({ name: "mems-sub", layer: "sensor", pos: [sensX, 1.2 + sDY, 0], size: [sm(2.4), 0.2, sm(2.4)], color: [0.2, 0.24, 0.34] });
     // diaphragm over a cavity (capacitive MEMS)
@@ -283,53 +283,85 @@ export function buildPackageScene(tpl: AsicTemplate, pkg = tpl.options[0]?.pkg ?
     // electrodes around the membrane
     for (const [ex, ez] of [[-sm(0.9), -sm(0.9)], [sm(0.9), -sm(0.9)], [-sm(0.9), sm(0.9)], [sm(0.9), sm(0.9)]] as const)
       put({ name: "el", layer: "sensor", pos: [sensX + ex, 1.34 + sDY, ez], size: [0.3, 0.08, 0.3], color: GOLD, metalness: 0.9 });
-    for (const bx of [-sm(0.9), sm(0.9)]) boxes.push(...bondWire(sensX + bx, 0, sensX + bx * 0.55, 0, 1.5 + sDY, 1.1 + (family === "wlcsp" ? dieTop - 1.6 : 0)));
-  } else {
-    // GMR element on a lead frame (current sensor) / sense pair (motor)
-    put({ name: "gmr", layer: "sensor", pos: [sensX, 1.3 + sDY, 0], size: [1.4, 0.3, 1.0], color: [0.45, 0.3, 0.55], metalness: 0.6 });
-    put({ name: "coil", layer: "sensor", pos: [sensX, 1.55 + sDY, 0], size: [1.0, 0.12, 0.7], color: GOLD, metalness: 0.9 });
-    boxes.push(...bondWire(sensX + 0.7, 0.3, sensX + 0.5, 0.2, 1.5 + sDY, 1.1 + sDY));
-    boxes.push(...bondWire(sensX + 0.7, -0.3, sensX + 0.5, -0.2, 1.5 + sDY, 1.1 + sDY));
-  }
-
-  // ── Bond wires: die pad ring → lead-frame fingers, per termination ──
-  if (family !== "wlcsp") {
-    const fingers: [number, number][] = [];
-    if (family === "lga") {
-      for (let i = 0; i < grid[0]; i++)
-        for (let j = 0; j < grid[1]; j++)
-          fingers.push([(i - (grid[0] - 1) / 2) * 1.3, (j - (grid[1] - 1) / 2) * 1.3]);
-    } else if (family === "qfn") {
-      const pitchW = (bodyW - 1.6) / (perSide - 1);
-      const q0 = -((perSide - 1) * pitchW) / 2;
-      for (let i = 0; i < perSide; i++) {
-        const a = q0 + i * pitchW;
-        for (const s of [-1, 1] as const) {
-          fingers.push([a, s * (bodyD / 2 - 0.5)]);
-          fingers.push([s * (bodyW / 2 - 0.5), a]);
-        }
-      }
-    } else {
-      // gull-wing families: fingers share the lead pitch/origin, so wire,
-      // finger and lead read as one continuous lead frame
-      const pitch = Math.min(0.95, (dieW - 0.6) / (perSide - 1));
-      const x0 = dieX - ((perSide - 1) * pitch) / 2;
-      const z0 = -((perSide - 1) * pitch) / 2;
-      for (let i = 0; i < perSide; i++) {
-        const ax = x0 + i * pitch;
-        const az = z0 + i * pitch;
-        for (const s of [-1, 1] as const) {
-          fingers.push([ax, s * (bodyD / 2 - 0.5)]);
-          if (family === "lqfp") fingers.push([s * (bodyW / 2 - 0.5), az]);
-        }
+    if (!stacked) {
+      // separate MEMS die: two bond wires out to dedicated substrate pads
+      for (const s of [-1, 1] as const) {
+        const [px, pz] = [sensX + sm(0.9) + 0.53, s * sm(0.55)];
+        put({ name: "sens-pad", layer: "package", pos: [px, 1.14, pz], size: [0.26, 0.05, 0.3], color: GOLD, metalness: 0.9 });
+        boxes.push(...bondWire(sensX + sm(0.9), s * sm(0.9), px, pz, 1.42, 1.12));
       }
     }
-    const nWires = Math.min(fingers.length, pads.length, Math.max(12, pins));
-    for (let w = 0; w < nWires; w++) {
-      const [px, pz] = pads[w % pads.length];
-      const [fx, fz] = fingers[w % fingers.length];
-      boxes.push(...bondWire(px, pz, fx, fz, dieY + 0.24, 1.1));
-      put({ name: "finger", layer: "package", pos: [fx, 1.12, fz], size: [0.3, 0.04, 0.5], color: [0.8, 0.68, 0.35], metalness: 0.8 });
+    // monolithic MEMS needs no wires — the electrodes route into the die metal
+  } else {
+    // GMR bridge + field coil, co-integrated on the die top (current sensor)
+    put({ name: "gmr", layer: "sensor", pos: [sensX, dieTop + 0.15, 0], size: [1.4, 0.3, 1.0], color: [0.45, 0.3, 0.55], metalness: 0.6 });
+    put({ name: "coil", layer: "sensor", pos: [sensX, dieTop + 0.4, 0], size: [1.0, 0.12, 0.7], color: GOLD, metalness: 0.9 });
+    for (const s of [-1, 1] as const)
+      put({ name: `gmr-trace${s}`, layer: "die", pos: [sensX + s * 1.0, dieTop + 0.01, s * 0.1], size: [0.6, 0.03, 0.1], color: [0.7, 0.75, 0.9], metalness: 0.6 });
+  }
+  // east footprint of the sensor element — the bond ring must clear it
+  const sensFootR = hasMems ? sensX + sm(1.2) : dieX + dieW / 2;
+
+  // ── Bond map: one die pad ⇄ one lead-frame finger per wire, same edge ──
+  // Industrial lead-frame cross-sections (SOIC/QFN/LQFP) and substrate
+  // layouts (LGA) share one rule: the inner fingers ring the die footprint
+  // in the moat between die and body wall, and every wire arcs from a die
+  // pad to the nearest finger on the SAME side — a fan-out, never a wire
+  // crossing over the die, and no fingers over the die or sensor footprint.
+  type BondSide = { axis: "z" | "x"; s: number; fingers: [number, number][] };
+  const sides: BondSide[] = [];
+  if (family === "lga") {
+    // substrate fan-out ring around die + sensor; vias drop to the land grid
+    const xL = dieX - dieW / 2 - 0.55;
+    const xR = sensFootR + 0.55;
+    const row = 5;
+    for (const s of [-1, 1] as const)
+      sides.push({
+        axis: "z", s,
+        fingers: Array.from({ length: row }, (_, i) => [xL + 0.5 + (i * (xR - xL - 1.0)) / (row - 1), s * (dieD / 2 + 0.55)] as [number, number]),
+      });
+    sides.push({ axis: "x", s: -1, fingers: [[xL, 0]] });
+    sides.push({ axis: "x", s: 1, fingers: [[xR, 0]] });
+  } else if (family === "qfn") {
+    // inner lead tips ring the die, one row per edge, inside the lands
+    const pitchW = (bodyW - 1.6) / (perSide - 1);
+    const q0 = -((perSide - 1) * pitchW) / 2;
+    for (const s of [-1, 1] as const) {
+      sides.push({ axis: "z", s, fingers: Array.from({ length: perSide }, (_, i) => [q0 + i * pitchW, s * (bodyD / 2 - 0.55)] as [number, number]) });
+      sides.push({ axis: "x", s, fingers: Array.from({ length: perSide }, (_, i) => [s * (bodyW / 2 - 0.55), q0 + i * pitchW] as [number, number]) });
+    }
+  } else if (gullWing) {
+    // fingers share the lead pitch/origin, so wire, finger and lead read as
+    // one continuous lead frame
+    for (const s of [-1, 1] as const) {
+      sides.push({ axis: "z", s, fingers: Array.from({ length: perSide }, (_, i) => [leadX0 + i * leadPitch, s * (bodyD / 2 - 0.5)] as [number, number]) });
+      if (family === "lqfp")
+        sides.push({ axis: "x", s, fingers: Array.from({ length: perSide }, (_, i) => [s * (bodyW / 2 - 0.5), leadZ0 + i * leadPitch] as [number, number]) });
+    }
+  } else {
+    for (const s of [-1, 1] as const)
+      sides.push({ axis: "z", s, fingers: Array.from({ length: 6 }, (_, i) => [-1.75 + i * 0.7, s * (bodyD / 2 - 0.5)] as [number, number]) });
+  }
+  for (const { axis, s, fingers } of sides) {
+    // die pads: m evenly spaced on the facing die edge (≥0.3 pitch), paired
+    // in row order with the fingers → a non-crossing trapezoid fan-out
+    const spanHalf = (axis === "z" ? dieW : dieD) / 2 - 0.25;
+    const n = fingers.length;
+    const m = Math.min(n, Math.max(1, Math.floor((spanHalf * 2) / 0.3)));
+    for (let i = 0; i < m; i++) {
+      const t = m === 1 ? 0.5 : i / (m - 1);
+      const a = -spanHalf + 2 * spanHalf * t;
+      const [fx, fz] = fingers[m === 1 ? Math.floor(n / 2) : Math.round((i * (n - 1)) / (m - 1))];
+      const [px, pz]: [number, number] = axis === "z" ? [dieX + a, s * dieD / 2] : [dieX + (s * dieW) / 2, a];
+      put({ name: "pad", layer: "die", pos: [px, dieY + 0.22, pz], size: [0.26, 0.05, 0.26], color: GOLD, metalness: 0.95, roughness: 0.2 });
+      boxes.push(...bondWire(px, pz, fx, fz, dieY + 0.24, 1.12));
+      // gold inner-finger tip on the substrate, plus the connection down:
+      // QFN wraps the lead tip to its land; LGA drops a via to the land grid
+      put({ name: "finger", layer: "package", pos: [fx, 1.12, fz], size: axis === "z" ? [0.34, 0.04, 0.5] : [0.5, 0.04, 0.34], color: [0.8, 0.68, 0.35], metalness: 0.8 });
+      if (family === "qfn")
+        put({ name: "finger-drop", layer: "package", pos: [fx + (axis === "x" ? s * 0.22 : 0), 0.92, fz + (axis === "z" ? s * 0.22 : 0)], size: [0.14, 0.4, 0.14], color: [0.8, 0.68, 0.35], metalness: 0.8 });
+      if (family === "lga")
+        put({ name: "finger-via", layer: "package", pos: [fx, 1.1, fz], size: [0.16, 0.05, 0.16], color: [0.3, 0.26, 0.2], cyl: true, metalness: 0.6 });
     }
   }
 
@@ -345,5 +377,15 @@ export function buildPackageScene(tpl: AsicTemplate, pkg = tpl.options[0]?.pkg ?
     { key: "mark", label: "mark", color: [0.9, 0.9, 0.85], count: boxes.filter((b) => b.layer === "mark").length },
   ];
 
-  return { mode: "package", boxes, legend, target: [0, 1.4, 0], distance: 26 };
+  // Explode anchors: keep the layer cake in cross-section order (PCB →
+  // solder → package → die → bond → sensor → mold → mark) instead of the
+  // box-min-y default, which interleaves bond wires under the die.
+  return {
+    mode: "package",
+    boxes,
+    legend,
+    target: [0, 1.4, 0],
+    distance: 26,
+    explodeAnchors: { PCB: 0, solder: 0.45, package: 1.15, die: 2.2, bond: 3.4, sensor: 4.5, mold: 5.6, mark: 6.5 },
+  };
 }

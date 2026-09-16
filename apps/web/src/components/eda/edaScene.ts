@@ -31,6 +31,8 @@ export type EdaScene = {
   legend: EdaLegendEntry[];
   /** process mode only — ordered step keys for the build-up slider */
   steps?: string[];
+  /** per-layer explode anchors; default is each layer's min box y */
+  explodeAnchors?: Record<string, number>;
   /** suggested orbit target + camera distance for framing */
   target: [number, number, number];
   distance: number;
