@@ -33,6 +33,9 @@ export type EdaScene = {
   steps?: string[];
   /** per-layer explode anchors; default is each layer's min box y */
   explodeAnchors?: Record<string, number>;
+  /** studio lighting — generated env map + contact shadow so polished
+   *  metal reads as metal (photoreal scenes; no HDR assets, all local) */
+  studio?: boolean;
   /** suggested orbit target + camera distance for framing */
   target: [number, number, number];
   distance: number;
@@ -256,6 +259,14 @@ export function shortGateLabel(cellType: string): string {
   return s.slice(0, 6) || "?";
 }
 
+// ── Synthesis scene — placed-die industrial model ──────────────────────
+// Gate-type clusters are rendered the way a placement viewer shows real
+// silicon, not toy cubes: each type is a placed region of standard-cell
+// ROWS bounded by M1 VDD/VSS power rails, dressed with copper M2 and
+// silver M3 routes stitched by gold vias, all on a lidded die substrate
+// framed by a gold seal ring and photolithography alignment keys.
+// Materials are polished metal lit by the generated studio env (studio:
+// true) so the die reads as inspected silicon under review lighting.
 export function buildSynthesisScene(report: SynthResult, projectTitle: string): EdaScene {
   const cells = Math.max(1, report.cellCount || 8);
   const flops = report.flopCount;
@@ -283,9 +294,10 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
     .sort((a, b) => (isSeq(a[0]) === isSeq(b[0]) ? b[1] - a[1] : isSeq(a[0]) ? -1 : 1));
 
   type Block = { type: string; count: number; disp: number; tw: number; td: number; color: RGB; label: string };
-  // Render cap per type — a 544-FF core still shows a believable cluster
-  // without 500+ meshes; the true count stays in the label/legend.
-  const CAP = 160;
+  // Render cap per type — rows + rails + routing cost ~1.4 meshes per cell,
+  // so the cap keeps a 544-FF core (AFE-SOC1) inside a smooth mesh budget;
+  // the true count stays in the label/legend.
+  const CAP = 96;
   const blocks: Block[] = types.map(([type, n]) => ({
     type,
     count: n,
@@ -298,9 +310,9 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
   for (const b of blocks) b.td = Math.max(1, Math.ceil(b.disp / b.tw));
 
   // Strip-pack: left-to-right, wrap when the running width exceeds MAX.
-  const spacing = 1.4;
-  const INTRA = 2;
-  const INTER = 2;
+  const PITCH = 1.05; // standard-cell row pitch (toy cubes used 1.4)
+  const INTRA = 1.6;
+  const INTER = 2.0;
   const totalCells = Math.max(1, blocks.reduce((a, b) => a + b.count, 0));
   const targetSide = Math.max(4, Math.ceil(Math.sqrt(totalCells * 1.5)));
   const MAX_STRIP_W = Math.max(6, Math.min(20, targetSide + 2));
@@ -324,30 +336,88 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
   // narrow sensor die and a square SoC no longer share the same slab — the
   // unused margin is the chip's real floorplan headroom.
   const prof = silProfileOf(projectTitle);
-  const floorW = totalWCubes * spacing * prof.aspect + 2.0;
-  const floorD = totalDCubes * spacing + 1.5;
+  const floorW = totalWCubes * PITCH * prof.aspect + 2.0;
+  const floorD = totalDCubes * PITCH + 1.5;
 
   const rng = mulberry32(strSeed(projectTitle));
   const boxes: EdaBox[] = [];
-  const perCellArea = Math.max(0.4, area / Math.max(1, cells) / 60.0);
 
+  // Die substrate: silicon base + lapped lid (top at y 0.18) + gold seal
+  // ring around the active area + corner alignment keys.
   boxes.push({
-    name: "eda_die_Floor",
+    name: "eda_die_Base",
     layer: "die",
-    pos: [0, -0.05, 0],
-    size: [floorW, 0.1, floorD],
-    color: [0.06, 0.1, 0.18],
-    roughness: 0.95,
+    pos: [0, 0, 0],
+    size: [floorW, 0.22, floorD],
+    color: [0.09, 0.11, 0.16],
+    metalness: 0.45,
+    roughness: 0.5,
   });
+  boxes.push({
+    name: "eda_die_Lid",
+    layer: "die",
+    pos: [0, 0.145, 0],
+    size: [floorW - 0.36, 0.07, floorD - 0.36],
+    color: [0.16, 0.2, 0.29],
+    metalness: 0.55,
+    roughness: 0.35,
+  });
+  const sW = floorW / 2 - 0.2;
+  const sD = floorD / 2 - 0.2;
+  for (const [px, pz, sx, sz] of [
+    [0, -sD, floorW - 0.3, 0.1],
+    [0, sD, floorW - 0.3, 0.1],
+    [-sW, 0, 0.1, floorD - 0.7],
+    [sW, 0, 0.1, floorD - 0.7],
+  ] as const)
+    boxes.push({
+      name: "eda_die_Seal",
+      layer: "die",
+      pos: [px, 0.2, pz],
+      size: [sx, 0.05, sz],
+      color: [0.95, 0.78, 0.3],
+      metalness: 0.95,
+      roughness: 0.22,
+      emissive: 0.1,
+    });
+  for (const [kx, kz] of [
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1],
+  ] as const) {
+    const kX = kx * (floorW / 2 - 0.75);
+    const kZ = kz * (floorD / 2 - 0.75);
+    boxes.push({
+      name: "eda_die_AlignH",
+      layer: "die",
+      pos: [kX, 0.19, kZ],
+      size: [0.34, 0.02, 0.07],
+      color: [0.85, 0.9, 0.98],
+      metalness: 0.8,
+      roughness: 0.3,
+      emissive: 0.25,
+    });
+    boxes.push({
+      name: "eda_die_AlignV",
+      layer: "die",
+      pos: [kX, 0.19, kZ],
+      size: [0.07, 0.02, 0.34],
+      color: [0.85, 0.9, 0.98],
+      metalness: 0.8,
+      roughness: 0.3,
+      emissive: 0.25,
+    });
+  }
 
   // Analog macro island — a mixed-signal part's AFE never comes out of the
   // synthesizer as gates; it sits beside the standard-cell sea as a hard
   // macro with its own cap array and guard ring.
   if (prof.analog) {
     const a = prof.analog;
-    const marginX = (floorW - totalWCubes * spacing) / 2;
+    const marginX = (floorW - totalWCubes * PITCH) / 2;
     const aW = Math.min(a.w * 0.8, Math.max(1.0, marginX - 0.7));
-    const aD = Math.min(a.d, Math.max(1.2, totalDCubes * spacing * 0.6));
+    const aD = Math.min(a.d, Math.max(1.2, totalDCubes * PITCH * 0.6));
     // near (+x, +z) corner — the default camera looks from there, so the
     // AFE island is the first thing a mixed-signal twin shows
     const ax = floorW / 2 - aW / 2 - 0.55;
@@ -358,8 +428,8 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
       pos: [ax, 0.3, az],
       size: [aW, 0.6, aD],
       color: [0.1, 0.65, 0.6],
-      metalness: 0.3,
-      roughness: 0.5,
+      metalness: 0.35,
+      roughness: 0.45,
       emissive: 0.18,
     });
     for (let i = 0; i < Math.min(a.caps, 8); i++) {
@@ -371,8 +441,8 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
         pos: [cx, 0.68, cz],
         size: [0.22, 0.14, 0.16],
         color: [0.3, 0.85, 0.75],
-        metalness: 0.6,
-        roughness: 0.35,
+        metalness: 0.7,
+        roughness: 0.3,
         emissive: 0.25,
       });
     }
@@ -387,78 +457,165 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
         layer: "analog",
         pos: [px, 0.3, pz],
         size: [sx, 0.2, sz],
-        color: [0.3, 0.85, 0.75],
-        metalness: 0.5,
-        roughness: 0.4,
-        emissive: 0.2,
+        color: [0.95, 0.78, 0.3],
+        metalness: 0.85,
+        roughness: 0.3,
+        emissive: 0.15,
       });
   }
 
   let cellIdx = 0;
-  const zTop = -(totalDCubes / 2.0) * spacing;
+  let railN = 0;
+  let m2N = 0;
+  let m3N = 0;
+  let viaN = 0;
+  const zTop = -(totalDCubes / 2.0) * PITCH;
   let zCursor = zTop;
   strips.forEach((strip, si) => {
-    const stripLeftX = -(stripWidths[si] / 2.0) * spacing;
+    const stripLeftX = -(stripWidths[si] / 2.0) * PITCH;
     let xCursor = stripLeftX;
     const stripD = stripDepths[si];
     for (const b of strip) {
       const color = b.color;
-      // Silkscreen bar in front of the block (darker shade of the type color)
+      const bw = b.tw * PITCH;
+      const bd = b.td * PITCH;
+      const bx = xCursor + bw / 2;
+      const bz = zCursor + bd / 2;
+      // Placement-region tray (darker shade of the type color) — hiding the
+      // cell layer leaves the placed footprint readable.
+      boxes.push({
+        name: `eda_place_${b.label}`,
+        layer: "die",
+        pos: [bx, 0.205, bz],
+        size: [bw + 0.24, 0.05, bd + 0.24],
+        color: [color[0] * 0.4, color[1] * 0.4, color[2] * 0.4],
+        metalness: 0.4,
+        roughness: 0.55,
+        emissive: 0.06,
+      });
+      // Etched silkscreen plate in front of the region
       boxes.push({
         name: `eda_gateLabel_${b.label}_${b.count}x`,
         layer: "label",
-        pos: [xCursor + (b.tw / 2.0) * spacing, 0.25, zCursor - 0.7],
-        size: [Math.min(3.0, b.tw * spacing * 0.8), 0.5, 0.4],
+        pos: [bx, 0.24, zCursor - 0.5],
+        size: [Math.min(3.0, bw * 0.85), 0.3, 0.26],
         color: [color[0] * 0.65, color[1] * 0.65, color[2] * 0.65],
-        emissive: 0.25,
+        metalness: 0.6,
+        roughness: 0.35,
+        emissive: 0.22,
       });
+      // M1 power rails bound every standard-cell row (shared edges → one rail)
+      for (let r = 0; r <= b.td; r++) {
+        boxes.push({
+          name: `eda_m1_rail_${b.label}_${r}`,
+          layer: "m1",
+          pos: [bx, 0.26, zCursor + r * PITCH],
+          size: [bw, 0.045, 0.08],
+          color: r % 2 ? [0.92, 0.32, 0.28] : [0.36, 0.6, 0.98],
+          metalness: 0.8,
+          roughness: 0.28,
+          emissive: 0.12,
+        });
+        railN++;
+      }
+      // Cells: flat poly-over-diffusion strips tucked between the rails
       let placed = 0;
       for (let r = 0; r < b.td && placed < b.disp; r++) {
+        const rowZ = zCursor + (r + 0.5) * PITCH;
         for (let c = 0; c < b.tw && placed < b.disp; c++) {
-          const h = 0.45 + perCellArea + rng() * 0.25;
           boxes.push({
             name: `eda_cell_${String(cellIdx).padStart(3, "0")}`,
             layer: "cell",
-            pos: [xCursor + (c + 0.5) * spacing, h / 2, zCursor + (r + 0.5) * spacing],
-            size: [0.85, h, 0.85],
+            pos: [xCursor + (c + 0.5) * PITCH, 0.335, rowZ],
+            size: [0.72, 0.12, PITCH * 0.6],
             color,
-            metalness: 0.25,
-            roughness: 0.45,
-            emissive: 0.18,
+            metalness: 0.55,
+            roughness: 0.3,
+            emissive: 0.1,
           });
           cellIdx++;
           placed++;
         }
       }
-      xCursor += b.tw * spacing + INTRA * spacing;
+      // BEOL dress over the placed region: copper M2 runs horizontally,
+      // silver M3 vertically, stitched with gold vias
+      const nM2 = Math.min(6, 2 + Math.floor(b.tw / 4));
+      for (let i = 0; i < nM2; i++) {
+        const w = bw * (0.45 + rng() * 0.5);
+        boxes.push({
+          name: `eda_m2_${b.label}_${i}`,
+          layer: "m2",
+          pos: [bx + (rng() - 0.5) * (bw - w) * 0.7, 0.5, zCursor + 0.25 + rng() * Math.max(0.1, bd - 0.5)],
+          size: [w, 0.04, 0.09],
+          color: [0.87, 0.52, 0.3],
+          metalness: 0.9,
+          roughness: 0.24,
+          emissive: 0.08,
+        });
+        m2N++;
+      }
+      const nM3 = Math.min(6, 2 + Math.floor(b.td / 4));
+      for (let i = 0; i < nM3; i++) {
+        const d = bd * (0.45 + rng() * 0.5);
+        boxes.push({
+          name: `eda_m3_${b.label}_${i}`,
+          layer: "m3",
+          pos: [bx + (rng() - 0.5) * Math.max(0.1, bw - 0.4), 0.62, bz + (rng() - 0.5) * (bd - d) * 0.7],
+          size: [0.09, 0.04, d],
+          color: [0.78, 0.84, 0.94],
+          metalness: 0.9,
+          roughness: 0.24,
+          emissive: 0.08,
+        });
+        m3N++;
+      }
+      const nVia = Math.min(5, 2 + Math.floor(b.tw / 5));
+      for (let i = 0; i < nVia; i++) {
+        boxes.push({
+          name: `eda_via_${b.label}_${i}`,
+          layer: "via",
+          cyl: true,
+          pos: [bx + (rng() - 0.5) * bw * 0.8, 0.56, bz + (rng() - 0.5) * bd * 0.8],
+          size: [0.11, 0.1, 0.11],
+          color: [0.96, 0.85, 0.32],
+          metalness: 0.9,
+          roughness: 0.2,
+          emissive: 0.15,
+        });
+        viaN++;
+      }
+      xCursor += bw + INTRA * PITCH;
     }
-    zCursor += stripD * spacing + INTER * spacing;
+    zCursor += stripD * PITCH + INTER * PITCH;
   });
 
   // Title strip — green when timing is met, red otherwise
   boxes.push({
     name: "eda_drc_Title",
     layer: "drc",
-    pos: [0, 3.5, -floorD / 2 - 1.0],
-    size: [4.0, 0.6, 0.1],
+    pos: [0, 2.6, -floorD / 2 - 1.0],
+    size: [4.0, 0.45, 0.1],
     color: slack >= 0 ? [0.27, 0.86, 0.46] : [0.94, 0.3, 0.45],
     emissive: 0.6,
   });
 
-  // KPI bars on the right edge (gates / area / slack)
+  // KPI gauge posts on the right edge (gates / area / slack), standing on
+  // the lid — short metallic pedestals so they don't tower over the die
   const bars: [RGB, number][] = [
-    [[0.13, 0.83, 0.93], Math.min(8.0, gateCount / 30)],
-    [[0.96, 0.62, 0.1], Math.min(8.0, area / 200)],
-    [slack >= 0 ? [0.27, 0.86, 0.46] : [0.94, 0.3, 0.45], Math.min(8.0, Math.max(0.5, Math.abs(slack) * 2))],
+    [[0.13, 0.83, 0.93], Math.min(2.4, gateCount / 30)],
+    [[0.96, 0.62, 0.1], Math.min(2.4, area / 200)],
+    [slack >= 0 ? [0.27, 0.86, 0.46] : [0.94, 0.3, 0.45], Math.min(2.4, Math.max(0.5, Math.abs(slack) * 2))],
   ];
   bars.forEach(([color, h], j) => {
     boxes.push({
       name: `eda_kpi_${j}`,
       layer: "kpi",
-      pos: [floorW / 2 + 1.0, h / 2, (j - 1) * 1.5],
-      size: [0.6, h, 0.6],
+      pos: [floorW / 2 + 0.9, 0.18 + h / 2, (j - 1) * 0.95],
+      size: [0.42, h, 0.42],
       color,
-      emissive: 0.3,
+      metalness: 0.6,
+      roughness: 0.3,
+      emissive: 0.22,
     });
   });
 
@@ -470,9 +627,34 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
   }));
   if (prof.analog)
     legend.push({ key: "analog", label: `${prof.analog.label} ×1`, color: [0.1, 0.65, 0.6], count: 1 });
+  legend.push({ key: "m1", label: `M1 VDD/VSS ×${railN}`, color: [0.36, 0.6, 0.98], count: railN });
+  legend.push({ key: "m2", label: `M2 Cu ×${m2N}`, color: [0.87, 0.52, 0.3], count: m2N });
+  legend.push({ key: "m3", label: `M3 Al ×${m3N}`, color: [0.78, 0.84, 0.94], count: m3N });
+  legend.push({ key: "via", label: `Via ×${viaN}`, color: [0.96, 0.85, 0.32], count: viaN });
 
+  // Explode lifts the stack in fab order: die frame → labels → analog macro
+  // → cell rows → M1 rails → M2 → vias → M3 → KPI → timing strip.
   const radius = Math.max(floorW, floorD);
-  return { mode: "synthesis", boxes, legend, target: [0, 1, 0], distance: radius * 1.6 + 4 };
+  return {
+    mode: "synthesis",
+    boxes,
+    legend,
+    studio: true,
+    target: [0, 1, 0],
+    distance: radius * 1.6 + 4,
+    explodeAnchors: {
+      die: 0,
+      label: 0.35,
+      analog: 0.6,
+      cell: 0.95,
+      m1: 1.35,
+      m2: 1.9,
+      via: 2.3,
+      m3: 2.65,
+      kpi: 3.2,
+      drc: 3.6,
+    },
+  };
 }
 
 // ── Layout scene — real-process layer cake ──

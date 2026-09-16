@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { ContactShadows, Environment, Lightformer, OrbitControls } from "@react-three/drei";
 import type * as THREE from "three";
 import type { EdaScene } from "./edaScene";
 
@@ -133,6 +133,28 @@ export function Eda3DViewer({ scene }: { scene: EdaScene | null }) {
         <directionalLight position={[-14, 8, -10]} intensity={0.4} />
         <Fit distance={scene.distance} target={scene.target} />
         <group key={`${scene.mode}-${scene.boxes.length}`}>
+          {scene.studio && (
+            <>
+              {/* Generated studio env (no HDR assets) — lets polished metal
+                  read as metal; ContactShadows grounds the die on the grid */}
+              <Environment resolution={256} frames={1}>
+                <Lightformer intensity={2.4} rotation-x={-Math.PI / 2} position={[0, 7, 0]} scale={[16, 16, 1]} color="#eaf1ff" />
+                <Lightformer intensity={1.2} rotation-y={-Math.PI / 3} position={[9, 3, 6]} scale={[10, 4, 1]} color="#cfe0ff" />
+                <Lightformer intensity={0.8} rotation-y={Math.PI / 2.6} position={[-9, 2.5, -5]} scale={[10, 3, 1]} color="#ffe7c4" />
+                <Lightformer intensity={0.45} rotation-x={Math.PI / 2} position={[0, -6, 0]} scale={[16, 16, 1]} color="#2c3d58" />
+              </Environment>
+              <ContactShadows
+                position={[0, -0.32, 0]}
+                scale={scene.distance * 1.15}
+                far={10}
+                opacity={0.5}
+                blur={2.6}
+                resolution={512}
+                frames={1}
+                color="#010409"
+              />
+            </>
+          )}
           {layers.map(({ key, anchor, boxes }) =>
             hidden.has(key) ? null : (
               <LayerGroup key={key} anchor={anchor} explodeRef={explodeRef}>
