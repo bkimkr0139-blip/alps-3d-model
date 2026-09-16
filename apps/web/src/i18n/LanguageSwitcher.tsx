@@ -25,8 +25,9 @@ export function LanguageSwitcher() {
       aria-label={t("app.language")}
       // Fixed width: the three autonym labels (한국어/English/日本語) have
       // different text widths, and an auto-width select made the whole nav
-      // bar reflow left/right on every language switch.
-      style={{ width: 104, padding: "6px 10px", borderRadius: 6, background: "var(--alps-bg-raise)", color: "var(--alps-text-bright)", border: "1px solid var(--alps-border-strong)", fontFamily: "inherit", fontSize: 13 }}
+      // bar reflow left/right on every language switch. Styled like the
+      // header buttons it sits between (metal raise, emboss lift).
+      style={{ width: 104, padding: "6px 12px", borderRadius: 6, background: "var(--alps-metal-raise)", color: "var(--alps-text-bright)", border: "1px solid var(--alps-border-strong)", boxShadow: "var(--alps-emboss-lift)", fontFamily: "inherit", fontSize: 13 }}
     >
       {LANGUAGES.map((l) => (
         <option key={l.code} value={l.code}>

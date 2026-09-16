@@ -374,6 +374,9 @@ function Workbench() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {/* Language + theme live pinned at the top-right of the header —
+              global settings, independent of what the nav bar below wraps. */}
+          <LanguageSwitcher />
           <ThemeToggle />
           <span
             style={{
@@ -504,9 +507,6 @@ function Workbench() {
             ⓘ {t("nav.standaloneHint")}
           </span>
         )}
-        <Field label={t("app.language")}>
-          <LanguageSwitcher />
-        </Field>
       </div>
 
       {/* The guide coaches the product/variant flow — noise in standalone
