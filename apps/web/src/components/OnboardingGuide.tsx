@@ -155,10 +155,12 @@ export function OnboardingGuide({
     <div
       style={{
         marginBottom: 16,
-        border: "1px solid #334155",
+        border: "1px solid var(--alps-border-strong)",
         borderRadius: 8,
         padding: "10px 12px",
         background: "#0b1222",
+        // keep-dark tip strip — pin light text (body color flips dark in light mode)
+        color: "#e2e8f0",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -172,7 +174,7 @@ export function OnboardingGuide({
               // private window etc. — hiding still works for this session
             }
           }}
-          style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, background: "#1e293b", color: "#e2e8f0", border: "1px solid #334155" }}
+          style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, background: "var(--alps-bg-raise)", color: "var(--alps-text)", border: "1px solid var(--alps-border-strong)" }}
         >
           {t("onboarding.dismiss")}
         </button>
@@ -191,7 +193,7 @@ export function OnboardingGuide({
                 ? "1px solid #14532d"
                 : s === next
                   ? "1px solid #b45309"
-                  : "1px solid #334155",
+                  : "1px solid var(--alps-border-strong)",
               background: s.done ? "#052e16" : s === next ? "#451a03" : "transparent",
               color: s.done ? "#4ade80" : s === next ? "#fbbf24" : "#94a3b8",
             }}

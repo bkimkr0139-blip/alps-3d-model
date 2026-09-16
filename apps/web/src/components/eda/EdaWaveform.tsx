@@ -9,7 +9,7 @@ import type { Waveform, WaveSignal } from "./edaRunner";
 export function EdaWaveform({ data }: { data: Waveform | null }) {
   const { t } = useTranslation();
   const [cursor, setCursor] = useState(0);
-  if (!data) return <div style={{ fontSize: 12, color: "#8b99b5" }}>{t("eda.wave.empty")}</div>;
+  if (!data) return <div style={{ fontSize: 12, color: "var(--alps-text-faint)" }}>{t("eda.wave.empty")}</div>;
 
   const W = 640;
   const ROW = 30;
@@ -69,7 +69,7 @@ export function EdaWaveform({ data }: { data: Waveform | null }) {
         </thead>
         <tbody>
           {data.signals.map((s) => (
-            <tr key={s.name} style={{ borderTop: "1px solid #1e293b" }}>
+            <tr key={s.name} style={{ borderTop: "1px solid var(--alps-border-base)" }}>
               <td style={{ padding: "3px 0", fontFamily: "monospace", color: "#cbd5e1" }}>{s.name}</td>
               <td style={{ padding: "3px 0", fontFamily: "monospace", color: "#22d3ee" }}>
                 {s.width > 1 ? prettyBus(valueAt(s, cursor)) : valueAt(s, cursor)}

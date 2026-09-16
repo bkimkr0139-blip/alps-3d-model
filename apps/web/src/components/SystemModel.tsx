@@ -76,7 +76,7 @@ function ModelCanvas({ model }: { model: SystemModel }) {
     <div style={{ overflowX: "auto" }}>
       <svg
         viewBox={`${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}`}
-        style={{ width: "100%", minHeight: 240, background: "#0b1220", borderRadius: 8 }}
+        style={{ width: "100%", minHeight: 240, background: "#0b1220", color: "#e2e8f0", borderRadius: 8 }}
         onClick={() => setSelectedComponentId(null)}
       >
         <defs>
@@ -218,7 +218,7 @@ function ImpactPathStrip({ paths }: { paths: ImpactPaths }) {
               padding: "5px 8px",
               borderRadius: 6,
               cursor: "pointer",
-              background: "#0b1220",
+              background: "#0b1220", color: "#e2e8f0",
               borderLeft: `3px ${style.dashed ? "dashed" : "solid"} ${style.color}`,
               fontSize: 12,
             }}
@@ -467,7 +467,7 @@ function ReviewSection({ variantId }: { variantId: string }) {
             <div
               key={f.id}
               style={{
-                background: "#0b1220",
+                background: "#0b1220", color: "#e2e8f0",
                 borderLeft: `3px solid ${SEVERITY_COLORS[f.severity]}`,
                 borderRadius: 6,
                 padding: "6px 9px",
@@ -544,7 +544,7 @@ function UQSection({ variantId }: { variantId: string }) {
           {t("uq.meta", { n: uq.n_samples, seed: uq.seed })}
         </span>
       </h4>
-      <svg viewBox="0 0 320 84" style={{ width: "100%", maxWidth: 560, marginTop: 6, background: "#0b1220", borderRadius: 8 }}>
+      <svg viewBox="0 0 320 84" style={{ width: "100%", maxWidth: 560, marginTop: 6, background: "#0b1220", color: "#e2e8f0", borderRadius: 8 }}>
         {/* target band overlay */}
         <rect x={bandX(band.min) * 320} y={0} width={(bandX(band.max) - bandX(band.min)) * 320} height={H} fill="#22c55e" opacity={0.10} />
         <line x1={bandX(band.min) * 320} y1={0} x2={bandX(band.min) * 320} y2={H} stroke="#22c55e" strokeDasharray="3 3" strokeWidth={1} />
@@ -575,7 +575,7 @@ function UQSection({ variantId }: { variantId: string }) {
         </text>
       </svg>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12, marginTop: 5 }}>
-        <span>{t("uq.violation")}: <b style={{ color: uq.results.violation_prob > 0.05 ? "#f87171" : "#4ade80" }}>
+        <span>{t("uq.violation")}: <b style={{ color: uq.results.violation_prob > 0.05 ? "var(--alps-violation)" : "var(--alps-ok)" }}>
           {(uq.results.violation_prob * 100).toFixed(1)}%
         </b></span>
         <span>P05 {uq.results.p05.toFixed(1)}</span>

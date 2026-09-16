@@ -152,7 +152,7 @@ export function FSOverlay({
   const path = predicted.map((p, i) => `${i === 0 ? "M" : "L"} ${sx(p.x).toFixed(1)} ${sy(p.y).toFixed(1)}`).join(" ");
 
   return (
-    <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 10, background: "#0b1220" }}>
+    <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 10, background: "#0b1220", color: "#e2e8f0" }}>
       <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>
         {t("bench.fsTitle")} · <span style={{ fontFamily: "monospace", fontSize: 11 }}>{mechRun.business_id}</span>
       </div>

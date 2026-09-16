@@ -22,9 +22,9 @@ import { useIsMobile } from "../ui/useIsMobile";
 import { StatusBadge, type KitStatus } from "../ui/kit";
 
 const inputStyle: React.CSSProperties = {
-  background: "#0f172a",
-  color: "white",
-  border: "1px solid #334155",
+  background: "var(--alps-bg-card)",
+  color: "var(--alps-text)",
+  border: "1px solid var(--alps-border-strong)",
   borderRadius: 4,
   padding: "4px 6px",
   fontSize: 11.5,
@@ -34,9 +34,9 @@ const inputStyle: React.CSSProperties = {
 function DispositionBadge({ disposition }: { disposition: LotCard["disposition"] }) {
   const { t } = useTranslation();
   const map = {
-    ok: { color: "#4ade80", mark: "●", label: t("proc.disposition.ok") },
-    quarantine: { color: "#fbbf24", mark: "▲", label: t("proc.disposition.quarantine") },
-    reject: { color: "#f87171", mark: "✕", label: t("proc.disposition.reject") },
+    ok: { color: "var(--alps-ok-alt)", mark: "●", label: t("proc.disposition.ok") },
+    quarantine: { color: "var(--alps-attention)", mark: "▲", label: t("proc.disposition.quarantine") },
+    reject: { color: "var(--alps-violation)", mark: "✕", label: t("proc.disposition.reject") },
   } as const;
   const s = map[disposition];
   return (
@@ -63,7 +63,7 @@ function RootCauseSection({ lotId }: { lotId: string }) {
     return (
       <button
         onClick={load}
-        style={{ marginTop: 8, padding: "5px 10px", borderRadius: 6, background: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", cursor: "pointer", fontSize: 12 }}
+        style={{ marginTop: 8, padding: "5px 10px", borderRadius: 6, background: "var(--alps-bg-raise)", color: "var(--alps-text)", border: "1px solid var(--alps-border-strong)", cursor: "pointer", fontSize: 12 }}
       >
         {t("proc.rootCause.button")}
       </button>
@@ -77,19 +77,19 @@ function RootCauseSection({ lotId }: { lotId: string }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {hypo.candidates.map((c, i) => (
-            <div key={i} style={{ background: "#0b1220", borderLeft: "3px solid #fbbf24", borderRadius: 6, padding: "6px 9px", fontSize: 12 }}>
+            <div key={i} style={{ background: "var(--alps-bg-card)", borderLeft: "3px solid #fbbf24", borderRadius: 6, padding: "6px 9px", fontSize: 12 }}>
               <div style={{ display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }}>
                 <span style={{ background: "#fbbf24", color: "#0b1220", padding: "0 6px", borderRadius: 4, fontWeight: 700, fontSize: 10 }}>
                   {t(`proc.cause.${c.cause}`)}
                 </span>
                 <span style={{ fontWeight: 600 }}>{tr(c.title)}</span>
-                <span style={{ marginLeft: "auto", fontSize: 10, color: "#fbbf24" }}>{t("proc.rootCause.checkRequired")}</span>
+                <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--alps-attention)" }}>{t("proc.rootCause.checkRequired")}</span>
               </div>
               <div style={{ opacity: 0.8, marginTop: 3 }}>{tr(c.detail)}</div>
               {c.evidence.length > 0 && (
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
                   {c.evidence.map((e, j) => (
-                    <span key={j} style={{ background: "#1e293b", borderRadius: 4, padding: "1px 6px", fontSize: 10.5 }} title={e.note ? tr(e.note) : undefined}>
+                    <span key={j} style={{ background: "var(--alps-bg-raise)", borderRadius: 4, padding: "1px 6px", fontSize: 10.5 }} title={e.note ? tr(e.note) : undefined}>
                       {e.kind}: {e.business_id}
                     </span>
                   ))}
@@ -145,7 +145,7 @@ function CapaCard({
   );
 
   return (
-    <div style={{ background: "#0b1220", border: "1px solid #334155", borderRadius: 8, padding: "8px 10px", marginTop: 6 }}>
+    <div style={{ background: "var(--alps-bg-card)", border: "1px solid var(--alps-border-strong)", borderRadius: 8, padding: "8px 10px", marginTop: 6 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
         <strong style={{ fontSize: 12.5 }}>{tr(capa.title)}</strong>
         <span style={{ fontSize: 11 }}>{enumLabel(t, "capaStatus", capa.status)}</span>
@@ -158,7 +158,7 @@ function CapaCard({
       {events.length > 0 && (
         <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 2 }}>
           {events.map((e) => (
-            <div key={e.id} style={{ fontSize: 10, opacity: 0.65, borderLeft: "2px solid #334155", paddingLeft: 6 }}>
+            <div key={e.id} style={{ fontSize: 10, opacity: 0.65, borderLeft: "2px solid var(--alps-border-strong)", paddingLeft: 6 }}>
               {enumLabel(t, "capaEventType", e.event_type)} · {e.actor} ({new Date(e.occurred_at).toLocaleString()})
               {e.comment ? ` — ${tr(e.comment)}` : ""}
               {e.evidence?.test_run_business_id
@@ -293,7 +293,7 @@ function DefectQualitySection({
   }
 
   return (
-    <div style={{ marginTop: 8, borderTop: "1px dashed #334155", paddingTop: 8 }}>
+    <div style={{ marginTop: 8, borderTop: "1px dashed var(--alps-border-strong)", paddingTop: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontSize: 11.5, fontWeight: 700, opacity: 0.85 }}>{t("proc.quality.title")}</div>
         <button onClick={() => setShowFaForm((s) => !s)} style={{ fontSize: 10.5, padding: "2px 6px" }}>
@@ -352,7 +352,7 @@ function DefectQualitySection({
             <div style={{ fontSize: 11.5, opacity: 0.85 }}>{tr(fa.findings)}</div>
             {fa.root_cause && (
               <div style={{ fontSize: 11, marginTop: 2 }}>
-                <span style={{ color: fa.root_cause_confirmed ? "#4ade80" : "#fbbf24", fontWeight: 600 }}>
+                <span style={{ color: fa.root_cause_confirmed ? "var(--alps-ok)" : "var(--alps-attention)", fontWeight: 600 }}>
                   {fa.root_cause_confirmed ? t("proc.quality.fa.confirmed") : t("proc.quality.fa.unconfirmed")}
                 </span>{" "}
                 {tr(fa.root_cause)}
@@ -444,7 +444,7 @@ function LotDetail({ lot }: { lot: LotCard }) {
   );
 
   return (
-    <div style={{ marginTop: 10, borderTop: "1px solid #1e293b", paddingTop: 10 }}>
+    <div style={{ marginTop: 10, borderTop: "1px solid var(--alps-border-base)", paddingTop: 10 }}>
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>{t("proc.genealogy.title")}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -471,7 +471,7 @@ function LotDetail({ lot }: { lot: LotCard }) {
         </thead>
         <tbody>
           {gene.process_runs.map((r) => (
-            <tr key={r.business_id} style={{ borderTop: "1px solid #1e293b" }}>
+            <tr key={r.business_id} style={{ borderTop: "1px solid var(--alps-border-base)" }}>
               <td style={{ padding: "3px 6px", opacity: 0.6 }}>{r.seq_no}</td>
               <td style={{ padding: "3px 6px" }}>
                 {r.operation} <span style={{ opacity: 0.5 }}>({r.equipment ?? "—"})</span>
@@ -559,7 +559,7 @@ function CavityStrip({ comparison }: { comparison: CavityComparison }) {
     <div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {comparison.cavities.map((c) => (
-          <div key={c.cavity_id} style={{ background: "#0b1220", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", minWidth: 170 }}>
+          <div key={c.cavity_id} style={{ background: "var(--alps-bg-card)", border: "1px solid var(--alps-border-strong)", borderRadius: 8, padding: "8px 12px", minWidth: 170 }}>
             <div style={{ fontWeight: 700, fontSize: 12.5 }}>{c.cavity_label}</div>
             <div style={{ fontSize: 12, marginTop: 2 }}>
               {t("proc.cavity.n", { count: c.n_values })} · {t("proc.cavity.mean")} {c.mean !== null ? c.mean.toFixed(1) : "—"}
@@ -574,7 +574,7 @@ function CavityStrip({ comparison }: { comparison: CavityComparison }) {
         ))}
       </div>
       {comparison.drift_suspected && (
-        <div style={{ marginTop: 8, fontSize: 12.5, color: "#fbbf24" }}>
+        <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--alps-attention)" }}>
           ▲ {t("proc.cavity.drift")}
         </div>
       )}
@@ -662,7 +662,7 @@ export function ProcessTwin({
             position: "relative",
             height: "clamp(300px, 46vh, 480px)",
             marginBottom: 12,
-            border: "1px solid #334155",
+            border: "1px solid var(--alps-border-strong)",
             borderRadius: 8,
             overflow: "hidden",
           }}
@@ -711,9 +711,9 @@ export function ProcessTwin({
                 key={lot.id}
                 onClick={() => setSelectedLotId(lot.id === selectedLotId ? null : lot.id)}
                 style={{
-                  borderTop: "1px solid #1e293b",
+                  borderTop: "1px solid var(--alps-border-base)",
                   cursor: "pointer",
-                  background: lot.id === selectedLotId ? "#1e293b" : "transparent",
+                  background: lot.id === selectedLotId ? "var(--alps-border-base)" : "transparent",
                 }}
               >
                 <td style={{ padding: "4px 8px" }}>{lot.business_id}</td>
@@ -724,7 +724,7 @@ export function ProcessTwin({
                 <td style={{ padding: "4px 8px" }}>{lot.defect_count > 0 ? `✕ ${lot.defect_count}` : "—"}</td>
                 <td style={{ padding: "4px 8px" }}>
                   {lot.out_of_window_runs > 0 ? (
-                    <span style={{ color: "#f87171" }}>▲ {lot.out_of_window_runs}</span>
+                    <span style={{ color: "var(--alps-violation)" }}>▲ {lot.out_of_window_runs}</span>
                   ) : (
                     "—"
                   )}
@@ -798,10 +798,10 @@ function StationDrawer({
         <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 8 }}>
           {station.params.map((p) => (
             <div key={p.parameter} style={{ display: "flex", gap: 8, fontSize: 11, fontFamily: "monospace", alignItems: "baseline" }}>
-              <span style={{ color: "#7dd3fc" }}>{p.parameter}</span>
+              <span style={{ color: "var(--alps-accent-id)" }}>{p.parameter}</span>
               <span style={{ opacity: 0.55 }}>{p.unit ?? ""}</span>
-              <span style={{ marginLeft: "auto", color: p.ruleHits > 0 ? "#fbbf24" : undefined }}>▲{p.ruleHits}</span>
-              <span style={{ color: p.excluded > 0 ? "#f87171" : undefined }}>✕{p.excluded}</span>
+              <span style={{ marginLeft: "auto", color: p.ruleHits > 0 ? "var(--alps-attention)" : undefined }}>▲{p.ruleHits}</span>
+              <span style={{ color: p.excluded > 0 ? "var(--alps-violation)" : undefined }}>✕{p.excluded}</span>
             </div>
           ))}
         </div>

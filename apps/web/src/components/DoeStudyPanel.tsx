@@ -3,7 +3,7 @@ import ReactECharts from "echarts-for-react";
 import { useTranslation } from "react-i18next";
 import { api, type DoeStudy, type ProcessOperationDto } from "../lib/api";
 import { seedTr } from "../lib/seedL10n";
-import { chartAxis, chartBase } from "../ui/chartTheme";
+import { useChartTheme } from "../ui/chartTheme";
 
 /** One (operation, parameter) pair a DOE study can be run against — every
  * operation window bound is a candidate regression target. */
@@ -92,7 +92,7 @@ export function DoeStudyPanel({
         <select
           value={selected.key}
           onChange={(e) => setSelectedKey(e.target.value)}
-          style={{ padding: "5px 8px", borderRadius: 6, background: "#1e293b", color: "white", border: "1px solid #334155", fontSize: 12 }}
+          style={{ padding: "5px 8px", borderRadius: 6, background: "var(--alps-bg-raise)", color: "var(--alps-text-bright)", border: "1px solid var(--alps-border-strong)", fontSize: 12 }}
         >
           {options.map((o) => (
             <option key={o.key} value={o.key}>
@@ -104,12 +104,12 @@ export function DoeStudyPanel({
         <button
           onClick={runStudy}
           disabled={running}
-          style={{ padding: "5px 10px", borderRadius: 6, background: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", cursor: running ? "default" : "pointer", fontSize: 12 }}
+          style={{ padding: "5px 10px", borderRadius: 6, background: "var(--alps-bg-raise)", color: "var(--alps-text)", border: "1px solid var(--alps-border-strong)", cursor: running ? "default" : "pointer", fontSize: 12 }}
         >
           {running ? t("doe.loading") : t("doe.runButton")}
         </button>
       </div>
-      {error && <div style={{ fontSize: 11.5, color: "#f87171", marginTop: 4 }}>{error}</div>}
+      {error && <div style={{ fontSize: 11.5, color: "var(--alps-violation)", marginTop: 4 }}>{error}</div>}
 
       {latest ? (
         <DoeStudyResult study={latest} />
@@ -122,6 +122,7 @@ export function DoeStudyPanel({
 
 function DoeStudyResult({ study }: { study: DoeStudy }) {
   const { t, i18n } = useTranslation();
+  const ct = useChartTheme();
   const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const fit = study.fit;
   const sign = fit.slope > 0 ? "+" : "";
@@ -135,9 +136,9 @@ function DoeStudyResult({ study }: { study: DoeStudy }) {
   ];
 
   const option = {
-    ...chartBase,
+    ...ct.chartBase,
     legend: {
-      ...chartBase.legend,
+      ...ct.chartBase.legend,
       data: [t("doe.chart.observed"), t("doe.chart.fitted")],
       top: 0,
     },
@@ -147,14 +148,14 @@ function DoeStudyResult({ study }: { study: DoeStudy }) {
       name: `${study.parameter}${study.parameter_unit ? ` (${study.parameter_unit})` : ""}`,
       nameLocation: "middle",
       nameGap: 26,
-      ...chartAxis(),
+      ...ct.chartAxis(),
     },
     yAxis: {
       type: "value",
       name: study.metric_unit ?? study.metric,
-      ...chartAxis(),
+      ...ct.chartAxis(),
     },
-    tooltip: { ...chartBase.tooltip, trigger: "item" },
+    tooltip: { ...ct.chartBase.tooltip, trigger: "item" },
     series: [
       {
         name: t("doe.chart.observed"),
@@ -168,7 +169,13 @@ function DoeStudyResult({ study }: { study: DoeStudy }) {
         type: "line",
         data: trendLine,
         symbol: "none",
-        lineStyle: { color: "#fbbf24", width: 1.6, type: "dashed" as const, shadowColor: "#fbbf2455", shadowBlur: 5 },
+        lineStyle: {
+          color: ct.traceColor(1),
+          width: 1.6,
+          type: "dashed" as const,
+          shadowColor: ct.mode === "light" ? "rgba(180, 83, 9, 0.3)" : "rgba(251, 191, 36, 0.33)",
+          shadowBlur: 5,
+        },
       },
     ],
   };
@@ -206,7 +213,7 @@ function DoeStudyResult({ study }: { study: DoeStudy }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           {study.constraint_violations.map((v) => (
-            <div key={v.process_run_business_id} style={{ fontSize: 11.5, color: "#fbbf24" }}>
+            <div key={v.process_run_business_id} style={{ fontSize: 11.5, color: "var(--alps-attention)" }}>
               ▲ {v.process_run_business_id} ({v.lot_business_id}) — {study.parameter}={v.parameter_value}
             </div>
           ))}
@@ -229,7 +236,7 @@ function DoeStudyResult({ study }: { study: DoeStudy }) {
           {[...study.candidates]
             .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0) || a.parameter_value - b.parameter_value)
             .map((c, i) => (
-              <tr key={i} style={{ borderTop: "1px solid #1e293b" }}>
+              <tr key={i} style={{ borderTop: "1px solid var(--alps-border-base)" }}>
                 <td style={{ padding: "3px 6px", opacity: 0.7 }}>{c.rank ?? "—"}</td>
                 <td style={{ padding: "3px 6px" }}>{c.parameter_value.toFixed(3)}</td>
                 <td style={{ padding: "3px 6px" }}>{c.predicted_ctq.toFixed(1)}</td>

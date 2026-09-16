@@ -110,7 +110,7 @@ export function Eda3DViewer({ scene }: { scene: EdaScene | null }) {
 
   if (!scene) {
     return (
-      <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#8b99b5", fontSize: 13 }}>
+      <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--alps-text-faint)", fontSize: 13 }}>
         {t("eda.view3d.empty")}
       </div>
     );

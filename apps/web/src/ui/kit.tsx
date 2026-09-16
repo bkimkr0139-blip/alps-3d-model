@@ -48,8 +48,8 @@ export function Chip({ color, children, title }: { color: string; children: Reac
         fontFamily: fontMono,
         padding: "1px 7px",
         borderRadius: radius.pill,
-        border: `1px solid ${color}55`,
-        background: `${color}18`,
+        border: `1px solid color-mix(in srgb, ${color} 33%, transparent)`,
+        background: `color-mix(in srgb, ${color} 10%, transparent)`,
         color,
         whiteSpace: "nowrap",
         display: "inline-block",
@@ -120,13 +120,13 @@ export const btn = (active: boolean, color: string = status.info): React.CSSProp
   borderRadius: radius.sm,
   border: `1px solid ${active ? color : border.strong}`,
   background: active
-    ? `linear-gradient(180deg, ${color}33 0%, ${color}1f 100%)`
+    ? `linear-gradient(180deg, color-mix(in srgb, ${color} 20%, transparent) 0%, color-mix(in srgb, ${color} 12%, transparent) 100%)`
     : bg.metalRaise,
   boxShadow: active
-    ? `inset 0 1px 0 ${color}44, inset 0 0 6px ${color}22, 0 1px 2px rgba(2,6,23,0.5)`
+    ? `inset 0 1px 0 color-mix(in srgb, ${color} 27%, transparent), inset 0 0 6px color-mix(in srgb, ${color} 13%, transparent), 0 1px 2px rgba(2,6,23,0.5)`
     : emboss.lift,
   color: active ? text.bright : text.body,
-  textShadow: active ? `0 0 8px ${color}55` : "none",
+  textShadow: active ? `0 0 8px color-mix(in srgb, ${color} 33%, transparent)` : "none",
   cursor: "pointer",
 });
 
@@ -210,8 +210,8 @@ export function HudChip({
         fontFamily: fontMono,
         padding: "2px 8px",
         borderRadius: radius.pill,
-        border: `1px solid ${color}66`,
-        background: "rgba(2, 6, 23, 0.72)",
+        border: `1px solid color-mix(in srgb, ${color} 40%, transparent)`,
+        background: "var(--alps-hud-chip)",
         color,
         whiteSpace: "nowrap",
         display: "inline-flex",

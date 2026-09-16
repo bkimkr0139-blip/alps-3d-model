@@ -26,7 +26,7 @@ export function LanguageSwitcher() {
       // Fixed width: the three autonym labels (한국어/English/日本語) have
       // different text widths, and an auto-width select made the whole nav
       // bar reflow left/right on every language switch.
-      style={{ width: 104, padding: "6px 10px", borderRadius: 6, background: "#1e293b", color: "white", border: "1px solid #334155", fontFamily: "inherit", fontSize: 13 }}
+      style={{ width: 104, padding: "6px 10px", borderRadius: 6, background: "var(--alps-bg-raise)", color: "var(--alps-text-bright)", border: "1px solid var(--alps-border-strong)", fontFamily: "inherit", fontSize: 13 }}
     >
       {LANGUAGES.map((l) => (
         <option key={l.code} value={l.code}>

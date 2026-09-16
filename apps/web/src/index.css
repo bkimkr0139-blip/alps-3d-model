@@ -5,23 +5,127 @@
 
   /* Mirrors of src/ui/tokens.ts — CSS-side copies so plain CSS (this file)
      and any future non-inline styling share the same palette. The TS tokens
-     stay the source of truth for the inline styles the app is built with. */
+     reference these variables; [data-theme="light"] below flips them for the
+     whole app, inline styles included. Dark values are the originals the app
+     was designed around. */
   --alps-bg-page: #060b15;
   --alps-bg-card: #0c1322;
   --alps-bg-panel: #101a2c;
+  --alps-bg-panel-alt: #152034;
   --alps-bg-raise: #1d2940;
-  --alps-border: #1e293b;
+  --alps-bg-hud: rgba(13, 20, 35, 0.86);
+  --alps-metal-header: linear-gradient(180deg, #1c2740 0%, #141e31 52%, #101828 100%);
+  --alps-metal-panel: linear-gradient(180deg, #131c2e 0%, #0f1725 100%);
+  --alps-metal-raise: linear-gradient(180deg, #26334d 0%, #1c2839 100%);
+  --alps-metal-well: linear-gradient(180deg, #0a101d 0%, #0e1626 100%);
+  --alps-border-subtle: #17203366;
+  --alps-border-base: #1e293b;
   --alps-border-strong: #334155;
+  --alps-border-rim: rgba(148, 178, 255, 0.14);
+  --alps-emboss-lift:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(2, 6, 23, 0.55),
+    0 2px 8px rgba(2, 6, 23, 0.3);
+  --alps-emboss-panel: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 3px rgba(2, 6, 23, 0.4);
+  --alps-emboss-well:
+    inset 0 2px 5px rgba(2, 6, 23, 0.6), inset 0 0 0 1px rgba(2, 6, 23, 0.4);
   --alps-text: #e2e8f0;
   --alps-text-bright: #f1f5f9;
   --alps-text-muted: #94a3b8;
-  --alps-text-faint: #64748b;
+  --alps-text-faint: #8b99b5;
   --alps-ok: #34d399;
+  --alps-ok-alt: #4ade80;
   --alps-attention: #fbbf24;
   --alps-violation: #f87171;
   --alps-synthetic: #a78bfa;
   --alps-info: #38bdf8;
+  --alps-idle: #8b99b5;
   --alps-accent: #ff6b35;
+  --alps-accent-orange: #f97316;
+  --alps-accent-kpi: #67e8f9;
+  --alps-accent-id: #7dd3fc;
+  --alps-accent-warn: #facc15;
+  --alps-tab-model: #60a5fa;
+  --alps-tab-bench: #fbbf24;
+  --alps-tab-sysmodel: #a78bfa;
+  --alps-tab-proc: #4ade80;
+  --alps-tab-air: #22d3ee;
+  --alps-tab-eda: #f97316;
+  --alps-tab-asic: #e879f9;
+  --alps-tab-docs: #94a3b8;
+  --alps-scroll-thumb: linear-gradient(180deg, #2e3c58, #22304a);
+  --alps-select-option-bg: #101a2c;
+  --alps-select-option-checked: #1d2940;
+  --alps-hud-chip: rgba(2, 6, 23, 0.72);
+  --alps-keycap: linear-gradient(180deg, rgba(38, 51, 77, 0.55) 0%, rgba(24, 34, 53, 0.55) 100%);
+}
+
+/* Light theme — daylight inspection room. Layered warm-gray blues instead of
+   the dark stack, darkened status hues (same roles, WCAG-safe on light
+   surfaces), white rim lights replacing the dark-theme's faint glows.
+   Instrument glass (scope canvas, schematic wells) deliberately stays dark —
+   see --alps-well-dark and the "keep dark" notes in tokens.ts. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --alps-bg-page: #dde3ec;
+  --alps-bg-card: #eef2f8;
+  --alps-bg-panel: #e9eef6;
+  --alps-bg-panel-alt: #e2e9f2;
+  --alps-bg-raise: #f5f8fc;
+  --alps-bg-hud: rgba(242, 246, 252, 0.9);
+  --alps-metal-header: linear-gradient(180deg, #f9fbfe 0%, #e9eef6 52%, #dfe6f0 100%);
+  --alps-metal-panel: linear-gradient(180deg, #eef2f8 0%, #e6ecf5 100%);
+  --alps-metal-raise: linear-gradient(180deg, #fdfeff 0%, #eaeff7 100%);
+  --alps-metal-well: linear-gradient(180deg, #d5dde9 0%, #dfe6f0 100%);
+  --alps-border-subtle: #93a3b855;
+  --alps-border-base: #c3cedd;
+  --alps-border-strong: #9aabbf;
+  --alps-border-rim: rgba(30, 64, 130, 0.14);
+  --alps-emboss-lift:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 1px 2px rgba(15, 23, 42, 0.18),
+    0 2px 8px rgba(15, 23, 42, 0.1);
+  --alps-emboss-panel:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(15, 23, 42, 0.12);
+  --alps-emboss-well:
+    inset 0 2px 5px rgba(15, 23, 42, 0.14), inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+  --alps-text: #243044;
+  --alps-text-bright: #0f1a2c;
+  --alps-text-muted: #46586f;
+  --alps-text-faint: #51627a;
+  --alps-ok: #0c6b43;
+  --alps-ok-alt: #136a32;
+  --alps-attention: #8a5606;
+  --alps-violation: #b91c1c;
+  --alps-synthetic: #6d28d9;
+  --alps-info: #0369a1;
+  --alps-idle: #526178;
+  --alps-accent: #c2410c;
+  --alps-accent-orange: #a83a0b;
+  --alps-accent-kpi: #0e7490;
+  --alps-accent-id: #0369a1;
+  --alps-accent-warn: #8a5606;
+  --alps-tab-model: #2563eb;
+  --alps-tab-bench: #b45309;
+  --alps-tab-sysmodel: #6d28d9;
+  --alps-tab-proc: #15803d;
+  --alps-tab-air: #0e7490;
+  --alps-tab-eda: #c2410c;
+  --alps-tab-asic: #a21caf;
+  --alps-tab-docs: #526178;
+  --alps-scroll-thumb: linear-gradient(180deg, #b6c3d6, #9fb0c6);
+  --alps-select-option-bg: #eef2f8;
+  --alps-select-option-checked: #d5deeb;
+  --alps-hud-chip: rgba(255, 255, 255, 0.92);
+  --alps-keycap: linear-gradient(180deg, rgba(255, 255, 255, 0.65) 0%, rgba(213, 222, 235, 0.65) 100%);
+}
+
+/* Sunken wells that stay dark in both themes (scope glass, schematic
+   canvases) — the light theme keeps them as instrument glass in a light
+   bezel, the way real bench instruments look. */
+:root {
+  --alps-well-dark: #0b1220;
+}
+:root[data-theme="light"] {
+  --alps-well-dark: #0b1220;
 }
 
 * {
@@ -30,6 +134,9 @@
 
 body {
   margin: 0;
+  /* Page base follows the theme so overscroll, the pre-mount flash and the
+     sign-in splash all sit on the same surface as the app shell. */
+  background: var(--alps-bg-page);
 }
 
 #root {
@@ -43,7 +150,7 @@ button {
   font: inherit;
   cursor: pointer;
   background: var(--alps-bg-raise);
-  color: white;
+  color: var(--alps-text);
   border: 1px solid var(--alps-border-strong);
   transition:
     filter 120ms ease,
@@ -74,16 +181,16 @@ input[type="text"] {
 }
 
 /* Native <select> popups ignore the styled select face — without explicit
-   option colors the OS draws a white list with our light text on it
-   (unreadable). Dark glass + light text keeps the list on-palette. */
+   option colors the OS draws a white list with light theme text on it
+   (unreadable). Theme glass + text keeps the list on-palette. */
 select option,
 select optgroup {
-  background-color: #101a2c;
-  color: #e2e8f0;
+  background-color: var(--alps-select-option-bg);
+  color: var(--alps-text);
 }
 
 select option:checked {
-  background-color: #1d2940;
+  background-color: var(--alps-select-option-checked);
 }
 
 ::selection {
@@ -92,7 +199,7 @@ select option:checked {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a3750 transparent;
+  scrollbar-color: var(--alps-border-strong) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -101,7 +208,7 @@ select option:checked {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #2e3c58, #22304a);
+  background: var(--alps-scroll-thumb);
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: padding-box;

@@ -166,7 +166,7 @@ export function AirInputStudio({ variantId, runs }: { variantId: string | null; 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, height: "100%", overflowY: "auto" }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 10, height: 420, flex: "0 0 auto" }}>
-        <div style={{ position: "relative", border: "1px solid #334155", borderRadius: 8, overflow: "hidden", height: "100%" }}>
+        <div style={{ position: "relative", border: "1px solid var(--alps-border-strong)", borderRadius: 8, overflow: "hidden", height: "100%" }}>
           <AirScene
             pose={pose}
             ood={ood}
@@ -194,7 +194,7 @@ export function AirInputStudio({ variantId, runs }: { variantId: string | null; 
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12, overflowY: "auto" }}>
-          <div style={{ border: "1px solid #334155", borderRadius: 6, padding: 8 }}>
+          <div style={{ border: "1px solid var(--alps-border-strong)", borderRadius: 6, padding: 8 }}>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>{t("air.controls.title")}</div>
             {(
               [
@@ -237,7 +237,7 @@ export function AirInputStudio({ variantId, runs }: { variantId: string | null; 
             </label>
             {liveState && (
               <div style={{ marginTop: 8 }}>
-                <span style={{ color: "#94a3b8" }}>{t("air.live")}: </span>
+                <span style={{ color: "var(--alps-text-muted)" }}>{t("air.live")}: </span>
                 <span style={{ color: AIR_STATE_COLOR[liveState], fontWeight: 700 }}>{t(`air.state.${liveState}`)}</span>
                 {liveCounts != null && <span style={{ opacity: 0.7 }}> · {liveCounts.toFixed(0)} counts · ΔC {liveDc ? Object.values(liveDc).reduce((a, b) => a + b, 0).toFixed(4) : "—"} fF</span>}
               </div>
@@ -248,7 +248,7 @@ export function AirInputStudio({ variantId, runs }: { variantId: string | null; 
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10, maxHeight: 320 }}>
-        <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 8, overflowY: "auto" }}>
+        <div style={{ border: "1px solid var(--alps-border-strong)", borderRadius: 8, padding: 8, overflowY: "auto" }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>
             {t("air.panels.signal")}
             {activeReplay ? ` — ${activeReplay.scenario_id} (${activeReplay.engine})` : ""}
@@ -256,13 +256,13 @@ export function AirInputStudio({ variantId, runs }: { variantId: string | null; 
           <AirSignalChart replay={activeReplay} cursorMs={cursor != null && activeReplay ? activeReplay.ticks[cursor]?.t_ms ?? null : null} />
           <AirThresholdNote cfg={cfg} />
         </div>
-        <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 8, overflowY: "auto" }}>
+        <div style={{ border: "1px solid var(--alps-border-strong)", borderRadius: 8, padding: 8, overflowY: "auto" }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>{t("air.panels.slice")}</div>
           <AirFieldSlice field={field} pose={pose} />
         </div>
       </div>
 
-      <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 8, maxHeight: 220, overflowY: "auto" }}>
+      <div style={{ border: "1px solid var(--alps-border-strong)", borderRadius: 8, padding: 8, maxHeight: 220, overflowY: "auto" }}>
         <div style={{ fontWeight: 600, marginBottom: 4 }}>{t("air.panels.scenarios")}</div>
         {replays.length > 0 ? (
           <AirScenarioTable replays={replays} activeId={activeScenario} onSelect={playScenario} />

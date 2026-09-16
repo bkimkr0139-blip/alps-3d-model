@@ -87,7 +87,7 @@ const selectStyle: React.CSSProperties = {
   padding: "6px 10px",
   borderRadius: 6,
   background: bg.metalRaise,
-  color: "white",
+  color: text.bright,
   border: `1px solid ${border.strong}`,
   boxShadow: emboss.lift,
   fontFamily: "inherit",
@@ -116,6 +116,60 @@ function NavGroup({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
+// App-wide dark/light chrome switch. The store persists the choice and
+// mirrors it onto <html data-theme>, which flips the --alps-* CSS variables
+// the whole inline-styled UI is built from. Icon is inline SVG in
+// currentColor so it reads identically in both themes (no emoji variance).
+function ThemeToggle() {
+  const { t } = useTranslation();
+  const uiTheme = useTwinStore((s) => s.uiTheme);
+  const setUiTheme = useTwinStore((s) => s.setUiTheme);
+  const toLight = uiTheme === "dark";
+  return (
+    <button
+      onClick={() => setUiTheme(toLight ? "light" : "dark")}
+      aria-label={toLight ? t("app.toLight") : t("app.toDark")}
+      title={toLight ? t("app.toLight") : t("app.toDark")}
+      style={{
+        width: 32,
+        height: 32,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: 6,
+        background: bg.metalRaise,
+        border: `1px solid ${border.strong}`,
+        boxShadow: emboss.lift,
+        color: text.body,
+      }}
+    >
+      {toLight ? (
+        // Sun: circle + eight rays.
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <circle cx="8" cy="8" r="3.2" />
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
+            const r = (a * Math.PI) / 180;
+            return (
+              <line
+                key={a}
+                x1={8 + 5.2 * Math.cos(r)}
+                y1={8 + 5.2 * Math.sin(r)}
+                x2={8 + 6.8 * Math.cos(r)}
+                y2={8 + 6.8 * Math.sin(r)}
+              />
+            );
+          })}
+        </svg>
+      ) : (
+        // Moon: crescent via a cut-out circle.
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden fill="currentColor">
+          <path d="M10.8 2.2a6 6 0 1 0 3 8.9A6.8 6.8 0 0 1 10.8 2.2Z" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 function TabButton({
   label,
   active,
@@ -139,21 +193,22 @@ function TabButton({
         padding: "6px 10px",
         borderRadius: 6,
         border: "1px solid",
-        borderColor: active ? `${color}88` : "transparent",
+        borderColor: active ? `color-mix(in srgb, ${color} 53%, transparent)` : "transparent",
         // Embossed key cap: inactive keys sit slightly raised on the metal
         // bar; the active key glows in its own identity color with an LED
-        // pip that brightens (the dot is the tab's status LED).
+        // pip that brightens (the dot is the tab's status LED). Tints compose
+        // via color-mix because the identity colors are theme variables.
         background: active
-          ? `linear-gradient(180deg, ${color}2e 0%, ${color}16 100%)`
-          : "linear-gradient(180deg, rgba(38,51,77,0.55) 0%, rgba(24,34,53,0.55) 100%)",
+          ? `linear-gradient(180deg, color-mix(in srgb, ${color} 18%, transparent) 0%, color-mix(in srgb, ${color} 9%, transparent) 100%)`
+          : "var(--alps-keycap)",
         boxShadow: active
-          ? `inset 0 1px 0 ${color}55, inset 0 0 8px ${color}26, 0 1px 2px rgba(2,6,23,0.5)`
-          : "inset 0 1px 0 rgba(148,178,255,0.09), 0 1px 2px rgba(2,6,23,0.4)",
+          ? `inset 0 1px 0 color-mix(in srgb, ${color} 33%, transparent), inset 0 0 8px color-mix(in srgb, ${color} 15%, transparent), 0 1px 2px rgba(2,6,23,0.5)`
+          : `inset 0 1px 0 ${border.rim}, 0 1px 2px rgba(2,6,23,0.4)`,
         color: active ? text.bright : text.muted,
         fontFamily: "inherit",
         fontWeight: active ? 600 : 400,
         fontSize: 13,
-        textShadow: active ? `0 0 10px ${color}66` : "none",
+        textShadow: active ? `0 0 10px color-mix(in srgb, ${color} 40%, transparent)` : "none",
         cursor: "pointer",
         whiteSpace: "nowrap",
       }}
@@ -319,6 +374,7 @@ function Workbench() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <ThemeToggle />
           <span
             style={{
               fontSize: 12,
@@ -587,6 +643,6 @@ export default function App() {
     initKeycloak().then(() => setReady(true));
   }, []);
 
-  if (!ready) return <div style={{ padding: 40, color: "white" }}>{t("app.signingIn")}</div>;
+  if (!ready) return <div style={{ padding: 40, color: "var(--alps-text-bright)" }}>{t("app.signingIn")}</div>;
   return <Workbench />;
 }

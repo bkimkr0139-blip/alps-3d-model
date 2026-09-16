@@ -664,14 +664,14 @@ function Scope({ family, pressure, running }: { family: BenchFamily; pressure: n
         height: 8,
         borderRadius: "50%",
         display: "inline-block",
-        background: lit ? color : "#334155",
+        background: lit ? color : "var(--alps-border-strong)",
         boxShadow: lit ? `0 0 6px ${color}` : "none",
       }}
     />
   );
 
   return (
-    <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 8, background: "#0b1220" }}>
+    <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 8, background: "#0b1220", color: "#e2e8f0" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
         <span style={{ fontSize: 12, opacity: 0.7 }}>{t("bench.scopeTitle")}</span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontFamily: "monospace" }}>
@@ -706,13 +706,13 @@ function CircuitTest({ spiceRun }: { spiceRun: SimulationRun | null }) {
   const pass = worst !== null && worst < LOGIC_LOW_LIMIT_V;
 
   const pill = (ok: boolean | null) => ({
-    color: ok === null ? "#94a3b8" : ok ? "#22c55e" : "#ef4444",
+    color: ok === null ? "var(--alps-idle)" : ok ? "var(--alps-ok-alt)" : "var(--alps-violation)",
     fontWeight: 600 as const,
     textAlign: "right" as const,
   });
 
   return (
-    <div style={{ border: "1px solid #334155", borderRadius: 8, padding: 10, fontSize: 12 }}>
+    <div style={{ border: "1px solid var(--alps-border-strong)", borderRadius: 8, padding: 10, fontSize: 12 }}>
       <div style={{ fontWeight: 600, marginBottom: 6 }}>{t("bench.circuitTest")}</div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <tbody>
@@ -782,7 +782,7 @@ export function TestBench({ product, runs, components }: { product: Product | nu
 
   return (
     <div style={{ height: "100%", display: "grid", gridTemplateColumns: "1fr 340px", gap: 12 }}>
-      <div style={{ position: "relative", border: "1px solid #334155", borderRadius: 8, overflow: "hidden", background: "#0f172a" }}>
+      <div style={{ position: "relative", border: "1px solid #334155", borderRadius: 8, overflow: "hidden", background: "#0f172a", color: "#e2e8f0" }}>
         <Canvas dpr={[1, 2]} camera={{ position: [4, 34, 40], fov: 35 }} gl={{ antialias: true }}>
           <ViewerEnvironment />
           <ambientLight intensity={0.35} />
@@ -830,7 +830,7 @@ export function TestBench({ product, runs, components }: { product: Product | nu
               borderRadius: 6,
               border: `1px solid ${scopeRunning ? border.base : accent.orange}`,
               background: scopeRunning ? bg.raise : "#7c2d12",
-              color: "white",
+              color: scopeRunning ? "var(--alps-text)" : "white",
               cursor: "pointer",
               fontSize: 12,
               fontFamily: "monospace",
@@ -846,9 +846,9 @@ export function TestBench({ product, runs, components }: { product: Product | nu
                 padding: "5px 10px",
                 borderRadius: 6,
                 border: "1px solid",
-                borderColor: rotating ? "#f97316" : "#334155",
-                background: rotating ? "#7c2d12" : "#1e293b",
-                color: "white",
+                borderColor: rotating ? "#f97316" : "var(--alps-border-strong)",
+                background: rotating ? "#7c2d12" : "var(--alps-bg-raise)",
+                color: rotating ? "white" : "var(--alps-text)",
                 cursor: "pointer",
               }}
             >
@@ -878,9 +878,9 @@ export function TestBench({ product, runs, components }: { product: Product | nu
                 padding: "5px 10px",
                 borderRadius: 6,
                 border: "1px solid",
-                borderColor: actuated ? "#f97316" : "#334155",
-                background: actuated ? "#7c2d12" : "#1e293b",
-                color: "white",
+                borderColor: actuated ? "#f97316" : "var(--alps-border-strong)",
+                background: actuated ? "#7c2d12" : "var(--alps-bg-raise)",
+                color: actuated ? "white" : "var(--alps-text)",
                 cursor: "pointer",
               }}
             >

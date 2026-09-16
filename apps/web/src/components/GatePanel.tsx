@@ -120,7 +120,7 @@ export function GatePanel({ variantId }: { variantId: string | null }) {
           <div style={{ opacity: 0.7, fontSize: 12 }}>{t("gate.evidenceChecklist")}</div>
           <ul style={{ margin: "4px 0", paddingLeft: 18 }}>
             {Object.entries(gate.evidence_checklist.checklist).map(([k, ok]) => (
-              <li key={k} style={{ color: ok ? "#22c55e" : "#ef4444" }}>
+              <li key={k} style={{ color: ok ? "var(--alps-ok-alt)" : "var(--alps-violation)" }}>
                 {ok ? "✓" : "✗"} {checklistLabel(t, k)}
               </li>
             ))}
@@ -132,7 +132,7 @@ export function GatePanel({ variantId }: { variantId: string | null }) {
         <div style={{ marginTop: 8 }}>
           <div style={{ opacity: 0.7, fontSize: 12 }}>{t("gate.comments")}</div>
           {comments.map((c) => (
-            <div key={c.id} style={{ borderLeft: "2px solid #334155", paddingLeft: 8, marginTop: 4 }}>
+            <div key={c.id} style={{ borderLeft: "2px solid var(--alps-border-strong)", paddingLeft: 8, marginTop: 4 }}>
               <div style={{ opacity: 0.6, fontSize: 11 }}>{c.author}</div>
               <div>{c.text}</div>
             </div>
@@ -144,7 +144,7 @@ export function GatePanel({ variantId }: { variantId: string | null }) {
         <div style={{ marginTop: 8 }}>
           <div style={{ opacity: 0.7, fontSize: 12 }}>{t("gate.decisions")}</div>
           {decisions.map((d) => (
-            <div key={d.id} style={{ borderLeft: "2px solid #22c55e", paddingLeft: 8, marginTop: 4 }}>
+            <div key={d.id} style={{ borderLeft: "2px solid var(--alps-ok)", paddingLeft: 8, marginTop: 4 }}>
               <div style={{ opacity: 0.6, fontSize: 11 }}>
                 {d.actor} ({d.actor_roles.join(", ")}) · {enumLabel(t, "decision", d.decision)}
               </div>
@@ -160,7 +160,7 @@ export function GatePanel({ variantId }: { variantId: string | null }) {
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             placeholder={t("gate.commentPlaceholder")}
-            style={{ width: "100%", minHeight: 50, background: "#0f172a", color: "white", border: "1px solid #334155", borderRadius: 4 }}
+            style={{ width: "100%", minHeight: 50, background: "var(--alps-bg-card)", color: "var(--alps-text-bright)", border: "1px solid var(--alps-border-strong)", borderRadius: 4 }}
           />
           <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
             <button onClick={addComment}>{t("gate.addComment")}</button>

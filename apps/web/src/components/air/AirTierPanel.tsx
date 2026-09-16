@@ -20,8 +20,8 @@ export function AirTierPanel({
   const gloveHoldout = surrogate ? Object.values(surrogate.glove_channels)[0]?.holdout : undefined;
   return (
     <div style={{ display: "grid", gap: 10, fontSize: 12 }}>
-      <div style={{ border: "1px solid #334155", borderRadius: 6, padding: 8 }}>
-        <div style={{ fontWeight: 600, color: "#fbbf24" }}>{t("air.tier.solver")}</div>
+      <div style={{ border: "1px solid var(--alps-border-strong)", borderRadius: 6, padding: 8 }}>
+        <div style={{ fontWeight: 600, color: "var(--alps-attention)" }}>{t("air.tier.solver")}</div>
         {field ? (
           <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 4 }}>
             <tbody>
@@ -35,8 +35,8 @@ export function AirTierPanel({
           <div style={{ opacity: 0.6 }}>{t("air.slice.unavailable")}</div>
         )}
       </div>
-      <div style={{ border: "1px solid #334155", borderRadius: 6, padding: 8 }}>
-        <div style={{ fontWeight: 600, color: "#38bdf8" }}>{t("air.tier.surrogate")}</div>
+      <div style={{ border: "1px solid var(--alps-border-strong)", borderRadius: 6, padding: 8 }}>
+        <div style={{ fontWeight: 600, color: "var(--alps-info)" }}>{t("air.tier.surrogate")}</div>
         {surrogate ? (
           <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 4 }}>
             <tbody>
@@ -51,7 +51,7 @@ export function AirTierPanel({
         )}
       </div>
       {correlation && (
-        <div style={{ border: "1px solid #334155", borderRadius: 6, padding: 8 }}>
+        <div style={{ border: "1px solid var(--alps-border-strong)", borderRadius: 6, padding: 8 }}>
           <div style={{ fontWeight: 600, color: "#a78bfa" }}>{t("air.tier.correlation")}</div>
           <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 4 }}>
             <tbody>
@@ -116,5 +116,5 @@ export function AirScenarioTable({
   );
 }
 
-const td: React.CSSProperties = { padding: "3px 6px", borderBottom: "1px solid #1e293b", verticalAlign: "top" };
-const th: React.CSSProperties = { textAlign: "left", padding: "3px 6px", color: "#94a3b8", fontWeight: 500 };
+const td: React.CSSProperties = { padding: "3px 6px", borderBottom: "1px solid var(--alps-border-base)", verticalAlign: "top" };
+const th: React.CSSProperties = { textAlign: "left", padding: "3px 6px", color: "var(--alps-text-muted)", fontWeight: 500 };

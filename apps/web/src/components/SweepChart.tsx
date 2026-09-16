@@ -1,7 +1,7 @@
 import ReactECharts from "echarts-for-react";
 import { useTranslation } from "react-i18next";
 import type { SimulationRun } from "../lib/api";
-import { chartAxis, chartBase, traceColor, traceGlow } from "../ui/chartTheme";
+import { useChartTheme, traceGlow } from "../ui/chartTheme";
 
 const SWEEP_METRIC = /^v_out_rc_([\d.]+)$/;
 
@@ -19,11 +19,12 @@ function sweepSeries(run: SimulationRun) {
  * same V y-axis, both variants' SPICE sweeps overlaid. */
 export function SweepChart({ runsByVariant }: { runsByVariant: { label: string; run: SimulationRun }[] }) {
   const { t } = useTranslation();
+  const ct = useChartTheme();
   const series = runsByVariant
     .map(({ label, run }, i) => {
       const points = sweepSeries(run);
       if (points.length === 0) return null;
-      const color = traceColor(i);
+      const color = ct.traceColor(i);
       return {
         name: label,
         type: "line" as const,
@@ -37,20 +38,20 @@ export function SweepChart({ runsByVariant }: { runsByVariant: { label: string; 
   if (series.length === 0) return null;
 
   const option = {
-    ...chartBase,
-    legend: { ...chartBase.legend, data: runsByVariant.map((r) => r.label) },
+    ...ct.chartBase,
+    legend: { ...ct.chartBase.legend, data: runsByVariant.map((r) => r.label) },
     grid: { left: 50, right: 20, top: 40, bottom: 40 },
     xAxis: {
       type: "log",
       name: t("sweep.xAxis"),
       nameLocation: "middle",
       nameGap: 28,
-      ...chartAxis(),
+      ...ct.chartAxis(),
     },
     yAxis: {
       type: "value",
       name: t("sweep.yAxis"),
-      ...chartAxis(),
+      ...ct.chartAxis(),
     },
     series,
   };

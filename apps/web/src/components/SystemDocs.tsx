@@ -27,7 +27,7 @@ function inline(text: string, keyBase: string): React.ReactNode[] {
     if (p.startsWith("**") && p.endsWith("**")) return <strong key={`${keyBase}-${i}`}>{p.slice(2, -2)}</strong>;
     if (p.startsWith("`") && p.endsWith("`"))
       return (
-        <code key={`${keyBase}-${i}`} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 4, padding: "1px 5px", fontSize: "0.9em" }}>
+        <code key={`${keyBase}-${i}`} style={{ background: "var(--alps-bg-raise)", border: "1px solid var(--alps-border-strong)", borderRadius: 4, padding: "1px 5px", fontSize: "0.9em" }}>
           {p.slice(1, -1)}
         </code>
       );
@@ -91,7 +91,7 @@ function parse(md: string): Block[] {
   return blocks;
 }
 
-const cell = { padding: "7px 10px", border: "1px solid #334155", textAlign: "left" as const, verticalAlign: "top" as const };
+const cell = { padding: "7px 10px", border: "1px solid var(--alps-border-strong)", textAlign: "left" as const, verticalAlign: "top" as const };
 
 export function SystemDocs() {
   const { t, i18n } = useTranslation();
@@ -129,7 +129,7 @@ export function SystemDocs() {
             onClick={() => {
               void navigator.clipboard.writeText(doc.md).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1500); });
             }}
-            style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #334155", background: "#1e293b", color: "#e2e8f0", fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}
+            style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--alps-border-strong)", background: "var(--alps-bg-raise)", color: "var(--alps-text)", fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}
           >
             {copied ? t("docs.copied") : t("docs.copy")}
           </button>
@@ -142,17 +142,17 @@ export function SystemDocs() {
               ↓ {t("docs.download")}
             </a>
           ) : (
-            <span style={{ display: "inline-flex", alignItems: "center", padding: "6px 10px", borderRadius: 6, background: "#1e293b", color: "#8b99b5", fontSize: 13 }}>…</span>
+            <span style={{ display: "inline-flex", alignItems: "center", padding: "6px 10px", borderRadius: 6, background: "var(--alps-bg-raise)", color: "var(--alps-text-faint)", fontSize: 13 }}>…</span>
           )}
         </div>
 
-        <article style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "28px 32px", lineHeight: 1.7, fontSize: 14 }}>
+        <article style={{ background: "var(--alps-bg-card)", border: "1px solid var(--alps-border-strong)", borderRadius: 10, padding: "28px 32px", lineHeight: 1.7, fontSize: 14 }}>
           {/* TOC from the h2 blocks — a doc this size needs jump links */}
-          <nav style={{ border: "1px solid #334155", borderRadius: 8, background: "#1e293b", padding: "10px 14px", marginBottom: 20, fontSize: 13 }}>
-            <div style={{ color: "#8b99b5", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{t("docs.toc")}</div>
+          <nav style={{ border: "1px solid var(--alps-border-strong)", borderRadius: 8, background: "var(--alps-bg-raise)", padding: "10px 14px", marginBottom: 20, fontSize: 13 }}>
+            <div style={{ color: "var(--alps-text-faint)", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{t("docs.toc")}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px" }}>
               {toc.map((h) => (
-                <a key={h.id} href={`#${h.id}`} onClick={(e) => { e.preventDefault(); scrollTo(h.id); }} style={{ color: "#93c5fd", textDecoration: "none" }}>
+                <a key={h.id} href={`#${h.id}`} onClick={(e) => { e.preventDefault(); scrollTo(h.id); }} style={{ color: "var(--alps-accent-id)", textDecoration: "none" }}>
                   {h.text}
                 </a>
               ))}
@@ -165,17 +165,17 @@ export function SystemDocs() {
                 return <h1 key={bi} style={{ fontSize: 24, margin: "0 0 8px" }}>{b.text}</h1>;
               case "h2":
                 return (
-                  <h2 key={bi} id={`sysdoc-${b.id}`} style={{ fontSize: 19, margin: "28px 0 10px", paddingBottom: 6, borderBottom: "1px solid #334155", scrollMarginTop: 12 }}>
+                  <h2 key={bi} id={`sysdoc-${b.id}`} style={{ fontSize: 19, margin: "28px 0 10px", paddingBottom: 6, borderBottom: "1px solid var(--alps-border-strong)", scrollMarginTop: 12 }}>
                     {b.text}
                   </h2>
                 );
               case "h3":
-                return <h3 key={bi} style={{ fontSize: 15, margin: "18px 0 8px", color: "#93c5fd" }}>{b.text}</h3>;
+                return <h3 key={bi} style={{ fontSize: 15, margin: "18px 0 8px", color: "var(--alps-accent-id)" }}>{b.text}</h3>;
               case "hr":
-                return <hr key={bi} style={{ border: "none", borderTop: "1px solid #334155", margin: "20px 0" }} />;
+                return <hr key={bi} style={{ border: "none", borderTop: "1px solid var(--alps-border-strong)", margin: "20px 0" }} />;
               case "quote":
                 return (
-                  <blockquote key={bi} style={{ margin: "12px 0", padding: "10px 14px", borderLeft: "3px solid #fbbf24", background: "#1e293b", borderRadius: "0 8px 8px 0" }}>
+                  <blockquote key={bi} style={{ margin: "12px 0", padding: "10px 14px", borderLeft: "3px solid #fbbf24", background: "var(--alps-bg-raise)", borderRadius: "0 8px 8px 0" }}>
                     {b.lines.map((l, li) => <p key={li} style={{ margin: li ? "8px 0 0" : 0 }}>{inline(l, `q${bi}-${li}`)}</p>)}
                   </blockquote>
                 );
@@ -196,7 +196,7 @@ export function SystemDocs() {
                   <div key={bi} style={{ overflowX: "auto", margin: "12px 0" }}>
                     <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
                       <thead>
-                        <tr>{b.head.map((h, hi) => <th key={hi} style={{ ...cell, background: "#1e293b", fontWeight: 600 }}>{inline(h, `th${bi}-${hi}`)}</th>)}</tr>
+                        <tr>{b.head.map((h, hi) => <th key={hi} style={{ ...cell, background: "var(--alps-bg-raise)", fontWeight: 600 }}>{inline(h, `th${bi}-${hi}`)}</th>)}</tr>
                       </thead>
                       <tbody>
                         {b.rows.map((r, ri) => (

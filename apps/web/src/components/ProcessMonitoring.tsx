@@ -10,6 +10,7 @@ import {
 } from "../lib/api";
 import { seedTr } from "../lib/seedL10n";
 import { bg, emboss, fontMono, radius } from "../ui/tokens";
+import { useSvgPalette } from "../ui/useTheme";
 
 const RULE_KEYS: Record<
   string,
@@ -50,6 +51,7 @@ function chartScale(chart: ControlChart) {
 
 function PointMark({ p, cx, cy }: { p: ControlChartPoint; cx: number; cy: number }) {
   const { t } = useTranslation();
+  const c = useSvgPalette();
   const rules = p.violations.map((r) => ruleLabel(t, r)).join(", ");
   const title = [
     `${p.lot_business_id} · ${p.process_run_business_id}`,
@@ -60,14 +62,15 @@ function PointMark({ p, cx, cy }: { p: ControlChartPoint; cx: number; cy: number
     .filter(Boolean)
     .join("\n");
   if (p.excluded_from_limits)
-    return <circle cx={cx} cy={cy} r={4.5} fill="none" stroke="#f87171" strokeWidth={2}><title>{title}</title></circle>;
+    return <circle cx={cx} cy={cy} r={4.5} fill="none" stroke={c.series[3]} strokeWidth={2}><title>{title}</title></circle>;
   if (p.violations.length > 0)
-    return <circle cx={cx} cy={cy} r={4.5} fill="#fbbf24"><title>{title}</title></circle>;
-  return <circle cx={cx} cy={cy} r={3.5} fill="#60a5fa"><title>{title}</title></circle>;
+    return <circle cx={cx} cy={cy} r={4.5} fill={c.series[2]}><title>{title}</title></circle>;
+  return <circle cx={cx} cy={cy} r={3.5} fill={c.mark}><title>{title}</title></circle>;
 }
 
 function ChartSvg({ chart }: { chart: ControlChart }) {
   const { t } = useTranslation();
+  const c = useSvgPalette();
   const { x, y, hi, lo } = chartScale(chart);
   const fmt = (v: number) => (Math.abs(v) >= 1000 ? v.toFixed(0) : String(Math.round(v * 1e4) / 1e4));
   const path = chart.points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i)},${y(p.value)}`).join(" ");
@@ -99,36 +102,36 @@ function ChartSvg({ chart }: { chart: ControlChart }) {
       )}
       {[hi, lo].map((v, i) => (
         <g key={i}>
-          <line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke="#1e293b" strokeWidth={1} />
-          <text x={PAD.l - 6} y={y(v) + 3.5} textAnchor="end" fontSize={10} fill="#8b99b5" fontFamily={fontMono}>{fmt(v)}</text>
+          <line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke={c.grid} strokeWidth={1} />
+          <text x={PAD.l - 6} y={y(v) + 3.5} textAnchor="end" fontSize={10} fill={c.faint} fontFamily={fontMono}>{fmt(v)}</text>
         </g>
       ))}
       {chart.center_line !== null && (
-        <line x1={PAD.l} x2={W - PAD.r} y1={y(chart.center_line)} y2={y(chart.center_line)} stroke="#94a3b8" strokeWidth={1.2} />
+        <line x1={PAD.l} x2={W - PAD.r} y1={y(chart.center_line)} y2={y(chart.center_line)} stroke={c.dim} strokeWidth={1.2} />
       )}
       {[chart.lcl, chart.ucl].map((v, i) =>
         v !== null ? (
-          <line key={i} x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke="#fbbf24" strokeWidth={1.2} strokeDasharray="6 4" />
+          <line key={i} x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke={c.series[2]} strokeWidth={1.2} strokeDasharray="6 4" />
         ) : null,
       )}
       <path
         d={path}
         fill="none"
-        stroke="#60a5fa"
+        stroke={c.mark}
         strokeWidth={1.4}
         opacity={0.85}
-        style={{ filter: "drop-shadow(0 0 3px rgba(96, 165, 250, 0.45))" }}
+        style={{ filter: `drop-shadow(0 0 3px color-mix(in srgb, ${c.mark} 45%, transparent))` }}
       />
       {chart.points.map((p, i) => (
         <PointMark key={p.process_run_business_id} p={p} cx={x(i)} cy={y(p.value)} />
       ))}
       {/* §5.1: icon + text together, never colour alone */}
-      <g fontSize={10} fill="#94a3b8">
-        <circle cx={PAD.l + 8} cy={H - 8} r={3.5} fill="#60a5fa" />
+      <g fontSize={10} fill={c.dim}>
+        <circle cx={PAD.l + 8} cy={H - 8} r={3.5} fill={c.mark} />
         <text x={PAD.l + 16} y={H - 4.5}>{t("proc.mon.legend.inControl")}</text>
-        <circle cx={PAD.l + 118} cy={H - 8} r={4.5} fill="#fbbf24" />
+        <circle cx={PAD.l + 118} cy={H - 8} r={4.5} fill={c.series[2]} />
         <text x={PAD.l + 126} y={H - 4.5}>{t("proc.mon.legend.violation")}</text>
-        <circle cx={PAD.l + 236} cy={H - 8} r={4.5} fill="none" stroke="#f87171" strokeWidth={2} />
+        <circle cx={PAD.l + 236} cy={H - 8} r={4.5} fill="none" stroke={c.series[3]} strokeWidth={2} />
         <text x={PAD.l + 244} y={H - 4.5}>{t("proc.mon.legend.excluded")}</text>
       </g>
     </svg>
@@ -157,14 +160,14 @@ function HypothesisCard({ chart }: { chart: ControlChart }) {
       <button
         onClick={load}
         disabled={busy}
-        style={{ marginTop: 8, padding: "5px 10px", borderRadius: 6, background: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", cursor: busy ? "wait" : "pointer", fontSize: 12 }}
+        style={{ marginTop: 8, padding: "5px 10px", borderRadius: 6, background: "var(--alps-bg-raise)", color: "var(--alps-text)", border: "1px solid var(--alps-border-strong)", cursor: busy ? "wait" : "pointer", fontSize: 12 }}
       >
         {busy ? t("proc.mon.hypoLoading") : t("proc.mon.hypoButton")}
       </button>
     );
 
   return (
-    <div style={{ marginTop: 10, background: "#0b1220", borderLeft: "3px solid #60a5fa", borderRadius: 6, padding: "8px 10px" }}>
+    <div style={{ marginTop: 10, background: "var(--alps-bg-card)", borderLeft: "3px solid #60a5fa", borderRadius: 6, padding: "8px 10px" }}>
       <div style={{ display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap", marginBottom: 4 }}>
         <span style={{ background: "#60a5fa", color: "#0b1220", padding: "0 6px", borderRadius: 4, fontWeight: 700, fontSize: 10 }}>
           {t("proc.mon.hypoTitle")}
@@ -179,7 +182,7 @@ function HypothesisCard({ chart }: { chart: ControlChart }) {
           <div style={{ fontSize: 10.5, opacity: 0.6, marginBottom: 3 }}>{t("proc.mon.facts")}</div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {hypo.facts_used.map((f, i) => (
-              <span key={i} style={{ background: "#1e293b", borderRadius: 4, padding: "1px 6px", fontSize: 10.5 }}>
+              <span key={i} style={{ background: "var(--alps-bg-raise)", borderRadius: 4, padding: "1px 6px", fontSize: 10.5 }}>
                 {tr(f)}
               </span>
             ))}
@@ -262,7 +265,7 @@ export function ProcessMonitoring({ variantId, initialParameter }: { variantId: 
         <select
           value={parameter ?? ""}
           onChange={(e) => setParameter(e.target.value)}
-          style={{ background: "#0b1220", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 6, fontSize: 12, padding: "3px 6px" }}
+          style={{ background: "var(--alps-bg-raise)", color: "var(--alps-text)", border: "1px solid var(--alps-border-strong)", borderRadius: 6, fontSize: 12, padding: "3px 6px" }}
         >
           {params.map((p) => (
             <option key={p.parameter} value={p.parameter}>
@@ -298,7 +301,7 @@ export function ProcessMonitoring({ variantId, initialParameter }: { variantId: 
             <div style={{ fontSize: 11, marginTop: 3 }}>
               <span style={{ opacity: 0.6 }}>{t("proc.mon.excludedList")}: </span>
               {excludedPoints.map((p) => (
-                <span key={p.process_run_business_id} style={{ color: "#f87171", marginRight: 8 }} title={p.exclusion_reason ?? undefined}>
+                <span key={p.process_run_business_id} style={{ color: "var(--alps-violation)", marginRight: 8 }} title={p.exclusion_reason ?? undefined}>
                   {p.lot_business_id} ({p.process_run_business_id})
                 </span>
               ))}

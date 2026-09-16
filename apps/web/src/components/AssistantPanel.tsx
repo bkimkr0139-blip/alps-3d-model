@@ -177,7 +177,7 @@ export function AssistantPanel() {
           height: 52,
           borderRadius: "50%",
           background: "#ff6b35",
-          color: "white",
+          color: "var(--alps-text-bright)",
           border: "none",
           fontSize: 22,
           cursor: "pointer",
@@ -199,8 +199,8 @@ export function AssistantPanel() {
         width: 380,
         maxWidth: "calc(100vw - 32px)",
         height: "60vh",
-        background: "#0f172a",
-        border: "1px solid #334155",
+        background: "var(--alps-bg-card)",
+        border: "1px solid var(--alps-border-strong)",
         borderRadius: 12,
         display: "flex",
         flexDirection: "column",
@@ -208,7 +208,7 @@ export function AssistantPanel() {
         boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderBottom: "1px solid #334155" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderBottom: "1px solid var(--alps-border-strong)" }}>
         <strong style={{ fontSize: 14 }}>{t("assistant.title")}</strong>
         <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 16 }}>
           ✕
@@ -228,8 +228,8 @@ export function AssistantPanel() {
                 borderRadius: 10,
                 fontSize: 13,
                 whiteSpace: "pre-wrap",
-                background: item.from === "user" ? "#1d4ed8" : "#1e293b",
-                color: "#e2e8f0",
+                background: item.from === "user" ? "#1d4ed8" : "var(--alps-bg-raise)",
+                color: "var(--alps-text)",
               }}
             >
               {item.text}
@@ -240,7 +240,7 @@ export function AssistantPanel() {
               style={{
                 alignSelf: "stretch",
                 border:
-                  item.state === "pending" ? "1px solid #b45309" : "1px solid #334155",
+                  item.state === "pending" ? "1px solid #b45309" : "1px solid var(--alps-border-strong)",
                 background: item.state === "pending" ? "#1c1408" : "#111c31",
                 borderRadius: 10,
                 padding: 10,
@@ -274,13 +274,13 @@ export function AssistantPanel() {
         {error && <div style={{ color: "#ef4444", fontSize: 12 }}>{error}</div>}
       </div>
 
-      <div style={{ display: "flex", gap: 6, padding: 10, borderTop: "1px solid #334155" }}>
+      <div style={{ display: "flex", gap: 6, padding: 10, borderTop: "1px solid var(--alps-border-strong)" }}>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && send()}
           placeholder={t("assistant.placeholder")}
-          style={{ flex: 1, background: "#020617", color: "white", border: "1px solid #334155", borderRadius: 6, padding: "8px 10px", fontSize: 13 }}
+          style={{ flex: 1, background: "var(--alps-bg-page)", color: "var(--alps-text-bright)", border: "1px solid var(--alps-border-strong)", borderRadius: 6, padding: "8px 10px", fontSize: 13 }}
         />
         <button onClick={send} disabled={busy || !input.trim()} style={{ padding: "8px 14px", borderRadius: 6 }}>
           {t("assistant.send")}

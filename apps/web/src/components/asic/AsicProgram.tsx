@@ -239,15 +239,15 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
       {/* ── Cockpit strip (§4.2) ── */}
       <div style={{ ...card, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 10 }}>
         <Kpi label={t("asic.cockpit.stage")} value={`${STAGES.find((s) => s.id === currentStage)!.num}/9 · ${t(`asic.stage.${currentStage}` as never)}`} />
-        <Kpi label={t("asic.cockpit.nextGate")} value={STAGES.find((s) => s.id === currentStage)!.gate} color={gates[currentStage].status === "pass" ? "#34d399" : "#fbbf24"} />
-        <Kpi label={t("asic.cockpit.trace")} value={`${tracePct}%`} color={tracePct === 100 ? "#34d399" : "#fbbf24"} />
-        <Kpi label={t("asic.cockpit.qual")} value={`${qualPct}%`} color={qualPct === 100 ? "#34d399" : "#fbbf24"} />
+        <Kpi label={t("asic.cockpit.nextGate")} value={STAGES.find((s) => s.id === currentStage)!.gate} color={gates[currentStage].status === "pass" ? "var(--alps-ok)" : "var(--alps-attention)"} />
+        <Kpi label={t("asic.cockpit.trace")} value={`${tracePct}%`} color={tracePct === 100 ? "var(--alps-ok)" : "var(--alps-attention)"} />
+        <Kpi label={t("asic.cockpit.qual")} value={`${qualPct}%`} color={qualPct === 100 ? "var(--alps-ok)" : "var(--alps-attention)"} />
         <Kpi label={t("asic.cockpit.r2")} value={corrDone ? round2(corr.perParam[0].stats.r2) : "—"} />
         {live.gate && (
           <Kpi
             label={t("asic.cockpit.readiness")}
             value={live.gate.readiness}
-            color={live.gate.readiness_reachable ? "#67e8f9" : "#fbbf24"}
+            color={live.gate.readiness_reachable ? "var(--alps-accent-kpi)" : "var(--alps-attention)"}
           />
         )}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginLeft: "auto" }}>
@@ -278,7 +278,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   borderRadius: 6,
                   border: `1px solid ${active ? tpl.color : "transparent"}`,
                   background: active ? `${tpl.color}14` : "transparent",
-                  color: active ? "#f1f5f9" : "#cbd5e1",
+                  color: active ? "var(--alps-text-bright)" : "var(--alps-text-muted)",
                   cursor: "pointer",
                   fontFamily: "inherit",
                 }}
@@ -286,18 +286,18 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 <GateDot status={g.status} />
                 <span style={{ fontSize: 12, fontWeight: active ? 600 : 400, flex: 1 }}>
                   {t(`asic.stage.${s.id}` as never)}
-                  <span style={{ display: "block", fontSize: 9, color: "#8b99b5" }}>{s.ws}</span>
+                  <span style={{ display: "block", fontSize: 9, color: "var(--alps-text-faint)" }}>{s.ws}</span>
                 </span>
               </button>
             );
           })}
-          <div style={{ fontSize: 9, color: "#7b8aa6", padding: "6px 4px", lineHeight: 1.5 }}>{t("asic.menuHint")}</div>
+          <div style={{ fontSize: 9, color: "var(--alps-text-muted)", padding: "6px 4px", lineHeight: 1.5 }}>{t("asic.menuHint")}</div>
         </div>
 
         {/* ── Stage panel ── */}
         <div style={{ minWidth: 0 }}>
           {staleActive && (
-            <div style={{ border: "1px solid #fbbf2466", background: "#fbbf2411", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#fbbf24" }}>
+            <div style={{ border: "1px solid color-mix(in srgb, var(--alps-attention) 40%, transparent)", background: "color-mix(in srgb, var(--alps-attention) 7%, transparent)", borderRadius: 8, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "var(--alps-attention)" }}>
               ⚠ {t("asic.stale")}
             </div>
           )}
@@ -320,22 +320,22 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   <tbody>
                     {reqs.map((r) => (
                       <tr key={r.id}>
-                        <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{r.id}</td>
+                        <td style={{ ...td, fontFamily: "monospace", color: "var(--alps-accent-id)" }}>{r.id}</td>
                         <td style={td}>
                           {pickText(r.text, lang)}
-                          <span style={{ display: "block", fontSize: 9, color: "#7b8aa6" }}>{pickText(r.source, lang)}</span>
+                          <span style={{ display: "block", fontSize: 9, color: "var(--alps-text-muted)" }}>{pickText(r.source, lang)}</span>
                         </td>
                         <td style={td}>{t(`asic.cat.${r.category}` as never)}</td>
                         <td style={td}>{r.priority}</td>
                         <td style={td}>
-                          <Chip color={r.status === "approved" ? "#34d399" : r.status === "draft" ? "#f87171" : r.status === "provisional" ? "#fbbf24" : "#94a3b8"}>
+                          <Chip color={r.status === "approved" ? "var(--alps-ok)" : r.status === "draft" ? "var(--alps-violation)" : r.status === "provisional" ? "var(--alps-attention)" : "var(--alps-idle)"}>
                             {r.status === "provisional" ? `provisional · ${r.assumptionId}` : r.status}
                           </Chip>
                         </td>
-                        <td style={{ ...td, fontFamily: "monospace" }}>{r.verId || <span style={{ color: "#f87171" }}>unlinked</span>}</td>
+                        <td style={{ ...td, fontFamily: "monospace" }}>{r.verId || <span style={{ color: "var(--alps-violation)" }}>unlinked</span>}</td>
                         <td style={td}>
                           {r.status === "draft" && (
-                            <button style={btn(true, "#fbbf24")} onClick={() => linkDraftReq(r)}>
+                            <button style={btn(true, "var(--alps-attention)")} onClick={() => linkDraftReq(r)}>
                               {t("asic.act.linkReq")}
                             </button>
                           )}
@@ -345,14 +345,14 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   </tbody>
                 </table>
               </div>
-              <div style={{ marginTop: 8, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 11, color: "#94a3b8" }}>
+              <div style={{ marginTop: 8, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 11, color: "var(--alps-text-muted)" }}>
                 <span>
-                  {t("asic.cockpit.trace")}: <b style={{ fontFamily: "monospace", color: tracePct === 100 ? "#34d399" : "#fbbf24" }}>{tracePct}%</b>
+                  {t("asic.cockpit.trace")}: <b style={{ fontFamily: "monospace", color: tracePct === 100 ? "var(--alps-ok)" : "var(--alps-attention)" }}>{tracePct}%</b>
                 </span>
                 <span>
-                  {t("asic.s1.conflict")}: <b style={{ fontFamily: "monospace", color: reqs.some((r) => r.status === "draft") ? "#f87171" : "#34d399" }}>{reqs.filter((r) => r.status === "draft").length}</b>
+                  {t("asic.s1.conflict")}: <b style={{ fontFamily: "monospace", color: reqs.some((r) => r.status === "draft") ? "var(--alps-violation)" : "var(--alps-ok)" }}>{reqs.filter((r) => r.status === "draft").length}</b>
                 </span>
-                <span style={{ color: "#7b8aa6" }}>{t("asic.s1.gate")}: REQ_TRACE_100</span>
+                <span style={{ color: "var(--alps-text-muted)" }}>{t("asic.s1.gate")}: REQ_TRACE_100</span>
               </div>
             </SectionCard>
           )}
@@ -367,7 +367,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                     key={o.id}
                     onClick={() => setOptId(o.id)}
                     style={{
-                      border: `1px solid ${optId === o.id ? tpl.color : "#1e293b"}`,
+                      border: `1px solid ${optId === o.id ? tpl.color : "var(--alps-border-base)"}`,
                       background: optId === o.id ? `${tpl.color}14` : "#0f172a",
                       borderRadius: 8,
                       padding: 10,
@@ -376,9 +376,9 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                       <b style={{ fontSize: 12, fontFamily: "monospace" }}>{o.id}</b>
-                      <Chip color={o.risk === "low" ? "#34d399" : o.risk === "medium" ? "#fbbf24" : "#f87171"}>risk {o.risk}</Chip>
+                      <Chip color={o.risk === "low" ? "var(--alps-ok)" : o.risk === "medium" ? "var(--alps-attention)" : "var(--alps-violation)"}>risk {o.risk}</Chip>
                     </div>
-                    <div style={{ fontSize: 11, color: "#cbd5e1", lineHeight: 1.7 }}>
+                    <div style={{ fontSize: 11, color: "var(--alps-text)", lineHeight: 1.7 }}>
                       {o.foundry} · {o.node}
                       <br />
                       pkg {o.pkg} · lead {o.leadWeeks[0]}–{o.leadWeeks[1]} wk
@@ -386,7 +386,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                       NRE ×{o.nreIdx.toFixed(2)}
                     </div>
                     <div style={{ marginTop: 6 }}>
-                      {optId === o.id ? <Chip color="#34d399">✓ {t("asic.s2.approved")}</Chip> : <Chip color="#8b99b5">{t("asic.s2.clickApprove")}</Chip>}
+                      {optId === o.id ? <Chip color="var(--alps-ok)">✓ {t("asic.s2.approved")}</Chip> : <Chip color="var(--alps-idle)">{t("asic.s2.clickApprove")}</Chip>}
                     </div>
                   </div>
                 ))}
@@ -404,9 +404,9 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   <tbody>
                     {tpl.risks.map((r) => (
                       <tr key={r.id}>
-                        <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{r.id}</td>
+                        <td style={{ ...td, fontFamily: "monospace", color: "var(--alps-accent-id)" }}>{r.id}</td>
                         <td style={td}>
-                          <Chip color={r.sev === "high" ? "#f87171" : r.sev === "medium" ? "#fbbf24" : "#34d399"}>{r.sev}</Chip>
+                          <Chip color={r.sev === "high" ? "var(--alps-violation)" : r.sev === "medium" ? "var(--alps-attention)" : "var(--alps-ok)"}>{r.sev}</Chip>
                         </td>
                         <td style={td}>{r.owner}</td>
                         <td style={td}>{pickText(r.text, lang)} → {pickText(r.mitigation, lang)}</td>
@@ -427,23 +427,23 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 <tbody>
                   {tpl.milestones.map((m) => (
                     <tr key={m.id}>
-                      <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc", width: 36 }}>{m.id}</td>
+                      <td style={{ ...td, fontFamily: "monospace", color: "var(--alps-accent-id)", width: 36 }}>{m.id}</td>
                       <td style={td}>{pickL(m.text, lang)}</td>
-                      <td style={{ ...td, fontFamily: "monospace", color: "#94a3b8", width: 100 }}>{m.due}</td>
+                      <td style={{ ...td, fontFamily: "monospace", color: "var(--alps-text-muted)", width: 100 }}>{m.due}</td>
                       <td style={td}>
-                        <Chip color={m.status === "done" ? "#34d399" : "#8b99b5"}>{m.status}</Chip>
+                        <Chip color={m.status === "done" ? "var(--alps-ok)" : "var(--alps-idle)"}>{m.status}</Chip>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <div style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, background: "#0f172a" }}>
+              <div style={{ border: "1px solid var(--alps-border-base)", borderRadius: 8, padding: 10, background: "var(--alps-bg-card)" }}>
                 <div style={{ fontSize: 12, marginBottom: 8 }}>
-                  {t("asic.s3.baseline")} — <span style={{ fontFamily: "monospace", color: "#7dd3fc" }}>hash {eduHash(tpl.id + "baseline")}</span>{" "}
-                  <Chip color="#a78bfa">{t("asic.conf.synthetic_fixture")}</Chip>
+                  {t("asic.s3.baseline")} — <span style={{ fontFamily: "monospace", color: "var(--alps-accent-id)" }}>hash {eduHash(tpl.id + "baseline")}</span>{" "}
+                  <Chip color="var(--alps-synthetic)">{t("asic.conf.synthetic_fixture")}</Chip>
                 </div>
                 {signed ? (
-                  <div style={{ fontSize: 12, color: "#34d399" }}>
+                  <div style={{ fontSize: 12, color: "var(--alps-ok)" }}>
                     ✓ {t("asic.s3.signedBy")} demo.architect (Approver) · {t("asic.s3.sod")} {t("asic.s3.sodOk")}
                   </div>
                 ) : (
@@ -456,7 +456,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                     {t("asic.act.sign")} (BASELINE_SIGNED)
                   </button>
                 )}
-                <div style={{ fontSize: 10, color: "#7b8aa6", marginTop: 6 }}>{t("asic.s3.sodNote")}</div>
+                <div style={{ fontSize: 10, color: "var(--alps-text-muted)", marginTop: 6 }}>{t("asic.s3.sodNote")}</div>
               </div>
               <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12 }}>
                 <thead>
@@ -485,13 +485,13 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 title={`${t("asic.stage.s4")} — ${t("asic.s4.design")}`}
                 right={
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {ranAt && <span style={{ fontSize: 10, color: "#7b8aa6", fontFamily: "monospace" }}>{ranAt}</span>}
+                    {ranAt && <span style={{ fontSize: 10, color: "var(--alps-text-muted)", fontFamily: "monospace" }}>{ranAt}</span>}
                     <ConfidenceBadge kind="educational_estimate" />
                   </div>
                 }
               >
-                <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>
-                  {t("asic.s4.reuse")} <b style={{ color: "#7dd3fc", fontFamily: "monospace" }}>{mission.slug}</b> ({mission.title}) — digital control block · engine educational-mock v1 (browser)
+                <div style={{ fontSize: 11, color: "var(--alps-text-muted)", marginBottom: 8 }}>
+                  {t("asic.s4.reuse")} <b style={{ color: "var(--alps-accent-id)", fontFamily: "monospace" }}>{mission.slug}</b> ({mission.title}) — digital control block · engine educational-mock v1 (browser)
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
                   <button aria-label="asic-run-lint" style={btn(true)} onClick={() => runStage(() => { setLint(runLint(mission.starterRtl, mission.topModule)); setSim(null); setSynth(null); setPnr(null); })}>
@@ -508,15 +508,15 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   </button>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {lint && <Kpi label="lint E/W" value={`${lint.errors.length}/${lint.warnings.length}`} color={lint.errors.length ? "#f87171" : "#34d399"} />}
-                  {sim && <Kpi label="sim pass" value={`${sim.passed}/${sim.testCount}`} color={sim.failed ? "#f87171" : "#34d399"} />}
+                  {lint && <Kpi label="lint E/W" value={`${lint.errors.length}/${lint.warnings.length}`} color={lint.errors.length ? "var(--alps-violation)" : "var(--alps-ok)"} />}
+                  {sim && <Kpi label="sim pass" value={`${sim.passed}/${sim.testCount}`} color={sim.failed ? "var(--alps-violation)" : "var(--alps-ok)"} />}
                   {sim && <Kpi label="coverage" value={`${Math.round(sim.coverage.overall * 100)}%`} />}
                   {synth && <Kpi label="gates" value={synth.gateCount} />}
                   {synth && <Kpi label="FFs" value={synth.flopCount} />}
-                  {synth && <Kpi label="WNS" value={`${synth.timingSlackNs} ns`} color={synth.timingSlackNs < 0 ? "#f87171" : "#34d399"} />}
-                  {pnr && <Kpi label="DRC" value={pnr.drcViolations} color={pnr.drcViolations ? "#f87171" : "#34d399"} />}
+                  {synth && <Kpi label="WNS" value={`${synth.timingSlackNs} ns`} color={synth.timingSlackNs < 0 ? "var(--alps-violation)" : "var(--alps-ok)"} />}
+                  {pnr && <Kpi label="DRC" value={pnr.drcViolations} color={pnr.drcViolations ? "var(--alps-violation)" : "var(--alps-ok)"} />}
                 </div>
-                {staleActive && <div style={{ marginTop: 8, fontSize: 11, color: "#fbbf24" }}>⚠ {t("asic.s4.rerunHint")}</div>}
+                {staleActive && <div style={{ marginTop: 8, fontSize: 11, color: "var(--alps-attention)" }}>⚠ {t("asic.s4.rerunHint")}</div>}
               </SectionCard>
               {sim?.waveform && (
                 <SectionCard title={t("asic.s4.wave")}>
@@ -540,14 +540,14 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                     <tbody>
                       {tpl.verItems.map((v) => (
                         <tr key={v.id}>
-                          <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{v.id}</td>
+                          <td style={{ ...td, fontFamily: "monospace", color: "var(--alps-accent-id)" }}>{v.id}</td>
                           <td style={{ ...td, fontFamily: "monospace" }}>{v.reqId}</td>
                           <td style={td}>{v.method}</td>
                           <td style={td}>{pickText(v.env, lang)}</td>
                           <td style={{ ...td, fontFamily: "monospace" }}>{Math.round(v.target * 100)}%</td>
                           <td style={td}>{v.owner}</td>
                           <td style={td}>
-                            <Chip color={verDone[v.id] || v.method !== "qualification" ? "#34d399" : "#fbbf24"}>
+                            <Chip color={verDone[v.id] || v.method !== "qualification" ? "var(--alps-ok)" : "var(--alps-attention)"}>
                               {verDone[v.id] || v.method !== "qualification" ? "linked/evidence" : "→ S07"}
                             </Chip>
                           </td>
@@ -557,14 +557,14 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                         .filter((r) => r.verId && !tpl.verItems.some((v) => v.id === r.verId))
                         .map((r) => (
                           <tr key={r.verId}>
-                            <td style={{ ...td, fontFamily: "monospace", color: "#fbbf24" }}>{r.verId}</td>
+                            <td style={{ ...td, fontFamily: "monospace", color: "var(--alps-attention)" }}>{r.verId}</td>
                             <td style={{ ...td, fontFamily: "monospace" }}>{r.id}</td>
                             <td style={td}>{r.method}</td>
                             <td style={td}>{t("asic.s4.newVer")}</td>
                             <td style={{ ...td, fontFamily: "monospace" }}>100%</td>
                             <td style={td}>Verification Engineer</td>
                             <td style={td}>
-                              <Chip color="#fbbf24">planned</Chip>
+                              <Chip color="var(--alps-attention)">planned</Chip>
                             </td>
                           </tr>
                         ))}
@@ -583,17 +583,17 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                 <div style={{ height: 360 }}>
                   <Eda3DViewer scene={pkgScene} />
                 </div>
-                <div style={{ fontSize: 10, color: "#7b8aa6", marginTop: 6 }}>{t("asic.s5.pkgNote")}</div>
+                <div style={{ fontSize: 10, color: "var(--alps-text-muted)", marginTop: 6 }}>{t("asic.s5.pkgNote")}</div>
               </SectionCard>
               <SectionCard
                 title={t("asic.s5.corr")}
                 right={
-                  <button aria-label="asic-run-corr" style={btn(!corrDone, "#34d399")} onClick={() => setCorrDone(true)}>
+                  <button aria-label="asic-run-corr" style={btn(!corrDone, "var(--alps-ok)")} onClick={() => setCorrDone(true)}>
                     {t("asic.act.runCorr")}
                   </button>
                 }
               >
-                <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8, fontFamily: "monospace" }}>
+                <div style={{ fontSize: 11, color: "var(--alps-text-muted)", marginBottom: 8, fontFamily: "monospace" }}>
                   {t("asic.s5.genealogy")}: GDS {maskRev} [{eduHash(tpl.id + maskRev)}] → mask MS-{maskRev} → wafer lot WL-{tpl.id.slice(0, 3).toUpperCase()}-09 (FAB alias) → assembly AL-1120 ({pkg}) → ES-1001..1012
                 </div>
                 {corrDone ? (
@@ -619,21 +619,21 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                         <tbody>
                           {corr.perParam.map((p) => (
                             <tr key={p.key}>
-                              <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{p.key}</td>
+                              <td style={{ ...td, fontFamily: "monospace", color: "var(--alps-accent-id)" }}>{p.key}</td>
                               <td style={{ ...td, fontFamily: "monospace" }}>{p.stats.bias.toExponential(2)}</td>
                               <td style={{ ...td, fontFamily: "monospace" }}>{round2(p.stats.mae)}</td>
                               <td style={{ ...td, fontFamily: "monospace" }}>{round2(p.stats.rmse)}</td>
-                              <td style={{ ...td, fontFamily: "monospace", color: p.stats.r2 >= 0.95 ? "#34d399" : "#fbbf24" }}>{round2(p.stats.r2)}</td>
+                              <td style={{ ...td, fontFamily: "monospace", color: p.stats.r2 >= 0.95 ? "var(--alps-ok)" : "var(--alps-attention)" }}>{round2(p.stats.r2)}</td>
                               <td style={td}>{p.unit}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
-                      <div style={{ fontSize: 10, color: "#7b8aa6", marginTop: 6 }}>{t("asic.s5.corrNote")}</div>
+                      <div style={{ fontSize: 10, color: "var(--alps-text-muted)", marginTop: 6 }}>{t("asic.s5.corrNote")}</div>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: "#8b99b5" }}>{t("asic.s5.corrHint")}</div>
+                  <div style={{ fontSize: 12, color: "var(--alps-text-faint)" }}>{t("asic.s5.corrHint")}</div>
                 )}
               </SectionCard>
               <EquipmentRunsPanel live={live} liveState={liveState} />
@@ -643,33 +643,33 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
           {stage === "s6" && (
             <>
             <SectionCard title={`${t("asic.stage.s6")} — ECO & Test Program`}>
-              {ecos.length === 0 && <div style={{ fontSize: 12, color: "#8b99b5" }}>{t("asic.s6.none")}</div>}
+              {ecos.length === 0 && <div style={{ fontSize: 12, color: "var(--alps-text-faint)" }}>{t("asic.s6.none")}</div>}
               {ecos.map((e) => (
-                <div key={e.id} style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, marginBottom: 8, background: "#0f172a" }}>
+                <div key={e.id} style={{ border: "1px solid var(--alps-border-base)", borderRadius: 8, padding: 10, marginBottom: 8, background: "var(--alps-bg-card)" }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <b style={{ fontFamily: "monospace", color: "#7dd3fc", fontSize: 12 }}>{e.id}</b>
+                    <b style={{ fontFamily: "monospace", color: "var(--alps-accent-id)", fontSize: 12 }}>{e.id}</b>
                     <span style={{ fontSize: 12, flex: 1 }}>{pickL(e.text, lang)}</span>
-                    <Chip color={e.status === "closed" ? "#34d399" : e.status === "analyzed" ? "#fbbf24" : "#94a3b8"}>{e.status}</Chip>
+                    <Chip color={e.status === "closed" ? "var(--alps-ok)" : e.status === "analyzed" ? "var(--alps-attention)" : "var(--alps-idle)"}>{e.status}</Chip>
                   </div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
+                  <div style={{ fontSize: 11, color: "var(--alps-text-muted)", marginTop: 6 }}>
                     {t("asic.s6.impact")}: {e.impactReq.join(", ") || "—"} / runs {e.impactRuns.join(", ")} / mask {e.maskRev}
                   </div>
                   <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                     {e.status === "proposed" && (
-                      <button style={btn(true, "#fbbf24")} onClick={() => ecoAnalyze(e.id)}>
+                      <button style={btn(true, "var(--alps-attention)")} onClick={() => ecoAnalyze(e.id)}>
                         {t("asic.act.ecoAnalyze")}
                       </button>
                     )}
                     {e.status === "analyzed" && (
-                      <button aria-label={`asic-eco-close-${e.id}`} style={btn(true, "#34d399")} onClick={() => ecoClose(e.id)}>
+                      <button aria-label={`asic-eco-close-${e.id}`} style={btn(true, "var(--alps-ok)")} onClick={() => ecoClose(e.id)}>
                         {t("asic.act.ecoClose")}
                       </button>
                     )}
                   </div>
                 </div>
               ))}
-              <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                {t("asic.s6.mask")}: <b style={{ fontFamily: "monospace", color: "#7dd3fc" }}>{maskRev}</b> · {t("asic.s6.testprog")}: <b style={{ fontFamily: "monospace", color: "#7dd3fc" }}>ATE v{testProgRev}</b>
+              <div style={{ fontSize: 11, color: "var(--alps-text-muted)" }}>
+                {t("asic.s6.mask")}: <b style={{ fontFamily: "monospace", color: "var(--alps-accent-id)" }}>{maskRev}</b> · {t("asic.s6.testprog")}: <b style={{ fontFamily: "monospace", color: "var(--alps-accent-id)" }}>ATE v{testProgRev}</b>
               </div>
             </SectionCard>
             <TestProgramTwin tpl={tpl} testProgRev={testProgRev} maskRev={maskRev} />
@@ -700,16 +700,16 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   <tbody>
                     {qual.map((r) => (
                       <tr key={r.group}>
-                        <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{r.group}</td>
+                        <td style={{ ...td, fontFamily: "monospace", color: "var(--alps-accent-id)" }}>{r.group}</td>
                         <td style={td}>
                           {pickText(r.method, lang)}
-                          {r.note && <span style={{ display: "block", fontSize: 9, color: r.status === "fail" ? "#f87171" : "#8b99b5" }}>{pickL(r.note, lang)}</span>}
+                          {r.note && <span style={{ display: "block", fontSize: 9, color: r.status === "fail" ? "var(--alps-violation)" : "var(--alps-idle)" }}>{pickL(r.note, lang)}</span>}
                         </td>
                         <td style={td}>{pickText(r.cond, lang)}</td>
                         <td style={{ ...td, fontFamily: "monospace" }}>{r.duration}</td>
                         <td style={{ ...td, fontFamily: "monospace" }}>{r.samples}</td>
                         <td style={td}>
-                          <Chip color={r.status === "pass" ? "#34d399" : r.status === "fail" ? "#f87171" : r.status === "waiver" ? "#a78bfa" : "#fbbf24"}>{r.status}</Chip>
+                          <Chip color={r.status === "pass" ? "var(--alps-ok)" : r.status === "fail" ? "var(--alps-violation)" : r.status === "waiver" ? "var(--alps-synthetic)" : "var(--alps-attention)"}>{r.status}</Chip>
                         </td>
                         <td style={td}>
                           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -720,10 +720,10 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                             )}
                             {r.status === "fail" && (
                               <>
-                                <button style={btn(true, "#34d399")} onClick={() => qualAction(r.group, "capa")}>
+                                <button style={btn(true, "var(--alps-ok)")} onClick={() => qualAction(r.group, "capa")}>
                                   {t("asic.act.qualCapa")}
                                 </button>
-                                <button style={btn(true, "#a78bfa")} onClick={() => qualAction(r.group, "waiver")}>
+                                <button style={btn(true, "var(--alps-synthetic)")} onClick={() => qualAction(r.group, "waiver")}>
                                   {t("asic.act.qualWaiver")}
                                 </button>
                               </>
@@ -735,7 +735,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                   </tbody>
                 </table>
               </div>
-              <div style={{ fontSize: 10, color: "#7b8aa6", marginTop: 8 }}>{t("asic.s7.note")}</div>
+              <div style={{ fontSize: 10, color: "var(--alps-text-muted)", marginTop: 8 }}>{t("asic.s7.note")}</div>
             </SectionCard>
             <SafetyTracePanel live={live} liveState={liveState} />
             </>
@@ -762,12 +762,12 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                     <tbody>
                       {evidence.map((e) => (
                         <tr key={e.id}>
-                          <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{e.id}</td>
+                          <td style={{ ...td, fontFamily: "monospace", color: "var(--alps-accent-id)" }}>{e.id}</td>
                           <td style={td}>{pickL(e.kind, lang)}</td>
                           <td style={{ ...td, fontFamily: "monospace" }}>{e.rev}</td>
-                          <td style={{ ...td, fontFamily: "monospace", color: "#7b8aa6" }}>{eduHash(e.id + e.rev)}…</td>
+                          <td style={{ ...td, fontFamily: "monospace", color: "var(--alps-text-muted)" }}>{eduHash(e.id + e.rev)}…</td>
                           <td style={td}>
-                            <Chip color={e.classification === "CUSTOMER_CONFIDENTIAL" ? "#f87171" : "#8b99b5"} title={t("asic.s8.clsNote")}>
+                            <Chip color={e.classification === "CUSTOMER_CONFIDENTIAL" ? "var(--alps-violation)" : "var(--alps-idle)"} title={t("asic.s8.clsNote")}>
                               {e.classification}
                             </Chip>
                           </td>
@@ -776,7 +776,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                           </td>
                           <td style={td}>
                             {e.approved ? (
-                              <Chip color="#34d399">✓ approved</Chip>
+                              <Chip color="var(--alps-ok)">✓ approved</Chip>
                             ) : (
                               <button style={btn(true)} onClick={() => approveEvidence(e.id)}>
                                 {t("asic.act.approveEv")}
@@ -800,14 +800,14 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                       {READINESS_LEVELS.map((l) => {
                         const reached = l.reachable && gates.s8.status === "pass" ? l.key === "controlled_pilot" : l.key === "education_only";
                         return (
-                          <Chip key={l.key} color={reached ? "#34d399" : l.reachable ? "#8b99b5" : "#7f1d1d"}>
+                          <Chip key={l.key} color={reached ? "var(--alps-ok)" : l.reachable ? "var(--alps-idle)" : "#7f1d1d"}>
                             {reached ? "● " : l.reachable ? "○ " : "✕ "}
                             {l.key}
                           </Chip>
                         );
                       })}
                     </div>
-                    <pre style={{ margin: 0, padding: 10, background: "#020617", borderRadius: 8, fontSize: 10, fontFamily: "monospace", color: "#94a3b8", overflowX: "auto" }}>
+                    <pre style={{ margin: 0, padding: 10, background: "var(--alps-bg-page)", borderRadius: 8, fontSize: 10, fontFamily: "monospace", color: "var(--alps-text-muted)", overflowX: "auto" }}>
 {JSON.stringify(
   {
     gate_id: "G8_RELEASE",
@@ -824,7 +824,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
   2,
 )}
                     </pre>
-                    <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 8 }}>⚠ {t("asic.s8.blockedNote")}</div>
+                    <div style={{ fontSize: 11, color: "var(--alps-attention)", marginTop: 8 }}>⚠ {t("asic.s8.blockedNote")}</div>
                   </div>
                 }
               />
@@ -838,7 +838,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
               <CopilotPanel live={live} liveState={liveState} tplId={tpl.id} onChanged={reloadLive} />
               <FaStudio live={live} liveState={liveState} />
               <SupplyChainPanel live={live} liveState={liveState} />
-              <SectionCard title={`${t("asic.stage.s9")} — ${t("asic.s9.quality")}`} right={<Chip color="#a78bfa">{t("asic.conf.synthetic_fixture")}</Chip>}>
+              <SectionCard title={`${t("asic.stage.s9")} — ${t("asic.s9.quality")}`} right={<Chip color="var(--alps-synthetic)">{t("asic.conf.synthetic_fixture")}</Chip>}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
                   <div>
                     <TrendLine values={lots.map((l) => l.yieldPct)} labels={lots.map((l) => l.id.slice(-2))} yLabel="yield %" />
@@ -880,17 +880,17 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                     <tbody>
                       {lots.map((l) => (
                         <tr key={l.id}>
-                          <td style={{ ...td, fontFamily: "monospace", color: "#7dd3fc" }}>{l.id}</td>
+                          <td style={{ ...td, fontFamily: "monospace", color: "var(--alps-accent-id)" }}>{l.id}</td>
                           <td style={{ ...td, fontFamily: "monospace" }}>{l.wafers}</td>
-                          <td style={{ ...td, fontFamily: "monospace", color: l.yieldPct < 85 ? "#f87171" : "#34d399" }}>{l.yieldPct}%</td>
+                          <td style={{ ...td, fontFamily: "monospace", color: l.yieldPct < 85 ? "var(--alps-violation)" : "var(--alps-ok)" }}>{l.yieldPct}%</td>
                           <td style={{ ...td, fontFamily: "monospace" }}>{l.bins.good}/{l.bins.retest}/{l.bins.fail1}/{l.bins.fail2}</td>
                           <td style={td}>
-                            {l.excursion && <div style={{ fontSize: 10, color: "#f87171", maxWidth: 260 }}>⚠ {pickL(l.excursion, lang)}</div>}
-                            <Chip color={l.disposition === "released" ? "#34d399" : l.disposition === "held" ? "#f87171" : "#a78bfa"}>{l.disposition}</Chip>
+                            {l.excursion && <div style={{ fontSize: 10, color: "var(--alps-violation)", maxWidth: 260 }}>⚠ {pickL(l.excursion, lang)}</div>}
+                            <Chip color={l.disposition === "released" ? "var(--alps-ok)" : l.disposition === "held" ? "var(--alps-violation)" : "var(--alps-synthetic)"}>{l.disposition}</Chip>
                           </td>
                           <td style={td}>
                             {l.disposition === "held" && (
-                              <button aria-label={`asic-mrb-${l.id}`} style={btn(true, "#a78bfa")} onClick={() => mrbDone(l.id)}>
+                              <button aria-label={`asic-mrb-${l.id}`} style={btn(true, "var(--alps-synthetic)")} onClick={() => mrbDone(l.id)}>
                                 {t("asic.act.mrb")}
                               </button>
                             )}
@@ -900,7 +900,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
                     </tbody>
                   </table>
                 </div>
-                <div style={{ fontSize: 10, color: "#7b8aa6", marginTop: 8 }}>{t("asic.s9.note")}</div>
+                <div style={{ fontSize: 10, color: "var(--alps-text-muted)", marginTop: 8 }}>{t("asic.s9.note")}</div>
               </SectionCard>
             </>
           )}
@@ -920,7 +920,7 @@ export function AsicProgram() {
     <div style={{ height: "100%", overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
         <h2 style={{ margin: 0, fontSize: 16 }}>{t("asic.title")}</h2>
-        <span style={{ fontSize: 12, color: "#8b99b5" }}>{t("asic.subtitle")}</span>
+        <span style={{ fontSize: 12, color: "var(--alps-text-faint)" }}>{t("asic.subtitle")}</span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
         {ASIC_TEMPLATES.map((x) => (

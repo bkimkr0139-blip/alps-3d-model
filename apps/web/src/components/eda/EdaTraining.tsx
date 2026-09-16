@@ -30,10 +30,10 @@ type CoachHint = { key: string; params?: Record<string, string | number> };
 type StageState = "idle" | "running" | "ok" | "failed";
 
 const card: React.CSSProperties = {
-  border: "1px solid #1e293b",
+  border: "1px solid var(--alps-border-base)",
   borderRadius: 8,
   padding: 12,
-  background: "#0b1220",
+  background: "var(--alps-bg-panel)",
 };
 
 function StatusDot({ state }: { state: StageState }) {
@@ -43,9 +43,9 @@ function StatusDot({ state }: { state: StageState }) {
 
 function Kpi({ label, value, warn }: { label: string; value: string | number; warn?: boolean }) {
   return (
-    <div style={{ background: "#0f172a", borderRadius: 6, padding: "6px 10px", minWidth: 86 }}>
-      <div style={{ fontSize: 10, color: "#8b99b5", whiteSpace: "nowrap" }}>{label}</div>
-      <div style={{ fontSize: 15, fontFamily: "monospace", color: warn ? "#f87171" : "#67e8f9" }}>{value}</div>
+    <div style={{ background: "var(--alps-bg-card)", borderRadius: 6, padding: "6px 10px", minWidth: 86 }}>
+      <div style={{ fontSize: 10, color: "var(--alps-text-faint)", whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ fontSize: 15, fontFamily: "monospace", color: warn ? "var(--alps-violation)" : "var(--alps-accent-kpi)" }}>{value}</div>
     </div>
   );
 }
@@ -195,8 +195,8 @@ export function EdaTraining() {
       {/* Intro + mission picker */}
       <div style={card}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
-          <h3 style={{ margin: 0, color: "#f97316" }}>{t("eda.title")}</h3>
-          <span style={{ fontSize: 11, color: "#94a3b8" }}>{t("eda.note")}</span>
+          <h3 style={{ margin: 0, color: "var(--alps-accent-orange)" }}>{t("eda.title")}</h3>
+          <span style={{ fontSize: 11, color: "var(--alps-text-muted)" }}>{t("eda.note")}</span>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
           {MISSIONS.map((m) => (
@@ -207,9 +207,9 @@ export function EdaTraining() {
                 fontSize: 12,
                 padding: "5px 12px",
                 borderRadius: 14,
-                border: `1px solid ${mission.slug === m.slug ? "#f97316" : "#334155"}`,
-                background: mission.slug === m.slug ? "#7c2d12" : "#0f172a",
-                color: mission.slug === m.slug ? "#fed7aa" : "#cbd5e1",
+                border: `1px solid ${mission.slug === m.slug ? "#f97316" : "var(--alps-border-strong)"}`,
+                background: mission.slug === m.slug ? "#7c2d12" : "var(--alps-bg-card)",
+                color: mission.slug === m.slug ? "#fed7aa" : "var(--alps-text)",
                 cursor: "pointer",
               }}
             >
@@ -218,19 +218,19 @@ export function EdaTraining() {
             </button>
           ))}
         </div>
-        <p style={{ margin: "8px 0 0", fontSize: 12, color: "#94a3b8" }}>{t(`eda.mission.${mission.slug}.desc` as never)}</p>
+        <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--alps-text-muted)" }}>{t(`eda.mission.${mission.slug}.desc` as never)}</p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 1fr) minmax(320px, 1.1fr)", gap: 12, alignItems: "start" }}>
         {/* RTL editor */}
         <div style={card}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <span style={{ fontSize: 13, color: "#e2e8f0" }}>
-              {t("eda.rtl")} · <span style={{ fontFamily: "monospace", color: "#67e8f9" }}>{mission.topModule}</span>
+            <span style={{ fontSize: 13, color: "var(--alps-text)" }}>
+              {t("eda.rtl")} · <span style={{ fontFamily: "monospace", color: "var(--alps-accent-kpi)" }}>{mission.topModule}</span>
             </span>
             <button
               onClick={() => setRtl(mission.starterRtl)}
-              style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #334155", background: "#0f172a", color: "#94a3b8", cursor: "pointer" }}
+              style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--alps-border-strong)", background: "var(--alps-bg-card)", color: "var(--alps-text-muted)", cursor: "pointer" }}
             >
               {t("eda.rtlReset")}
             </button>
@@ -246,7 +246,7 @@ export function EdaTraining() {
               minHeight: 300,
               background: "#020617",
               color: "#a5f3fc",
-              border: "1px solid #1e293b",
+              border: "1px solid var(--alps-border-base)",
               borderRadius: 6,
               padding: 10,
               fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -273,9 +273,9 @@ export function EdaTraining() {
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
-                    border: "1px solid #334155",
-                    background: stageDone(s.state) ? "#064e3b" : "#0f172a",
-                    color: stageDone(s.state) ? "#a7f3d0" : "#e2e8f0",
+                    border: "1px solid var(--alps-border-strong)",
+                    background: stageDone(s.state) ? "#064e3b" : "var(--alps-bg-card)",
+                    color: stageDone(s.state) ? "var(--alps-ok-alt)" : "var(--alps-text)",
                     cursor: "pointer",
                   }}
                 >
@@ -285,7 +285,7 @@ export function EdaTraining() {
                 {i < stages.length - 1 && <span style={{ color: "#7b8aa6", fontSize: 12 }}>→</span>}
               </span>
             ))}
-            <span style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto", fontSize: 11, color: "#94a3b8" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto", fontSize: 11, color: "var(--alps-text-muted)" }}>
               {t("eda.clockPeriod")}
               <input
                 type="number"
@@ -294,7 +294,7 @@ export function EdaTraining() {
                 step={0.5}
                 value={clockPeriod}
                 onChange={(e) => setClockPeriod(parseFloat(e.target.value) || 10)}
-                style={{ width: 52, background: "#0f172a", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 4, padding: "2px 4px" }}
+                style={{ width: 52, background: "var(--alps-bg-card)", color: "var(--alps-text)", border: "1px solid var(--alps-border-strong)", borderRadius: 4, padding: "2px 4px" }}
               />
               ns
             </span>
@@ -306,7 +306,7 @@ export function EdaTraining() {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <Kpi label={t("eda.kpi.errors")} value={lint.errors.length} warn={lint.errors.length > 0} />
                 <Kpi label={t("eda.kpi.warnings")} value={lint.warnings.length} warn={lint.warnings.length > 0} />
-                <span style={{ fontSize: 11, color: "#8b99b5", alignSelf: "center", fontFamily: "monospace" }}>{t("eda.log")}: {lint.log.split("\n").slice(-2, -1)[0]}</span>
+                <span style={{ fontSize: 11, color: "var(--alps-text-faint)", alignSelf: "center", fontFamily: "monospace" }}>{t("eda.log")}: {lint.log.split("\n").slice(-2, -1)[0]}</span>
               </div>
               {(lint.errors.length > 0 || lint.warnings.length > 0) && (
                 <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 11, color: "#fca5a5" }}>
@@ -314,7 +314,7 @@ export function EdaTraining() {
                     <li key={`e${i}`}>[E] {e.message}</li>
                   ))}
                   {lint.warnings.map((w, i) => (
-                    <li key={`w${i}`} style={{ color: "#fbbf24" }}>
+                    <li key={`w${i}`} style={{ color: "var(--alps-attention)" }}>
                       [W] {w.message}
                     </li>
                   ))}
@@ -333,7 +333,7 @@ export function EdaTraining() {
               <div style={{ marginTop: 8 }}>
                 <EdaWaveform data={sim.waveform} />
               </div>
-              <div style={{ marginTop: 8, fontSize: 11, color: "#94a3b8" }}>
+              <div style={{ marginTop: 8, fontSize: 11, color: "var(--alps-text-muted)" }}>
                 {t("eda.scenarios")}
                 <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
                   {sim.scenarios.map((s) => (
@@ -357,14 +357,14 @@ export function EdaTraining() {
                 <Kpi label={t("eda.kpi.slack")} value={`${synth.timingSlackNs} ns`} warn={synth.timingSlackNs < 0} />
                 <Kpi label={t("eda.kpi.power")} value={`${synth.power.totalMw} mW`} />
               </div>
-              <div style={{ marginTop: 8, fontSize: 11, color: "#94a3b8" }}>
+              <div style={{ marginTop: 8, fontSize: 11, color: "var(--alps-text-muted)" }}>
                 {t("eda.criticalPaths")}
                 <table style={{ width: "100%", marginTop: 4, borderCollapse: "collapse", fontSize: 10, fontFamily: "monospace" }}>
                   <tbody>
                     {synth.criticalPaths.map((p) => (
-                      <tr key={p.id} style={{ borderTop: "1px solid #1e293b" }}>
-                        <td style={{ padding: "3px 4px", color: "#cbd5e1" }}>{p.startpoint} → {p.endpoint}</td>
-                        <td style={{ padding: "3px 4px", color: "#94a3b8" }}>{p.delayNs} ns</td>
+                      <tr key={p.id} style={{ borderTop: "1px solid var(--alps-border-base)" }}>
+                        <td style={{ padding: "3px 4px", color: "var(--alps-text)" }}>{p.startpoint} → {p.endpoint}</td>
+                        <td style={{ padding: "3px 4px", color: "var(--alps-text-muted)" }}>{p.delayNs} ns</td>
                         <td style={{ padding: "3px 4px", color: p.status === "MET" ? "#86efac" : "#fca5a5" }}>{p.slackNs} ns {p.status}</td>
                       </tr>
                     ))}
@@ -389,8 +389,8 @@ export function EdaTraining() {
 
           {/* Floorplan controls (P&R) */}
           <div style={card}>
-            <div style={{ fontSize: 12, color: "#e2e8f0", marginBottom: 6 }}>{t("eda.floorplan")}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px", fontSize: 11, color: "#94a3b8" }}>
+            <div style={{ fontSize: 12, color: "var(--alps-text)", marginBottom: 6 }}>{t("eda.floorplan")}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px", fontSize: 11, color: "var(--alps-text-muted)" }}>
               {(
                 [
                   ["fpDieW", "dieW", 6, 18, 0.5, (v: number) => `${v} µm`],
@@ -402,7 +402,7 @@ export function EdaTraining() {
               ).map(([key, field, min, max, stepStep, fmt]) => (
                 <label key={field} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <span>
-                    {t(`eda.${key}`)}: <b style={{ color: "#67e8f9" }}>{fmt(fp[field])}</b>
+                    {t(`eda.${key}`)}: <b style={{ color: "var(--alps-accent-kpi)" }}>{fmt(fp[field])}</b>
                   </span>
                   <input
                     type="range"
@@ -416,7 +416,7 @@ export function EdaTraining() {
               ))}
               <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <span>
-                  {t("eda.fpMacros")}: <b style={{ color: "#67e8f9" }}>{fp.numMacros}</b>
+                  {t("eda.fpMacros")}: <b style={{ color: "var(--alps-accent-kpi)" }}>{fp.numMacros}</b>
                 </span>
                 <input type="range" min={0} max={4} step={1} value={fp.numMacros} onChange={(e) => setFp({ ...fp, numMacros: parseInt(e.target.value, 10) })} />
               </label>
@@ -425,7 +425,7 @@ export function EdaTraining() {
                 <select
                   value={fp.padDensity}
                   onChange={(e) => setFp({ ...fp, padDensity: e.target.value as FloorplanConfig["padDensity"] })}
-                  style={{ background: "#0f172a", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 4, padding: 2 }}
+                  style={{ background: "var(--alps-bg-card)", color: "var(--alps-text)", border: "1px solid var(--alps-border-strong)", borderRadius: 4, padding: 2 }}
                 >
                   <option value="low">low</option>
                   <option value="medium">medium</option>
@@ -433,7 +433,7 @@ export function EdaTraining() {
                 </select>
               </label>
             </div>
-            <div style={{ fontSize: 10, color: "#8b99b5", marginTop: 6 }}>{t("eda.fpHint")}</div>
+            <div style={{ fontSize: 10, color: "var(--alps-text-faint)", marginTop: 6 }}>{t("eda.fpHint")}</div>
           </div>
         </div>
       </div>
@@ -448,9 +448,9 @@ export function EdaTraining() {
               fontSize: 12,
               padding: "4px 12px",
               borderRadius: 6,
-              border: `1px solid ${view3d === "process" ? "#34d399" : "#334155"}`,
-              background: view3d === "process" ? "#064e3b" : "#0f172a",
-              color: view3d === "process" ? "#a7f3d0" : "#94a3b8",
+              border: `1px solid ${view3d === "process" ? "#34d399" : "var(--alps-border-strong)"}`,
+              background: view3d === "process" ? "#064e3b" : "var(--alps-bg-card)",
+              color: view3d === "process" ? "#a7f3d0" : "var(--alps-idle)",
               cursor: procScene ? "pointer" : "not-allowed",
               opacity: procScene ? 1 : 0.4,
             }}
@@ -464,9 +464,9 @@ export function EdaTraining() {
               fontSize: 12,
               padding: "4px 12px",
               borderRadius: 6,
-              border: `1px solid ${view3d === "synthesis" ? "#22d3ee" : "#334155"}`,
-              background: view3d === "synthesis" ? "#164e63" : "#0f172a",
-              color: view3d === "synthesis" ? "#a5f3fc" : "#94a3b8",
+              border: `1px solid ${view3d === "synthesis" ? "#22d3ee" : "var(--alps-border-strong)"}`,
+              background: view3d === "synthesis" ? "#164e63" : "var(--alps-bg-card)",
+              color: view3d === "synthesis" ? "#a5f3fc" : "var(--alps-idle)",
               cursor: synthScene ? "pointer" : "not-allowed",
               opacity: synthScene ? 1 : 0.4,
             }}
@@ -480,20 +480,20 @@ export function EdaTraining() {
               fontSize: 12,
               padding: "4px 12px",
               borderRadius: 6,
-              border: `1px solid ${view3d === "layout" ? "#a78bfa" : "#334155"}`,
-              background: view3d === "layout" ? "#4c1d95" : "#0f172a",
-              color: view3d === "layout" ? "#ddd6fe" : "#94a3b8",
+              border: `1px solid ${view3d === "layout" ? "#a78bfa" : "var(--alps-border-strong)"}`,
+              background: view3d === "layout" ? "#4c1d95" : "var(--alps-bg-card)",
+              color: view3d === "layout" ? "#ddd6fe" : "var(--alps-idle)",
               cursor: layoutScene ? "pointer" : "not-allowed",
               opacity: layoutScene ? 1 : 0.4,
             }}
           >
             {t("eda.view3dLayout")}
           </button>
-          <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: "monospace", color: "#fbbf24" }}>
+          <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: "monospace", color: "var(--alps-attention)" }}>
             ◈ {t("eda.view3dChip")}: {silProfileOf(mission.slug).chip} · {mission.topModule}
             {synth?.status === "success" ? ` · ${synth.gateCount} gates` : ""}
           </span>
-          <span style={{ fontSize: 11, color: "#8b99b5" }}>{t("eda.view3dHint")}</span>
+          <span style={{ fontSize: 11, color: "var(--alps-text-faint)" }}>{t("eda.view3dHint")}</span>
         </div>
         <div style={{ height: 430 }}>
           <Eda3DViewer scene={scene} />
@@ -504,7 +504,7 @@ export function EdaTraining() {
       {coach.length > 0 && (
         <div style={card}>
           <div style={{ fontSize: 12, color: "#f97316", marginBottom: 4 }}>{t("eda.coach.title")}</div>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#cbd5e1" }}>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--alps-text)" }}>
             {coach.map((h, i) => (
               <li key={i} style={{ marginTop: 2 }}>
                 {t(h.key as never, h.params)}

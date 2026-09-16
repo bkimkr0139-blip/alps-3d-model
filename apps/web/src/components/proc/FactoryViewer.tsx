@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { buildFactoryScene, stationX } from "./factoryScene";
 import { canvasTextTexture } from "../../ui/canvasText";
 import { HudChip, HudPanel, StatusBadge, btn, type KitStatus } from "../../ui/kit";
-import { accent, status as S } from "../../ui/tokens";
+import { rawAccent, rawStatus, status as S } from "../../ui/tokens";
 import { ViewerEnvironment } from "../ThreeViewer";
 
 // Production-line 3D twin — photoreal rendering pass: real machine
@@ -23,9 +23,9 @@ export function stationToKitStatus(s: StationStatus): KitStatus {
 }
 
 const DISP_COLOR: Record<string, string> = {
-  ok: S.okAlt,
-  quarantine: S.attention,
-  reject: S.violation,
+  ok: rawStatus.okAlt,
+  quarantine: rawStatus.attention,
+  reject: rawStatus.violation,
 };
 
 // Shared machine materials — one idiom per surface type keeps the line
@@ -59,9 +59,9 @@ function StackLight({ status, position }: { status: StationStatus; position: [nu
         <cylinderGeometry args={[0.035, 0.035, 0.48, 10]} />
         <meshStandardMaterial color="#3a4150" metalness={0.7} roughness={0.4} />
       </mesh>
-      <Lamp color={S.violation} lit={status === "excluded"} blink position={[x, y + 0.6, z]} />
-      <Lamp color={S.attention} lit={status === "rule_hit"} blink position={[x, y + 0.36, z]} />
-      <Lamp color={S.okAlt} lit={status === "in_control"} blink={false} position={[x, y + 0.12, z]} />
+      <Lamp color={rawStatus.violation} lit={status === "excluded"} blink position={[x, y + 0.6, z]} />
+      <Lamp color={rawStatus.attention} lit={status === "rule_hit"} blink position={[x, y + 0.36, z]} />
+      <Lamp color={rawStatus.okAlt} lit={status === "in_control"} blink={false} position={[x, y + 0.12, z]} />
     </group>
   );
 }
@@ -225,7 +225,7 @@ function AssemblyCell() {
       </mesh>
       <mesh position={[0.75, 1.36, 0.25]}>
         <cylinderGeometry args={[0.17, 0.2, 0.34, 16]} />
-        <meshStandardMaterial color={accent.primary} metalness={0.5} roughness={0.45} />
+        <meshStandardMaterial color={rawAccent.primary} metalness={0.5} roughness={0.45} />
       </mesh>
       <mesh position={[0.62, 1.72, 0.2]} rotation={[0, 0, 0.5]}>
         <boxGeometry args={[0.17, 0.95, 0.17]} />
@@ -309,7 +309,7 @@ function Station({
       {selected && (
         <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[2.3, 2.55, 48]} />
-          <meshBasicMaterial color={accent.primary} transparent opacity={0.85} />
+          <meshBasicMaterial color={rawAccent.primary} transparent opacity={0.85} />
         </mesh>
       )}
     </group>

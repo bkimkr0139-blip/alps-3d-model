@@ -35,7 +35,7 @@ export function TwinControls({ top = 10 }: { top?: number }) {
     border: "1px solid",
     borderColor: on ? accent.orange : border.strong,
     background: on ? "#7c2d12" : bg.raise,
-    color: "white",
+    color: on ? "white" : "var(--alps-text)",
     fontSize: 12,
     cursor: "pointer",
   });

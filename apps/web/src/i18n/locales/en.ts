@@ -5,6 +5,8 @@ const en = {
   app: {
     title: "ALPS ALPINE Engineering Twin Workbench",
     logout: "Logout",
+    toLight: "Switch to light mode",
+    toDark: "Switch to dark mode",
     signingIn: "Signing in…",
     language: "Language",
   },

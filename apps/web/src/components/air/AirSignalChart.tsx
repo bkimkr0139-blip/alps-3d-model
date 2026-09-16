@@ -2,7 +2,7 @@ import ReactECharts from "echarts-for-react";
 import { useTranslation } from "react-i18next";
 import type { ReplayPayload, AsicConfigPayload } from "../../lib/air";
 import { AIR_STATE_COLOR, dcThresholdFf } from "../../lib/air";
-import { chartAxis, chartBase, traceGlow } from "../../ui/chartTheme";
+import { useChartTheme, traceGlow } from "../../ui/chartTheme";
 
 // Seeded ASIC replay trace: truth vs noisy counts, the v2 EMA baseline, and
 // the derived count thresholds. The v1/v2 state rows render as colored
@@ -10,6 +10,7 @@ import { chartAxis, chartBase, traceGlow } from "../../ui/chartTheme";
 // firing inside the deep-IDLE hold where v2 stays flat.
 export function AirSignalChart({ replay, cursorMs }: { replay: ReplayPayload | null; cursorMs: number | null }) {
   const { t } = useTranslation();
+  const ct = useChartTheme();
   if (!replay) return <div style={{ fontSize: 12, opacity: 0.6 }}>{t("air.signal.unavailable")}</div>;
 
   const cfg: AsicConfigPayload = replay.asic_config;
@@ -26,18 +27,18 @@ export function AirSignalChart({ replay, cursorMs }: { replay: ReplayPayload | n
     }));
 
   const option = {
-    ...chartBase,
+    ...ct.chartBase,
     animation: false,
-    legend: { ...chartBase.legend, data: [t("air.signal.truth"), t("air.signal.noisy"), t("air.signal.baseline")] },
+    legend: { ...ct.chartBase.legend, data: [t("air.signal.truth"), t("air.signal.noisy"), t("air.signal.baseline")] },
     grid: [{ left: 50, right: 16, top: 30, height: "55%" }, { left: 50, right: 16, top: "72%", height: "20%" }],
     xAxis: [
       // Dense category axes: hairline spine only — no splitLines, no ticks,
       // labels only on the bottom grid (mono ms readouts).
-      { type: "category", data: tms, gridIndex: 0, ...chartAxis({ axisLabel: { show: false }, splitLine: { show: false } }) },
-      { type: "category", data: tms, gridIndex: 1, name: "t [ms]", nameLocation: "middle", nameGap: 22, ...chartAxis({ splitLine: { show: false } }) },
+      { type: "category", data: tms, gridIndex: 0, ...ct.chartAxis({ axisLabel: { show: false }, splitLine: { show: false } }) },
+      { type: "category", data: tms, gridIndex: 1, name: "t [ms]", nameLocation: "middle", nameGap: 22, ...ct.chartAxis({ splitLine: { show: false } }) },
     ],
     yAxis: [
-      { type: "value", name: "counts", gridIndex: 0, ...chartAxis() },
+      { type: "value", name: "counts", gridIndex: 0, ...ct.chartAxis() },
       { type: "value", min: 0, max: 2, show: false, gridIndex: 1 },
     ],
     dataZoom: [{ type: "inside", xAxisIndex: [0, 1] }],
@@ -80,7 +81,7 @@ export function AirSignalChart({ replay, cursorMs }: { replay: ReplayPayload | n
         lineStyle: { color: "#a78bfa", width: 1, type: "dashed" as const },
         markLine:
           cursorMs != null
-            ? { symbol: "none", data: [{ xAxis: cursorMs, lineStyle: { color: "#f8fafc" } }, { xAxis: cursorMs, xAxisIndex: 1, lineStyle: { color: "#f8fafc" } }] }
+            ? { symbol: "none", data: [{ xAxis: cursorMs, lineStyle: { color: ct.bright } }, { xAxis: cursorMs, xAxisIndex: 1, lineStyle: { color: ct.bright } }] }
             : undefined,
       },
       { name: "truth", type: "scatter", xAxisIndex: 1, yAxisIndex: 1, data: stateStrip("truth", 1.0), symbolSize: 8, tooltip: { show: false } },

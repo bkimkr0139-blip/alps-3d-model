@@ -8,7 +8,7 @@ import { api, type CorrelationRecord, type GapAnalysisDto, type Measurement, typ
 // app/correlation.py CURVE_FAMILIES — keep the three tables in sync).
 import { CURVE_FAMILIES, parseCurveMetric, predictedCurve, type CurveFamily } from "../lib/curve";
 import { seedTr } from "../lib/seedL10n";
-import { chartAxis, chartBase, traceGlow } from "../ui/chartTheme";
+import { useChartTheme, traceGlow } from "../ui/chartTheme";
 
 /** Residual-cause candidates (§AI-05 lite): read-only view over the stored
  * correlation's residuals. Output is explicitly "check required" hints —
@@ -18,6 +18,7 @@ function GapSection({ correlationId }: { correlationId: string }) {
   // candidate title/detail are composed backend f-strings (correlation insights).
   const tr = (s: string) => seedTr(s, i18n.resolvedLanguage);
   const [gap, setGap] = useState<GapAnalysisDto | null>(null);
+  const ct = useChartTheme();
 
   useEffect(() => {
     api.gapAnalysis(correlationId).then(setGap);
@@ -25,15 +26,15 @@ function GapSection({ correlationId }: { correlationId: string }) {
 
   if (!gap) return null;
   const option = {
-    ...chartBase,
+    ...ct.chartBase,
     grid: { left: 46, right: 12, top: 18, bottom: 24 },
-    xAxis: { type: "value", name: gap.stats.x_unit, ...chartAxis() },
+    xAxis: { type: "value", name: gap.stats.x_unit, ...ct.chartAxis() },
     yAxis: {
       type: "value",
       name: "Δ",
-      ...chartAxis(),
+      ...ct.chartAxis(),
     },
-    tooltip: { ...chartBase.tooltip, trigger: "axis" },
+    tooltip: { ...ct.chartBase.tooltip, trigger: "axis" },
     series: [
       {
         type: "line",
@@ -47,7 +48,7 @@ function GapSection({ correlationId }: { correlationId: string }) {
   };
 
   return (
-    <div style={{ marginTop: 12, borderTop: "1px solid #1e293b", paddingTop: 8 }}>
+    <div style={{ marginTop: 12, borderTop: "1px solid var(--alps-border-base)", paddingTop: 8 }}>
       <h4 style={{ margin: "0 0 4px", fontSize: 12.5 }}>{t("gap.title")}</h4>
       <div style={{ fontSize: 11.5, opacity: 0.7, marginBottom: 4 }}>
         {t("gap.stats", {
@@ -65,7 +66,7 @@ function GapSection({ correlationId }: { correlationId: string }) {
             <div
               key={i}
               style={{
-                background: "#0b1220",
+                background: "var(--alps-bg-card)",
                 borderLeft: "3px solid #fbbf24",
                 borderRadius: 6,
                 padding: "5px 8px",
@@ -99,6 +100,7 @@ export function TestCorrelationPanel({ mechRun }: { mechRun: SimulationRun | nul
   const { t } = useTranslation();
   const [correlation, setCorrelation] = useState<CorrelationRecord | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const ct = useChartTheme();
 
   useEffect(() => {
     if (!mechRun || mechRun.status !== "succeeded") return;
@@ -125,11 +127,11 @@ export function TestCorrelationPanel({ mechRun }: { mechRun: SimulationRun | nul
   const errorUnit = family.errorUnit;
 
   const option = {
-    ...chartBase,
-    legend: { ...chartBase.legend, data: [t("correlation.legendPredicted"), t("correlation.legendMeasured")] },
+    ...ct.chartBase,
+    legend: { ...ct.chartBase.legend, data: [t("correlation.legendPredicted"), t("correlation.legendMeasured")] },
     grid: { left: 55, right: 20, top: 40, bottom: 40 },
-    xAxis: { type: "value", name: t(family.xAxis), nameLocation: "middle", nameGap: 28, ...chartAxis() },
-    yAxis: { type: "value", name: t(family.yAxis), ...chartAxis() },
+    xAxis: { type: "value", name: t(family.xAxis), nameLocation: "middle", nameGap: 28, ...ct.chartAxis() },
+    yAxis: { type: "value", name: t(family.yAxis), ...ct.chartAxis() },
     series: [
       // Model vs measurement: the model trace glows in signal cyan, measured
       // points sit on top as amber markers (color = signal, ISA-101).

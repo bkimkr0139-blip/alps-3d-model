@@ -11,7 +11,7 @@ import { stressHsl, stressOf } from "../lib/stress";
 import { useTwinStore } from "../store";
 import { TwinControls } from "./TwinControls";
 import { HudChip, btn } from "../ui/kit";
-import { accent, bg, border, status as S, text as T } from "../ui/tokens";
+import { accent, rawAccent, bg, border, status as S, text as T } from "../ui/tokens";
 
 // GLB node name → digital-twin part kind. Drives both actuation (which meshes
 // move when the switch is pressed) and the stress overlay (which meshes tint
@@ -785,13 +785,13 @@ export function ThreeViewer({ components, controlsTop = 10 }: { components: Comp
         {measure.a && (
           <mesh position={measure.a}>
             <sphereGeometry args={[pinScale, 12, 12]} />
-            <meshBasicMaterial color={accent.kpi} />
+            <meshBasicMaterial color={rawAccent.kpi} />
           </mesh>
         )}
         {measure.b && (
           <mesh position={measure.b}>
             <sphereGeometry args={[pinScale, 12, 12]} />
-            <meshBasicMaterial color={accent.kpi} />
+            <meshBasicMaterial color={rawAccent.kpi} />
           </mesh>
         )}
         {annotations.map((a) => (

@@ -33,8 +33,8 @@ export function RequirementsPanel({
             padding: "8px 10px",
             borderRadius: 6,
             cursor: "pointer",
-            border: r.id === selectedId ? "2px solid #ff6b35" : "1px solid #334155",
-            background: r.id === selectedId ? "#1e293b" : "transparent",
+            border: r.id === selectedId ? "2px solid #ff6b35" : "1px solid var(--alps-border-strong)",
+            background: r.id === selectedId ? "var(--alps-border-base)" : "transparent",
           }}
         >
           <div style={{ fontSize: 12, opacity: 0.7 }}>{r.business_id}</div>

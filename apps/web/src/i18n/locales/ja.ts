@@ -4,6 +4,8 @@ const ja: Resources = {
   app: {
     title: "ALPS ALPINE エンジニアリングツイン ワークベンチ",
     logout: "ログアウト",
+    toLight: "ライトモードに切替",
+    toDark: "ダークモードに切替",
     signingIn: "サインイン中…",
     language: "言語",
   },

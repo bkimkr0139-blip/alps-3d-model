@@ -12,7 +12,7 @@ export function SimulationPanel({ runs }: { runs: SimulationRun[] }) {
       <h3 style={{ margin: 0 }}>{t("panels.simulation")}</h3>
       {runs.length === 0 && <div style={{ opacity: 0.6 }}>{t("simulation.empty")}</div>}
       {runs.map((run) => (
-        <div key={run.id} style={{ border: "1px solid #334155", borderRadius: 6, padding: 10 }}>
+        <div key={run.id} style={{ border: "1px solid var(--alps-border-strong)", borderRadius: 6, padding: 10 }}>
           {/* §6.2: every result card must show tool/model version, status,
               executor and evidence — never a bare number. */}
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>

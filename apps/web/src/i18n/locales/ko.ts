@@ -4,6 +4,8 @@ const ko: Resources = {
   app: {
     title: "ALPS ALPINE 엔지니어링 트윈 워크벤치",
     logout: "로그아웃",
+    toLight: "밝은 모드로 전환",
+    toDark: "어두운 모드로 전환",
     signingIn: "로그인 중…",
     language: "언어",
   },

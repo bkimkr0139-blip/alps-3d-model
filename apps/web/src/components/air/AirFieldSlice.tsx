@@ -113,7 +113,7 @@ export function AirFieldSlice({ field, pose }: { field: FieldGridPayload | null;
         ref={ref}
         width={picked.entry.slice.values.length}
         height={picked.entry.slice.values[0]?.length ?? 1}
-        style={{ width: "100%", imageRendering: "pixelated", borderRadius: 6, border: "1px solid #334155" }}
+        style={{ width: "100%", imageRendering: "pixelated", borderRadius: 6, border: "1px solid var(--alps-border-strong)" }}
       />
       <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
         {t("air.slice.solvedAt", { r: Math.hypot(p.x_mm, p.y_mm).toFixed(1), gap: p.gap_mm.toFixed(1) })}
