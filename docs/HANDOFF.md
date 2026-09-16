@@ -44,11 +44,23 @@ verify:seedl10n 101/0 + Playwright 헤드리스 CLEAN):
    SOIC/SOP/TSSOP(양측 gull-wing 리드)·LQFP(4측), 몸체 비례·인덱스 노치·
    pin1 점. 다이 레벨은 템플릿 고유 센서(MEMS 스택 vs GMR+coil) 유지.
    계보 문자열·섹션 칩이 모델링된 pkg를 표시.
+8. `1d57f6f` **패키지 내부 구조 산업 표준 정합**(사용자 지시 — 분해도/mold-off
+   에서 핀이 칩·센서 위에 뿌려진다는 보고) — 3결함 수정: (a) 본드 맵 재작성 —
+   핑거가 다이 주변 무어트에 링을 이루고 와이어는 같은 변의 다이 패드↔핑거
+   1:1 부채꼴(QFN은 z/x 행 교차 vs S/N 패드 순서라 와이어 절반이 다이를
+   가로질렀고, LGA는 랜드 그리드 좌표를 써서 핑거가 다이 위에 놓임), 패드는
+   와이어 수만큼만 렌더; (b) 센서 배치 — QFN/WLCSP는 MEMS를 다이 위 모놀리
+   식 적층, LGA는 별도 MEMS 다이+전용 패드 와이어본딩, 협소 SOIC/SOP/TSSOP는
+   GMR을 다이 위 공동집적(기존엔 다이 발찌와 겹쳐 파묻힘+공중 와이어); (c)
+   `explodeAnchors`(EdaScene 선택 필드)로 분해 레이어 케이크가 단면 순서
+   (PCB→solder→package→die→bond→sensor→mold→mark)로 분리. 검증:
+   pkg_internals_e2e(mold-off+explode 스크린샷 A/B/D)·pkg_e2e·eda_e2e CLEAN.
 
 **검증 스크립트**(`/tmp/alps-logs/`, 전부 PASS): cockpit_e2e(W2),
 proc_e2e/proc_mobile_e2e(W3), bench_e2e(W4), review_e2e(W5), w6_sweep(8탭
 ko + en/ja 스모크 + 390×844 모바일), pkg_e2e(템플릿 A~D × ⑤단계 캔버스+
-pkg 칩 + B OPT-2 → TSSOP-16 재표적).
+pkg 칩 + B OPT-2 → TSSOP-16 재표적), pkg_internals_e2e(⑤ mold-off+분해도
+0.45 스크린샷 A/B/D — 내부 구조 육안 검증용).
 
 **다음 세션(또는 사용자)이 할 일**:
 - **`git push`** (사용자 직접 실행 필요, 위 참조) + **웹 브라우저 검증** —
