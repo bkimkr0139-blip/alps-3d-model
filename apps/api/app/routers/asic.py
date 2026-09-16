@@ -25,8 +25,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.asic_gate_policy import evaluate_gate
+from app.asic_copilot import ENGINE_VERSION, proposal_diff, run_copilot
 from app.asic_report import LANGS as REPORT_LANGS, build_evidence_report
 from app.asic_signal import TOOL_VERSION, derive_seed, evaluate_chain
 from app.asic_testprog import (
@@ -44,7 +46,12 @@ from app.db import get_db
 from app.models.artifact import ArtifactKind, ArtifactVersion, ArtifactVersionStatus
 from app.models.artifact import Artifact
 from app.models.asic import (
+    AsicAssumption,
+    AsicAssumptionEvent,
+    AsicCopilotInteraction,
+    AsicDeviation,
     AsicEco,
+    AsicImpactScan,
     AsicPartner,
     CornerStudy,
     FaCase,
@@ -70,6 +77,7 @@ from app.models.asic import (
 )
 from app.models.base import utcnow
 from app.models.product import Variant
+from app.models.requirement import Requirement
 from app.schemas.asic import (
     AsicEcoAnalyzeRequest,
     AsicEcoCloseRequest,
@@ -123,6 +131,22 @@ from app.schemas.asic import (
     TradeStudyRead,
     WaferMapCreate,
     WaferMapRead,
+    # R3 EPIC I
+    AssumptionCreate,
+    AssumptionEventRead,
+    AssumptionRead,
+    AssumptionResolve,
+    AssumptionUpdate,
+    DeviationCreate,
+    DeviationDecision,
+    DeviationRead,
+    FindingDone,
+    ImpactScanRead,
+    TEMPLATE_IDS,
+    # R3 EPIC J
+    CopilotInteractionRead,
+    CopilotRun,
+    ProposalAccept,
 )
 from app.security import CurrentUser, require_role
 from app.storage import s3_client
@@ -136,6 +160,7 @@ CAN_QUAL = require_role("quality_engineer", "system_architect")
 CAN_FA = require_role("electrical_asic_engineer", "quality_engineer")
 CAN_ECO = require_role("system_architect", "electrical_asic_engineer", "quality_engineer")
 CAN_ECO_CLOSE = require_role("system_architect", "reviewer_approver")
+CAN_CE_DECIDE = require_role("system_architect", "reviewer_approver")  # 편차 결정 — 요청자와 독립
 # R2 EPIC B: 단가/NRE 열람은 사업·엔지니어링 역할로 제한 (수용기준 5).
 CAN_COST = require_role(
     "system_architect", "electrical_asic_engineer", "quality_engineer", "reviewer_approver"
@@ -2574,3 +2599,547 @@ def partner_portal_dashboard(
             QualityActionRead.model_validate(a).model_dump(mode="json") for a in actions
         ],
     }
+
+
+# ══ R3 EPIC I: Concurrent Engineering 제어판 ══════════════════════════════════
+
+_CE_KIND_ACTION = {
+    # 수용기준 2: 영향 목록은 재실행(rerun)·재검토(review) 상태로 자동 전환된다
+    "circuit": ("rerun", "회로 시뮬레이션(corner/MC·ToolRun) 재실행 필요"),
+    "layout": ("rerun", "레이아웃/P&R 도구 재실행 필요"),
+    "package": ("review", "패키지·조립 영향 재검토 필요"),
+    "test": ("review", "시험 프로그램·한계값 재검토 필요"),
+    "quote": ("review", "견적·납기 시나리오 갱신 필요"),
+}
+
+
+def _impact_findings(downstream: list[dict], assumption_bid: str) -> list[dict]:
+    findings = []
+    for d in downstream:
+        action, reason = _CE_KIND_ACTION.get(
+            d.get("kind", "review"), ("review", "영향 재검토 필요")
+        )
+        findings.append({
+            "kind": d.get("kind", "review"),
+            "ref": d.get("ref", ""),
+            "label": d.get("label", ""),
+            "action": action,
+            "status": "pending",
+            "reason": reason,
+        })
+    return findings
+
+
+def _open_scans(db: Session, assumption_id: uuid.UUID) -> list[AsicImpactScan]:
+    return (
+        db.query(AsicImpactScan)
+        .filter_by(assumption_id=assumption_id, status="open")
+        .all()
+    )
+
+
+@router.post("/assumptions", response_model=AssumptionRead, status_code=status.HTTP_201_CREATED)
+def create_assumption(
+    body: AssumptionCreate,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(CAN_DESIGN)],
+    correlation_id: Annotated[str, Depends(get_correlation_id)],
+    idempotency_key: Annotated[str | None, Depends(get_idempotency_key)],
+):
+    """EPIC I — 가정 등록. 등록 즉시 1차 영향 탐색이 생성된다(재실행·재검토
+    상태로 시작 — 수용기준 2). 요구사항과 연결하면 ASSUMPTION_BASED로 추적된다."""
+    if body.requirement_id is not None and db.get(Requirement, body.requirement_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "requirement not found")
+    if body.variant_id is not None and db.get(Variant, body.variant_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "variant not found")
+
+    def compute() -> tuple[int, dict]:
+        a = AsicAssumption(
+            business_id=body.business_id,
+            template_id=body.template_id,
+            variant_id=body.variant_id,
+            requirement_id=body.requirement_id,
+            title=body.title,
+            detail=body.detail,
+            risk=body.risk,
+            confidence=body.confidence,
+            owner=body.owner,
+            due_at=body.due_at,
+            downstream=[d.model_dump() for d in body.downstream],
+            note=body.note,
+            created_by=user.username,
+        )
+        db.add(a)
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            return _conflict({"detail": f"business_id '{body.business_id}' already exists"})
+        db.add(AsicAssumptionEvent(
+            business_id=f"{a.business_id}-EV-CREATED-{uuid.uuid4().hex[:8]}",
+            assumption_id=a.id, kind="created", payload={"risk": a.risk, "confidence": a.confidence},
+            created_by=user.username,
+        ))
+        scan = AsicImpactScan(
+            business_id=f"{a.business_id}-SCAN-{uuid.uuid4().hex[:8]}",
+            assumption_id=a.id, trigger="created",
+            findings=_impact_findings(a.downstream, a.business_id),
+            created_by=user.username,
+        )
+        db.add(scan)
+        record_audit(db, user=user, action="create", entity_type="asic_assumption",
+                     entity_id=a.id, correlation_id=correlation_id,
+                     payload={"business_id": a.business_id, "risk": a.risk})
+        resp = AssumptionRead.model_validate(a).model_dump(mode="json")
+        resp["initial_scan_id"] = str(scan.id)
+        return status.HTTP_201_CREATED, resp
+
+    result = idempotent_write(
+        db, request=request, idempotency_key=idempotency_key, user=user, compute=compute
+    )
+    db.commit()
+    return result
+
+
+@router.get("/templates/{template_id}/assumptions", response_model=list[AssumptionRead])
+def list_assumptions(template_id: str, db: Annotated[Session, Depends(get_db)]):
+    return db.query(AsicAssumption).filter_by(template_id=template_id).order_by(
+        AsicAssumption.created_at.desc()
+    ).all()
+
+
+@router.get("/assumptions/{assumption_id}/events", response_model=list[AssumptionEventRead])
+def list_assumption_events(assumption_id: uuid.UUID, db: Annotated[Session, Depends(get_db)]):
+    a = db.get(AsicAssumption, assumption_id)
+    if a is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "assumption not found")
+    return (
+        db.query(AsicAssumptionEvent)
+        .filter_by(assumption_id=assumption_id)
+        .order_by(AsicAssumptionEvent.created_at.asc())
+        .all()
+    )
+
+
+@router.get("/assumptions/{assumption_id}/impact-scans", response_model=list[ImpactScanRead])
+def list_assumption_scans(assumption_id: uuid.UUID, db: Annotated[Session, Depends(get_db)]):
+    a = db.get(AsicAssumption, assumption_id)
+    if a is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "assumption not found")
+    return (
+        db.query(AsicImpactScan)
+        .filter_by(assumption_id=assumption_id)
+        .order_by(AsicImpactScan.created_at.desc())
+        .all()
+    )
+
+
+@router.patch("/assumptions/{assumption_id}", response_model=AssumptionRead)
+def update_assumption(
+    assumption_id: uuid.UUID,
+    body: AssumptionUpdate,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(CAN_DESIGN)],
+    correlation_id: Annotated[str, Depends(get_correlation_id)],
+    idempotency_key: Annotated[str | None, Depends(get_idempotency_key)],
+):
+    """EPIC I — 가정 변경. 내용(title/detail)·신뢰도·리스크·downstream이 바뀌면
+    변경 장부(append-only)와 새 영향 탐색이 자동 생성된다 — 영향 목록이
+    재실행·재검토 상태로 자동 전환(수용기준 2)."""
+    a = db.get(AsicAssumption, assumption_id)
+    if a is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "assumption not found")
+    if a.status != "open":
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f"closed assumption cannot be edited (status={a.status})")
+    fields = ("title", "detail", "risk", "confidence", "owner", "due_at", "downstream", "note")
+    changes = {f: getattr(body, f) for f in fields if getattr(body, f) is not None}
+    if not changes:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "no fields to update")
+
+    def compute() -> tuple[int, dict]:
+        old: dict = {}
+        for f, new in changes.items():
+            old[f] = getattr(a, f)
+            if f == "downstream":
+                setattr(a, f, [d.model_dump() for d in new])
+            else:
+                setattr(a, f, new)
+        db.add(AsicAssumptionEvent(
+            business_id=f"{a.business_id}-EV-{uuid.uuid4().hex[:8]}",
+            assumption_id=a.id, kind="field_changed",
+            payload={f: {"old": str(old[f]), "new": str(changes[f])} for f in changes},
+            created_by=user.username,
+        ))
+        content_changed = any(f in changes for f in
+                              ("title", "detail", "risk", "confidence", "downstream"))
+        scan_id = None
+        if content_changed:
+            scan = AsicImpactScan(
+                business_id=f"{a.business_id}-SCAN-{uuid.uuid4().hex[:8]}",
+                assumption_id=a.id, trigger="assumption_changed",
+                findings=_impact_findings(a.downstream, a.business_id),
+                created_by=user.username,
+            )
+            db.add(scan)
+            scan_id = scan.id
+        record_audit(db, user=user, action="update", entity_type="asic_assumption",
+                     entity_id=a.id, correlation_id=correlation_id,
+                     payload={"changed": sorted(changes)})
+        resp = AssumptionRead.model_validate(a).model_dump(mode="json")
+        resp["impact_scan_id"] = str(scan_id) if scan_id else None
+        return status.HTTP_200_OK, resp
+
+    result = idempotent_write(
+        db, request=request, idempotency_key=idempotency_key, user=user, compute=compute
+    )
+    db.commit()
+    return result
+
+
+@router.post("/assumptions/{assumption_id}/resolve", response_model=AssumptionRead)
+def resolve_assumption(
+    assumption_id: uuid.UUID,
+    body: AssumptionResolve,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(CAN_DESIGN)],
+    correlation_id: Annotated[str, Depends(get_correlation_id)],
+    idempotency_key: Annotated[str | None, Depends(get_idempotency_key)],
+):
+    """가정 해결/무효화. 열린 영향 탐색이 남아 있으면 거부한다 — 재실행·재검토가
+    끝나기 전에 가정이 조용히 닫히는 것을 막는다 (수용기준 2의 강제)."""
+    a = db.get(AsicAssumption, assumption_id)
+    if a is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "assumption not found")
+    if a.status != "open":
+        raise HTTPException(status.HTTP_409_CONFLICT, f"assumption already {a.status}")
+    open_scans = _open_scans(db, assumption_id)
+    if open_scans:
+        raise HTTPException(
+            status.HTTP_412_PRECONDITION_FAILED,
+            {"detail": "열린 영향 탐색이 있습니다 — findings를 완료하고 탐색을 clear한 뒤 해결하세요.",
+             "open_scans": [s.business_id for s in open_scans]},
+        )
+
+    def compute() -> tuple[int, dict]:
+        a.status = body.decision
+        a.resolved_evidence = body.evidence
+        a.resolved_at = utcnow()
+        db.add(AsicAssumptionEvent(
+            business_id=f"{a.business_id}-EV-{uuid.uuid4().hex[:8]}",
+            assumption_id=a.id, kind=body.decision,
+            payload={"evidence": body.evidence, "note": body.note},
+            created_by=user.username,
+        ))
+        record_audit(db, user=user, action=body.decision, entity_type="asic_assumption",
+                     entity_id=a.id, correlation_id=correlation_id, payload={})
+        return status.HTTP_200_OK, AssumptionRead.model_validate(a).model_dump(mode="json")
+
+    result = idempotent_write(
+        db, request=request, idempotency_key=idempotency_key, user=user, compute=compute
+    )
+    db.commit()
+    return result
+
+
+@router.post("/impact-scans/{scan_id}/findings/done", response_model=ImpactScanRead)
+def complete_finding(
+    scan_id: uuid.UUID,
+    body: FindingDone,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(CAN_DESIGN)],
+    correlation_id: Annotated[str, Depends(get_correlation_id)],
+    idempotency_key: Annotated[str | None, Depends(get_idempotency_key)],
+):
+    """영향 항목 하나를 완료 처리 (재실행·재검토가 실제로 끝났을 때 사람이 표시)."""
+    scan = db.get(AsicImpactScan, scan_id)
+    if scan is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "impact scan not found")
+    if scan.status != "open":
+        raise HTTPException(status.HTTP_409_CONFLICT, "scan already cleared")
+    target = next((f for f in scan.findings if f.get("ref") == body.ref), None)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"finding ref '{body.ref}' not in scan")
+
+    def compute() -> tuple[int, dict]:
+        target["status"] = "done"
+        if body.note:
+            target["done_note"] = body.note
+        flag_modified(scan, "findings")
+        record_audit(db, user=user, action="update", entity_type="asic_impact_scan",
+                     entity_id=scan.id, correlation_id=correlation_id,
+                     payload={"ref": body.ref, "status": "done"})
+        return status.HTTP_200_OK, ImpactScanRead.model_validate(scan).model_dump(mode="json")
+
+    result = idempotent_write(
+        db, request=request, idempotency_key=idempotency_key, user=user, compute=compute
+    )
+    db.commit()
+    return result
+
+
+@router.post("/impact-scans/{scan_id}/clear", response_model=ImpactScanRead)
+def clear_scan(
+    scan_id: uuid.UUID,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(CAN_DESIGN)],
+    correlation_id: Annotated[str, Depends(get_correlation_id)],
+    idempotency_key: Annotated[str | None, Depends(get_idempotency_key)],
+):
+    scan = db.get(AsicImpactScan, scan_id)
+    if scan is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "impact scan not found")
+    if scan.status != "open":
+        raise HTTPException(status.HTTP_409_CONFLICT, "scan already cleared")
+    pending = [f.get("ref") for f in scan.findings if f.get("status") != "done"]
+    if pending:
+        raise HTTPException(status.HTTP_412_PRECONDITION_FAILED,
+                            {"detail": "완료되지 않은 findings가 있습니다", "pending": pending})
+
+    def compute() -> tuple[int, dict]:
+        scan.status = "cleared"
+        record_audit(db, user=user, action="update", entity_type="asic_impact_scan",
+                     entity_id=scan.id, correlation_id=correlation_id,
+                     payload={"status": "cleared"})
+        return status.HTTP_200_OK, ImpactScanRead.model_validate(scan).model_dump(mode="json")
+
+    result = idempotent_write(
+        db, request=request, idempotency_key=idempotency_key, user=user, compute=compute
+    )
+    db.commit()
+    return result
+
+
+@router.post("/deviations", response_model=DeviationRead, status_code=status.HTTP_201_CREATED)
+def create_deviation(
+    body: DeviationCreate,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(CAN_DESIGN)],
+    correlation_id: Annotated[str, Depends(get_correlation_id)],
+    idempotency_key: Annotated[str | None, Depends(get_idempotency_key)],
+):
+    """EPIC I — CS 단축/변형으로 생략·병행한 활동의 편차 문서 (수용기준 3:
+    숨기지 않고 승인된 편차로 남긴다). 승인은 요청자와 다른 사람이 한다."""
+
+    def compute() -> tuple[int, dict]:
+        d = AsicDeviation(
+            business_id=body.business_id,
+            template_id=body.template_id,
+            skipped=[s.model_dump() for s in body.skipped],
+            rationale=body.rationale,
+            residual_risk=body.residual_risk,
+            requested_by=user.username,
+            note=body.note,
+            created_by=user.username,
+        )
+        db.add(d)
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            return _conflict({"detail": f"business_id '{body.business_id}' already exists"})
+        record_audit(db, user=user, action="create", entity_type="asic_deviation",
+                     entity_id=d.id, correlation_id=correlation_id,
+                     payload={"business_id": d.business_id})
+        return status.HTTP_201_CREATED, DeviationRead.model_validate(d).model_dump(mode="json")
+
+    result = idempotent_write(
+        db, request=request, idempotency_key=idempotency_key, user=user, compute=compute
+    )
+    db.commit()
+    return result
+
+
+@router.get("/templates/{template_id}/deviations", response_model=list[DeviationRead])
+def list_deviations(template_id: str, db: Annotated[Session, Depends(get_db)]):
+    return db.query(AsicDeviation).filter_by(template_id=template_id).order_by(
+        AsicDeviation.created_at.desc()
+    ).all()
+
+
+@router.post("/deviations/{deviation_id}/decide", response_model=DeviationRead)
+def decide_deviation(
+    deviation_id: uuid.UUID,
+    body: DeviationDecision,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(CAN_CE_DECIDE)],
+    correlation_id: Annotated[str, Depends(get_correlation_id)],
+    idempotency_key: Annotated[str | None, Depends(get_idempotency_key)],
+):
+    """편차 승인/기각 — 독립성 규칙(FA/CAPA와 동일): 요청자 ≠ 결정자."""
+    d = db.get(AsicDeviation, deviation_id)
+    if d is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "deviation not found")
+    if d.status != "submitted":
+        raise HTTPException(status.HTTP_409_CONFLICT, f"deviation already {d.status}")
+    if d.requested_by == user.username:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "독립성 규칙: 편차 요청자는 본인의 편차를 승인할 수 없습니다",
+        )
+
+    def compute() -> tuple[int, dict]:
+        d.status = body.decision
+        d.decided_by = user.username
+        d.decided_at = utcnow()
+        if body.note:
+            d.note = body.note
+        record_audit(db, user=user, action=body.decision, entity_type="asic_deviation",
+                     entity_id=d.id, correlation_id=correlation_id, payload={})
+        return status.HTTP_200_OK, DeviationRead.model_validate(d).model_dump(mode="json")
+
+    result = idempotent_write(
+        db, request=request, idempotency_key=idempotency_key, user=user, compute=compute
+    )
+    db.commit()
+    return result
+
+
+# ══ R3 EPIC J: 근거 중심 AI Engineering Copilot ═══════════════════════════════
+
+CAN_COPILOT = require_role(
+    "system_architect", "electrical_asic_engineer", "quality_engineer", "test_emc_engineer"
+)
+
+
+@router.post("/copilot/{template_id}/run", response_model=CopilotInteractionRead,
+             status_code=status.HTTP_201_CREATED)
+def run_copilot_usecase(
+    template_id: str,
+    body: CopilotRun,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(CAN_COPILOT)],
+    correlation_id: Annotated[str, Depends(get_correlation_id)],
+    idempotency_key: Annotated[str | None, Depends(get_idempotency_key)],
+):
+    """EPIC J — 유스케이스 실행. 결과는 감사 재현 메타데이터(input_hash·engine
+    version)와 함께 상호작록으로 남는다. copilot은 gate/evidence 테이블에
+    절대 쓰지 않으므로 근거 링크 없는 제안이 증적이 되는 경로가 없다."""
+    if template_id not in TEMPLATE_IDS:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown template '{template_id}'")
+    fa_case = None
+    if body.fa_case_id is not None:
+        fa_case = db.get(FaCase, body.fa_case_id)
+        if fa_case is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "fa_case not found")
+
+    def compute() -> tuple[int, dict]:
+        result, snapshot, input_hash, proposals = run_copilot(
+            db, template_id, body.usecase, text=body.text, fa_case=fa_case
+        )
+        interaction = AsicCopilotInteraction(
+            business_id=f"COPL-{template_id[:3].upper()}-{body.usecase[:8].upper()}-{uuid.uuid4().hex[:8]}",
+            template_id=template_id,
+            usecase=body.usecase,
+            input_snapshot=snapshot,
+            input_hash=input_hash,
+            result=result,
+            engine_version=ENGINE_VERSION,
+            accepted_proposals=[],
+            created_by=user.username,
+        )
+        db.add(interaction)
+        db.flush()
+        record_audit(db, user=user, action="create", entity_type="asic_copilot_interaction",
+                     entity_id=interaction.id, correlation_id=correlation_id,
+                     payload={"usecase": body.usecase, "abstain": result.get("abstain")})
+        return status.HTTP_201_CREATED, CopilotInteractionRead.model_validate(
+            interaction
+        ).model_dump(mode="json")
+
+    result = idempotent_write(
+        db, request=request, idempotency_key=idempotency_key, user=user, compute=compute
+    )
+    db.commit()
+    return result
+
+
+@router.get("/templates/{template_id}/copilot", response_model=list[CopilotInteractionRead])
+def list_copilot_interactions(template_id: str, db: Annotated[Session, Depends(get_db)]):
+    return (
+        db.query(AsicCopilotInteraction)
+        .filter_by(template_id=template_id)
+        .order_by(AsicCopilotInteraction.created_at.desc())
+        .limit(50)
+        .all()
+    )
+
+
+@router.get("/copilot/interactions/{interaction_id}/proposals/{pid}/diff")
+def proposal_diff_text(
+    interaction_id: uuid.UUID,
+    pid: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(CAN_COPILOT)],
+):
+    """수용기준 2 — UI는 이 diff 문자열을 그대로 보여주고, 수락 시 그 sha256을
+    돌려보낸다. 서버가 재계산해 대조하므로 '사용자가 본 것'과 '검증 대상'이
+    항상 같은 바이트다."""
+    it = db.get(AsicCopilotInteraction, interaction_id)
+    if it is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "interaction not found")
+    prop = next((p for p in (it.result or {}).get("proposals", []) if p.get("pid") == pid), None)
+    if prop is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"proposal '{pid}' not found")
+    diff = proposal_diff(prop.get("diff_base") or "", prop.get("text", ""))
+    return {"pid": pid, "diff": diff, "sha256": hashlib.sha256(diff.encode()).hexdigest()}
+
+
+@router.post("/copilot/interactions/{interaction_id}/proposals/accept",
+             response_model=CopilotInteractionRead)
+def accept_copilot_proposal(
+    interaction_id: uuid.UUID,
+    body: ProposalAccept,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(CAN_DESIGN)],
+    correlation_id: Annotated[str, Depends(get_correlation_id)],
+    idempotency_key: Annotated[str | None, Depends(get_idempotency_key)],
+):
+    """제안 수락 기록 — diff 해시 대조가 강제된다. 수락은 '기록'일 뿐 실제
+    적용(요구사항 등록, FA 가설 채택, 시험 변경)은 도메인 엔드포인트에서
+    인간이 수행한다 (AI가 승인자가 아님)."""
+    it = db.get(AsicCopilotInteraction, interaction_id)
+    if it is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "interaction not found")
+    prop = next((p for p in (it.result or {}).get("proposals", []) if p.get("pid") == body.pid), None)
+    if prop is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"proposal '{body.pid}' not found")
+    if any(a.get("pid") == body.pid for a in it.accepted_proposals):
+        raise HTTPException(status.HTTP_409_CONFLICT, "proposal already accepted")
+    expected = hashlib.sha256(
+        proposal_diff(prop.get("diff_base") or "", prop.get("text", "")).encode()
+    ).hexdigest()
+    if body.diff_sha256 != expected:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "diff 해시가 일치하지 않습니다 — 원문 대비 diff를 확인한 뒤 다시 수락하세요 (수용기준 2)",
+        )
+
+    def compute() -> tuple[int, dict]:
+        it.accepted_proposals = list(it.accepted_proposals) + [{
+            "pid": body.pid,
+            "accepted_by": user.username,
+            "accepted_at": utcnow().isoformat(),
+            "diff_sha256": body.diff_sha256,
+            "kind": prop.get("kind"),
+        }]
+        flag_modified(it, "accepted_proposals")
+        record_audit(db, user=user, action="update",
+                     entity_type="asic_copilot_interaction", entity_id=it.id,
+                     correlation_id=correlation_id, payload={"accepted": body.pid})
+        return status.HTTP_200_OK, CopilotInteractionRead.model_validate(it).model_dump(mode="json")
+
+    result = idempotent_write(
+        db, request=request, idempotency_key=idempotency_key, user=user, compute=compute
+    )
+    db.commit()
+    return result

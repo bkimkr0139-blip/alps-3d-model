@@ -986,3 +986,223 @@ class QualityActionRead(BaseModel):
 
 class QualityActionClose(BaseModel):
     note: str | None = None
+
+
+# ── R3 EPIC I: concurrent-engineering control panel ──────────────────────────
+
+DownstreamKind = Literal["circuit", "layout", "package", "test", "quote"]
+
+
+class DownstreamRef(BaseModel):
+    """가정이 변경될 때 영향을 받는 대상 한 건 (§4 EPIC I 구현범위 3)."""
+
+    kind: DownstreamKind
+    ref: str = Field(min_length=1, max_length=128)
+    label: str = Field(min_length=1, max_length=255)
+
+
+class AssumptionCreate(BaseModel):
+    business_id: str = Field(min_length=3, max_length=64)
+    template_id: TemplateId
+    variant_id: uuid.UUID | None = None
+    requirement_id: uuid.UUID | None = None
+    title: str = Field(min_length=3, max_length=255)
+    detail: str = Field(min_length=1)
+    risk: Literal["low", "medium", "high"] = "medium"
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    owner: str = Field(min_length=1, max_length=255)
+    due_at: datetime | None = None
+    downstream: list[DownstreamRef] = Field(default_factory=list)
+    note: str | None = None
+
+
+class AssumptionUpdate(BaseModel):
+    """부분 수정 — 변경된 필드만 old/new로 장부에 남고, 내용·신뢰도·리스크가
+    바뀌면 영향 탐색이 자동 생성된다 (수용기준 2)."""
+
+    title: str | None = Field(default=None, min_length=3, max_length=255)
+    detail: str | None = None
+    risk: Literal["low", "medium", "high"] | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    owner: str | None = Field(default=None, max_length=255)
+    due_at: datetime | None = None
+    downstream: list[DownstreamRef] | None = None
+    note: str | None = None
+
+
+class AssumptionResolve(BaseModel):
+    decision: Literal["resolved", "invalidated"]
+    evidence: dict = Field(default_factory=dict)  # {ref, label, summary} 근거 링크
+    note: str | None = None
+
+
+class AssumptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    template_id: str
+    variant_id: uuid.UUID | None
+    requirement_id: uuid.UUID | None
+    title: str
+    detail: str
+    status: str
+    risk: str
+    confidence: float
+    owner: str
+    due_at: datetime | None
+    downstream: list[dict]
+    resolved_evidence: dict | None
+    resolved_at: datetime | None
+    note: str | None
+    created_by: str
+    created_at: datetime
+
+
+class AssumptionEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    assumption_id: uuid.UUID
+    kind: str
+    payload: dict
+    created_by: str
+    created_at: datetime
+
+
+class ImpactFindingRead(BaseModel):
+    kind: DownstreamKind
+    ref: str
+    label: str
+    action: Literal["rerun", "review"]
+    status: Literal["pending", "done"]
+    reason: str | None = None
+
+
+class ImpactScanRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    assumption_id: uuid.UUID
+    trigger: str
+    findings: list[dict]
+    status: str
+    note: str | None
+    created_by: str
+    created_at: datetime
+
+
+class FindingDone(BaseModel):
+    ref: str = Field(min_length=1, max_length=128)
+    note: str | None = None
+
+
+class SkippedRef(BaseModel):
+    """생략·병행된 활동 한 건 (§4 EPIC I 구현범위 5) — 활동은 스테이지로 읽는다."""
+
+    stage: str = Field(min_length=1, max_length=64)
+    ref: str = Field(min_length=1, max_length=128)
+    label: str = Field(min_length=1, max_length=255)
+
+
+class DeviationCreate(BaseModel):
+    business_id: str = Field(min_length=3, max_length=64)
+    template_id: TemplateId
+    skipped: list[SkippedRef] = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+    residual_risk: str = Field(min_length=1)
+    note: str | None = None
+
+
+class DeviationDecision(BaseModel):
+    decision: Literal["approved", "rejected"]
+    note: str | None = None
+
+
+class DeviationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    template_id: str
+    skipped: list[dict]
+    rationale: str
+    residual_risk: str
+    status: str
+    requested_by: str
+    decided_by: str | None
+    decided_at: datetime | None
+    note: str | None
+    created_by: str
+    created_at: datetime
+
+
+# ── R3 EPIC J: evidence-grounded AI copilot ─────────────────────────────────
+
+CopilotUsecase = Literal[
+    "req_draft",
+    "similar_fa",
+    "corner_sensitivity",
+    "wafer_anomaly",
+    "fa_hypothesis",
+    "test_efficiency",
+    "gate_gap",
+]
+
+
+class CopilotRun(BaseModel):
+    usecase: CopilotUsecase
+    text: str | None = Field(default=None, max_length=4000)  # req_draft/similar_fa 질의문
+    fa_case_id: uuid.UUID | None = None  # fa_hypothesis 대상
+
+
+class CopilotEvidence(BaseModel):
+    kind: str  # fa_case|corner_study|wafer_map|test_flow|gate_report|measurement_run|requirement
+    ref: str  # business_id 또는 gate-report/{template_id} 형태 링크
+    label: str
+
+
+class CopilotProposal(BaseModel):
+    pid: str
+    kind: str  # requirement_draft|fa_hypothesis|confirm_test|review_candidate
+    text: str
+    diff_base: str | None = None  # 원문(대상 문서) 대비 diff를 UI가 강제 표시
+    evidence: list[CopilotEvidence]
+
+
+class CopilotResult(BaseModel):
+    summary: str
+    facts: list[str] = Field(default_factory=list)
+    evidence: list[CopilotEvidence] = Field(default_factory=list)
+    proposals: list[CopilotProposal] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    abstain: bool = False
+    abstain_reason: str | None = None
+
+
+class CopilotInteractionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    business_id: str
+    template_id: str
+    usecase: str
+    input_snapshot: dict
+    input_hash: str
+    result: dict
+    engine_version: str
+    accepted_proposals: list[dict]
+    note: str | None
+    created_by: str
+    created_at: datetime
+
+
+class ProposalAccept(BaseModel):
+    """수용기준: 사용자가 AI 제안 수락 전 원문 대비 diff를 확인한다 —
+    `diff_sha256`은 UI가 표시한 diff 본문의 해시로, 서버가 재계산해 대조한다."""
+
+    pid: str
+    diff_sha256: str = Field(min_length=64, max_length=64)
+    note: str | None = None

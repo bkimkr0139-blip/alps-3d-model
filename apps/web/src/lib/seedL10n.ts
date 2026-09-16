@@ -802,6 +802,171 @@ const RULES: Rule[] = [
     en: (g) => `Cannot parse temperature_c '${g[0]}'`,
     ja: (g) => `temperature_c '${g[0]}' を解釈できません`,
   },
+  // ── R3: gate blockers (EPIC I) ──
+  {
+    re: /^미해결 고위험 가정 (\d+)건이 있습니다 — mask release가 차단됩니다 \(지시서 §4 EPIC I 수용기준 1\)\.$/,
+    en: (g) => `${g[0]} unresolved high-risk assumption(s) — mask release is blocked (spec §4 EPIC I acceptance 1).`,
+    ja: (g) => `未解決の高リスク仮定 ${g[0]}件 — マスクリリースがブロックされます (仕様書 §4 EPIC I 受入基準1)。`,
+  },
+  {
+    re: /^해결 기한이 지난 가정 (\d+)건이 있습니다\.$/,
+    en: (g) => `${g[0]} assumption(s) past their resolution due date.`,
+    ja: (g) => `解決期限を過ぎた仮定が ${g[0]}件あります。`,
+  },
+  // ── R3: copilot summaries ──
+  {
+    re: /^(\d+)개의 측정 가능 수량에서 요구사항·검증 초안 (\d+)건을 제안합니다 \(전부 DRAFT — 수락 전 diff 확인 필수\)\.$/,
+    en: (g) => `Proposing ${g[1]} requirement/verification draft(s) from ${g[0]} measurable quantities (all DRAFT — check the diff before accepting).`,
+    ja: (g) => `${g[0]}件の測定可能数量から要求・検証ドラフト${g[1]}件を提案します (すべてDRAFT — 受け入れ前にdiff確認必須)。`,
+  },
+  {
+    re: /^과거 FA (\d+)건 중 유사 상위 (\d+)건을 제시합니다 \(문자 2-gram Jaccard — 근거 링크로 직접 확인 요망\)\.$/,
+    en: (g) => `Top ${g[1]} similar of ${g[0]} past FA cases (char 2-gram Jaccard — verify via the evidence links).`,
+    ja: (g) => `過去FA ${g[0]}件のうち類似上位${g[1]}件を提示します (文字2-gram Jaccard — 根拠リンクで直接確認を推奨)。`,
+  },
+  {
+    re: /^최근 Corner\/MC (\d+)건의 출력별 분포를 규격 윈도 대비로 정리했습니다\. 스펙 민감도가 큰 출력부터 재검토하십시오 \(휴리스틱 신뢰도\)\.$/,
+    en: (g) => `Summarized per-output distributions of the latest ${g[0]} corner/MC studies against spec windows. Re-review outputs with the largest spec sensitivity first (heuristic confidence).`,
+    ja: (g) => `最新のCorner/MC ${g[0]}件の出力別分布を規格ウィンドウ比で整理しました。スペック感度の大きい出力から再検討してください (ヒューリスティック信頼度)。`,
+  },
+  {
+    re: /^wafer map (\d+)건에서 site·edge·underkill 패턴 이상이 발견되지 않았습니다\.$/,
+    en: (g) => `No site/edge/underkill pattern anomalies found across ${g[0]} wafer map(s).`,
+    ja: (g) => `ウェハマップ ${g[0]}件でsite・エッジ・underkillパターン異常は見つかりませんでした。`,
+  },
+  {
+    re: /^wafer map (\d+)건에서 이상 패턴 (\d+)건을 탐지했습니다 \(규칙: site 2× 편향, edge 2× 집중, underkill>0\)\.$/,
+    en: (g) => `Detected ${g[1]} anomaly pattern(s) across ${g[0]} wafer map(s) (rules: site 2× bias, edge 2× concentration, underkill>0).`,
+    ja: (g) => `ウェハマップ ${g[0]}件から異常パターン ${g[1]}件を検出しました (ルール: site 2× 偏向、エッジ 2× 集中、underkill>0)。`,
+  },
+  {
+    re: /^증상 텍스트에서 원인 계통 키워드 (\d+)개를 찾았습니다: (.+)\. 확인 시험 후보는 결함 커버리지가 맞는 기존 테스트 항목입니다\.$/,
+    en: (g) => `Found ${g[0]} cause-family keyword(s) in the symptom text: ${g[1].split(/,\s*/).map((x) => seedTr(x, "en")).join(", ")}. Confirm-test candidates are existing test items whose defect coverage matches.`,
+    ja: (g) => `症状テキストから原因系キーワード ${g[0]}個を見つけました: ${g[1].split(/,\s*/).map((x) => seedTr(x, "ja")).join("、")}。確認試験候補は欠陥カバレージが合う既存テスト項目です。`,
+  },
+  {
+    re: /^테스트 플로우 (\d+)건에서 검토 후보 (\d+)건을 찾았습니다\. 전부 review_only — 제거·변경은 인간의 supersede 절차로만 가능합니다\.$/,
+    en: (g) => `Found ${g[1]} review candidate(s) across ${g[0]} test flows. All review-only — removals/changes go through the human supersede procedure only.`,
+    ja: (g) => `テストフロー ${g[0]}件から検討候補 ${g[1]}件を見つけました。すべてreview_only — 削除・変更は人間のsupersede手順でのみ可能です。`,
+  },
+  {
+    re: /^게이트 블로커 (\d+)건 — readiness (.+)\. 블로커별 누락 증적은 facts와 근거 링크에 정리되어 있습니다\.$/,
+    en: (g) => `${g[0]} gate blocker(s) — readiness ${g[1]}. Per-blocker missing evidence is organized in the facts and evidence links.`,
+    ja: (g) => `ゲートブロッカー ${g[0]}件 — readiness ${g[1]}。ブロッカーごとの欠落エビデンスはfactsと根拠リンクに整理されています。`,
+  },
+  // ── R3: copilot facts ──
+  {
+    re: /^입력 문장에서 수량 ([\d.]+) (.+) 발견 \(검증방법 후보: (\w+)\)$/,
+    en: (g) => `Quantity ${g[0]} ${g[1]} found in the input sentence (candidate verification method: ${g[2]})`,
+    ja: (g) => `入力文から数量 ${g[0]} ${g[1]} を発見 (検証方法候補: ${g[2]})`,
+  },
+  {
+    re: /^검색 대상 FA 케이스 (\d+)건$/,
+    en: (g) => `${g[0]} FA case(s) searched`,
+    ja: (g) => `検索対象FAケース ${g[0]}件`,
+  },
+  {
+    re: /^(.+) · (.+): p99−p50=([\-\d.e+]+) \(스펙 윈도 대비 (\d+%)\), 위반률 ([\d.]+%)$/,
+    en: (g) => `${g[0]} · ${g[1]}: p99−p50=${g[2]} (${g[3]} of the spec window), violation ${g[4]}`,
+    ja: (g) => `${g[0]} · ${g[1]}: p99−p50=${g[2]} (規格ウィンドウ比 ${g[3]})、違反率 ${g[4]}`,
+  },
+  {
+    re: /^(.+) · (.+): p99−p50=([\-\d.e+]+) \(스펙 윈도 미정 — TBD\), 위반률 ([\d.]+%)$/,
+    en: (g) => `${g[0]} · ${g[1]}: p99−p50=${g[2]} (spec window unset — TBD), violation ${g[3]}`,
+    ja: (g) => `${g[0]} · ${g[1]}: p99−p50=${g[2]} (規格ウィンドウ未定 — TBD)、違反率 ${g[3]}`,
+  },
+  {
+    re: /^(.+): 모델 OOD 플래그 — (.+)\. 민감도 해석 전 OOD 검토 필요\.$/,
+    en: (g) => `${g[0]}: model OOD flag — ${g[1]}. OOD review required before interpreting sensitivity.`,
+    ja: (g) => `${g[0]}: モデルOODフラグ — ${g[1]}。感度解釈の前にOOD検討が必要。`,
+  },
+  {
+    re: /^(.+): site (\w+) 실패율 ([\d.]+)% — 중앙값의 2배 초과 \(site 편향 의심\)$/,
+    en: (g) => `${g[0]}: site ${g[1]} fail rate ${g[2]}% — over 2× the median (site bias suspected)`,
+    ja: (g) => `${g[0]}: site ${g[1]} 失敗率 ${g[2]}% — 中央値の2倍超過 (site偏向疑い)`,
+  },
+  {
+    re: /^(.+): edge band 실패율 ([\d.]+%) vs 내부 ([\d.]+%) — edge ring\/스크라이브 손상 패턴 의심$/,
+    en: (g) => `${g[0]}: edge-band fail rate ${g[1]} vs inner ${g[2]} — edge ring / scribe damage pattern suspected`,
+    ja: (g) => `${g[0]}: エッジバンド失敗率 ${g[1]} vs 内部 ${g[2]} — エッジリング・スクライブ損傷パターン疑い`,
+  },
+  {
+    re: /^(.+): underkill (\d+)다이 — 탈출 결함 \(ground_truth 대비, SYNTHETIC fixture\)$/,
+    en: (g) => `${g[0]}: underkill ${g[1]} dies — escaped defects (vs ground_truth, SYNTHETIC fixture)`,
+    ja: (g) => `${g[0]}: underkill ${g[1]}ダイ — 脱出欠陥 (ground_truth比、SYNTHETICフィクスチャ)`,
+  },
+  {
+    re: /^(.+): 수율 ([\d.]+)% · 재시험 ([\d.]+)% · 실패 ([\d.]+)%$/,
+    en: (g) => `${g[0]}: yield ${g[1]}% · retest ${g[2]}% · fail ${g[3]}%`,
+    ja: (g) => `${g[0]}: 歩留まり ${g[1]}% ・ 再試験 ${g[2]}% ・ 失敗 ${g[3]}%`,
+  },
+  {
+    re: /^(.+) · (.+): (\w+) — 항목 시간 ([\d.]+)s\/die 기준 — (.+)$/,
+    en: (g) => `${g[0]} · ${seedTr(g[1], "en")}: ${g[2]} — based on ${g[3]}s/die per item — ${seedTr(g[4], "en")}`,
+    ja: (g) => `${g[0]} · ${seedTr(g[1], "ja")}: ${g[2]} — 項目時間 ${g[3]}s/die 基準 — ${seedTr(g[4], "ja")}`,
+  },
+  {
+    re: /^(.+) · (.+): (\w+) — (.+)$/,
+    en: (g) => `${g[0]} · ${seedTr(g[1], "en")}: ${g[2]} — ${seedTr(g[3], "en")}`,
+    ja: (g) => `${g[0]} · ${seedTr(g[1], "ja")}: ${g[2]} — ${seedTr(g[3], "ja")}`,
+  },
+  {
+    re: /^플로우 (\d+)건 분석$/,
+    en: (g) => `Analyzed ${g[0]} flow(s)`,
+    ja: (g) => `フロー ${g[0]}件を分析`,
+  },
+  {
+    re: /^symptom: (.+)$/,
+    en: (g) => `symptom: ${g[0]}`,
+    ja: (g) => `症状: ${g[0]}`,
+  },
+  {
+    re: /^키워드 매치: (\w+) → (.+)$/,
+    en: (g) => `keyword match: ${g[0]} → ${seedTr(g[1], "en")}`,
+    ja: (g) => `キーワードマッチ: ${g[0]} → ${seedTr(g[1], "ja")}`,
+  },
+  // ── R3: copilot proposal texts ──
+  {
+    re: /^\[초안\] 측정값 ([\d.]+) (.+) 기준 요구사항 — 한계 방향 (\w+), 검증 방법 (\w+)\. 담당자가 값·방향·단위를 확정해야 한다\.$/,
+    en: (g) => `[draft] requirement based on ${g[0]} ${g[1]} — limit direction ${g[2]}, verification ${g[3]}. The owner must confirm value, direction and unit.`,
+    ja: (g) => `[ドラフト] 測定値 ${g[0]} ${g[1]} 基準の要求 — 限度方向 ${g[2]}、検証方法 ${g[3]}。担当者が値・方向・単位を確定すること。`,
+  },
+  {
+    re: /^\[검토안\] 유사사례 ([A-Za-z0-9\-]+)의 원인 분류\(([^)]*)\)를 현재 케이스의 가설 후보로 검토 — 인간 분석가가 채택\/기각한다\.$/,
+    en: (g) => `[review] review cause class (${g[1]}) of similar case ${g[0]} as a hypothesis candidate for the current case — a human analyst adopts or rejects.`,
+    ja: (g) => `[検討案] 類似事例 ${g[0]} の原因分類(${g[1]})を現在ケースの仮説候補として検討 — 人間のアナリストが採択/却下する。`,
+  },
+  {
+    re: /^\[검토안\] OOD 플래그가 있는 연구 (\d+)건 — 재검토 또는 학습 범위 확대 후 재실행 \(MODEL_OOD 게이트 블로커와 연동\)\.$/,
+    en: (g) => `[review] ${g[0]} study(ies) carry OOD flags — re-review or widen the training scope and rerun (linked to the MODEL_OOD gate blocker).`,
+    ja: (g) => `[検討案] OODフラグ付きスタディ ${g[0]}件 — 再検討または学習範囲拡大後に再実行 (MODEL_OODゲートブロッカーと連動)。`,
+  },
+  {
+    re: /^\[확인시험 후보\] ([A-Za-z0-9\-]+) #(\d+) (.+) — 결함 클래스 \[(.+)\] 커버 \(사람이 실행·판정\)\.$/,
+    en: (g) => `[confirm-test candidate] ${g[0]} #${g[1]} ${seedTr(g[2], "en")} — covers defect classes [${g[3]}] (executed and judged by a human).`,
+    ja: (g) => `[確認試験候補] ${g[0]} #${g[1]} ${seedTr(g[2], "ja")} — 欠陥クラス [${g[3]}] カバー (人間が実行・判定)。`,
+  },
+  {
+    re: /^\[가설 후보\] (.+) — 관찰 근거와 대조 후 분석가가 채택\/기각\. AI는 원인을 결론짓지 않는다\.$/,
+    en: (g) => `[hypothesis candidate] ${g[1].split(/,\s*/).map((x) => seedTr(x, "en")).join(", ") || g[0]} — the analyst adopts or rejects after comparing with observed evidence. The AI never concludes the cause.`,
+    ja: (g) => `[仮説候補] ${g[1].split(/,\s*/).map((x) => seedTr(x, "ja")).join("、") || g[0]} — 観察根拠と対比後にアナリストが採択/却下。AIは原因を結論づけない。`,
+  },
+  {
+    re: /^\[검토안\] ([A-Za-z0-9\-]+) · (.+?) — (.+) \(review_only: 자동 제거 없음\)$/,
+    en: (g) => `[review] ${g[0]} · ${seedTr(g[1], "en")} — ${seedTr(g[2], "en")} (review_only: nothing is auto-removed)`,
+    ja: (g) => `[検討案] ${g[0]} · ${seedTr(g[1], "ja")} — ${seedTr(g[2], "ja")} (review_only: 自動削除なし)`,
+  },
+  {
+    re: /^키워드 '(\w+)' → (.+)$/,
+    en: (g) => `keyword '${g[0]}' → ${seedTr(g[1], "en")}`,
+    ja: (g) => `キーワード '${g[0]}' → ${seedTr(g[1], "ja")}`,
+  },
+  // ── R3: gate-blocker fact bodies (generic "CODE: detail" — keep LAST) ──
+  {
+    re: /^([A-Z][A-Z0-9_]{2,}): (.+)$/,
+    en: (g) => `${g[0]}: ${seedTr(g[1], "en")}`,
+    ja: (g) => `${g[0]}: ${seedTr(g[1], "ja")}`,
+  },
 ];
 
 // ── ASIC R2 (seed_asic_r2 + asic_trade/asic_testprog + trade-study router) ──
@@ -968,6 +1133,252 @@ const EXACT_R2: Record<string, LStr> = {
 
 // merge into the EXACT table above (the spread keeps one lookup for seedTr)
 Object.assign(EXACT, EXACT_R2);
+
+// ── ASIC R3 (seed_asic_r3 + asic_copilot + gate/CE reasons) ─────────────────
+// (same merge pattern as EXACT_R2; RULES entries appended to the RULES array
+// further down — see R3_RULES merged right after)
+
+const EXACT_R3: Record<string, LStr> = {
+  // seed_asic_r3 — assumptions
+  "GMR 감도 온도 드리프트 ≤0.05 %/°C (공급사 데이터시트 미확증)": L(
+    "GMR 감도 온도 드리프트 ≤0.05 %/°C (공급사 데이터시트 미확증)",
+    "GMR sensitivity temperature drift ≤0.05 %/°C (supplier datasheet unconfirmed)",
+    "GMR感度温度ドリフト ≤0.05 %/°C (サプライヤーデータシート未確認)",
+  ),
+  "병행 설계 중인 AFE 온도 보정 계수는 이 가정에 의존한다. 공급사 확증 시료는 10월 도착 예정 — 확증 전까지 가정 상태로 추적.": L(
+    "병행 설계 중인 AFE 온도 보정 계수는 이 가정에 의존한다. 공급사 확증 시료는 10월 도착 예정 — 확증 전까지 가정 상태로 추적.",
+    "The AFE temperature compensation coefficients being designed in parallel depend on this assumption. Supplier confirmation samples arrive in October — tracked as an assumption until then.",
+    "並行設計中のAFE温度補正係数はこの仮定に依存する。サプライヤー確認サンプルは10月到着予定 — 確認まで仮定として追跡。",
+  ),
+  "신호체인 r2 온도 보정": L("신호체인 r2 온도 보정", "signal chain r2 temperature compensation", "信号チェーンr2温度補正"),
+  "양산 테스트 프로그램": L("양산 테스트 프로그램", "production test program", "量産テストプログラム"),
+  "사업성 시나리오": L("사업성 시나리오", "business case scenario", "事業性シナリオ"),
+  "QFN-32 몰딩 컴파운드 유리전이온도 210°C 가정": L(
+    "QFN-32 몰딩 컴파운드 유리전이온도 210°C 가정",
+    "QFN-32 molding compound glass-transition temperature assumed 210°C",
+    "QFN-32 モールディングコンパウンドガラス転移温度 210°C 仮定",
+  ),
+  "패키지 열해석 입력값 — 공급사 Tg 데이터시트 확증 대기.": L(
+    "패키지 열해석 입력값 — 공급사 Tg 데이터시트 확증 대기.",
+    "Package thermal-analysis input — awaiting supplier Tg datasheet confirmation.",
+    "パッケージ熱解析入力値 — サプライヤーTgデータシート確認待ち。",
+  ),
+  "패키지 열해석": L("패키지 열해석", "package thermal analysis", "パッケージ熱解析"),
+  "열해석 재검토 완료 — Tg 205°C 로 입력 갱신, 결과 유효": L(
+    "열해석 재검토 완료 — Tg 205°C 로 입력 갱신, 결과 유효",
+    "Thermal re-analysis done — input updated to Tg 205°C, results remain valid",
+    "熱解析再検討完了 — Tg 205°C に入力更新、結果は有効",
+  ),
+  "공급사 Tg 데이터시트 확증 (205°C)": L(
+    "공급사 Tg 데이터시트 확증 (205°C)",
+    "Supplier Tg datasheet confirmed (205°C)",
+    "サプライヤーTgデータシート確認 (205°C)",
+  ),
+  "가정 대비 -5°C — 열해석 결과 유효 범위 내": L(
+    "가정 대비 -5°C — 열해석 결과 유효 범위 내",
+    "-5°C vs the assumption — thermal results stay within the valid range",
+    "仮定比 -5°C — 熱解析結果は有効範囲内",
+  ),
+  // seed_asic_r3 — deviation
+  "ES 리그리션 전수 재실행": L("ES 리그리션 전수 재실행", "full ES regression rerun", "ESリグレッション全数再実行"),
+  "CS 일정 단축 — ES 리그리션을 CS 초기 결과로 대체 검증한다.": L(
+    "CS 일정 단축 — ES 리그리션을 CS 초기 결과로 대체 검증한다.",
+    "CS schedule compression — ES regression is substituted by early CS results as verification.",
+    "CS日程短縮 — ESリグレッションをCS初期結果で代替検証する。",
+  ),
+  "ES 회귀 없이 CS 진입 — CS 첫 2롯 fail률 1% 초과 시 ES 전수 재실행.": L(
+    "ES 회귀 없이 CS 진입 — CS 첫 2롯 fail률 1% 초과 시 ES 전수 재실행.",
+    "Entering CS without ES regression — if the first two CS lots exceed 1% fail rate, the full ES regression is rerun.",
+    "ESリグレッションなしでCSへ — CS最初の2ロットのfail率が1%超過ならES全数再実行。",
+  ),
+  "승인 조건: CS 첫 2롯 fail률 <1%.": L(
+    "승인 조건: CS 첫 2롯 fail률 <1%.",
+    "Approval condition: first two CS lots fail rate <1%.",
+    "承認条件: CS最初の2ロットfail率 <1%。",
+  ),
+  "잔여 위험 수용 — 조건부 승인 (demo.architect)": L(
+    "잔여 위험 수용 — 조건부 승인 (demo.architect)",
+    "Residual risk accepted — conditional approval (demo.architect)",
+    "残存リスク許容 — 条件付き承認 (demo.architect)",
+  ),
+  // EPIC I — impact scan reasons (routers/asic.py _CE_KIND_ACTION)
+  "회로 시뮬레이션(corner/MC·ToolRun) 재실행 필요": L(
+    "회로 시뮬레이션(corner/MC·ToolRun) 재실행 필요",
+    "circuit simulation (corner/MC · ToolRun) rerun required",
+    "回路シミュレーション(corner/MC・ToolRun)の再実行が必要",
+  ),
+  "레이아웃/P&R 도구 재실행 필요": L(
+    "레이아웃/P&R 도구 재실행 필요",
+    "layout / P&R tool rerun required",
+    "レイアウト/P&Rツールの再実行が必要",
+  ),
+  "패키지·조립 영향 재검토 필요": L(
+    "패키지·조립 영향 재검토 필요",
+    "package & assembly impact review required",
+    "パッケージ・組立への影響の再検討が必要",
+  ),
+  "시험 프로그램·한계값 재검토 필요": L(
+    "시험 프로그램·한계값 재검토 필요",
+    "test program & limit review required",
+    "テストプログラム・限度値の再検討が必要",
+  ),
+  "견적·납기 시나리오 갱신 필요": L(
+    "견적·납기 시나리오 갱신 필요",
+    "quote & lead-time scenario update required",
+    "見積・納期シナリオの更新が必要",
+  ),
+  // testprog rule strings surfaced by the copilot (test_efficiency)
+  "final test에서 동일 limits로 재검출 — wafer sort 반복은 검토 후 제거 가능": L(
+    "final test에서 동일 limits로 재검출 — wafer sort 반복은 검토 후 제거 가능",
+    "re-detected at final test with identical limits — the wafer-sort repeat can be removed after review",
+    "ファイナルテストで同一limitsで再検出 — ウェハソートの反復はレビュー後に削除可能",
+  ),
+  "요구사항·고장모드·결함 커버리지 링크가 없음 — 목적 확인 또는 링크 추가 검토": L(
+    "요구사항·고장모드·결함 커버리지 링크가 없음 — 목적 확인 또는 링크 추가 검토",
+    "no requirement / failure-mode / defect-coverage links — confirm the purpose or review adding links",
+    "要求・故障モード・欠陥カバレージのリンクなし — 目的確認またはリンク追加を検討",
+  ),
+  "재시험률 ≥5% — 한계값 가드밴드·사이트 편향 원인 분석 검토": L(
+    "재시험률 ≥5% — 한계값 가드밴드·사이트 편향 원인 분석 검토",
+    "retest rate ≥5% — review root cause: limit guardbands, site bias",
+    "再試験率 ≥5% — 限度値ガードバンド・サイト偏向の原因分析を検討",
+  ),
+  "AI는 시험 삭제를 자동 적용하지 않습니다 — 검토안만 생성합니다 (수용기준 4).": L(
+    "AI는 시험 삭제를 자동 적용하지 않습니다 — 검토안만 생성합니다 (수용기준 4).",
+    "The AI never auto-applies test removals — it only drafts review candidates (acceptance criterion 4).",
+    "AIはテスト削除を自動適用しません — 検討案のみ生成します (受入基準4)。",
+  ),
+  // stored prose — R2 pack notes / R3 assumption notes
+  "P1-07 검증 팩 — 템플릿 기본 신호체인 (SYNTHETIC)": L(
+    "P1-07 검증 팩 — 템플릿 기본 신호체인 (SYNTHETIC)",
+    "P1-07 validation pack — template default signal chain (SYNTHETIC)",
+    "P1-07検証パック — テンプレート既定の信号チェーン (SYNTHETIC)",
+  ),
+  "P1-07 검증 팩 옵션 (교육용 가명·합성 단가)": L(
+    "P1-07 검증 팩 옵션 (교육용 가명·합성 단가)",
+    "P1-07 validation pack option (training pseudonyms, synthetic unit cost)",
+    "P1-07検証パック・オプション (教育用仮名・合成単価)",
+  ),
+  "P1-07 검증 팩 — 의사결정은 열어둔다 (검토 워크플로 데모)": L(
+    "P1-07 검증 팩 — 의사결정은 열어둔다 (검토 워크플로 데모)",
+    "P1-07 validation pack — decision left open (review workflow demo)",
+    "P1-07検証パック — 意思決定は未確定 (レビューワークフローデモ)",
+  ),
+  "P1-07 검증 팩 테스트 플로우 (합성 항목)": L(
+    "P1-07 검증 팩 테스트 플로우 (합성 항목)",
+    "P1-07 validation pack test flow (synthetic items)",
+    "P1-07検証パック・テストフロー (合成項目)",
+  ),
+  "EPIC I 수용기준 시연 — 해결 전까지 mask release 차단": L(
+    "EPIC I 수용기준 시연 — 해결 전까지 mask release 차단",
+    "EPIC I acceptance demo — mask release stays blocked until resolved",
+    "EPIC I 受入基準デモ — 解決までマスクリリースはブロック",
+  ),
+  // stored prose — R2 tool-run / test-flow notes
+  "final test — site-hour 단가 14,500 KRW, wafer sort와 항목 계보 비교 대상": L(
+    "final test — site-hour 단가 14,500 KRW, wafer sort와 항목 계보 비교 대상",
+    "final test — 14,500 KRW per site-hour; lineage comparison target vs wafer sort",
+    "final test — サイト時間単価 14,500 KRW、ウェハソートとの項目系譜比較対象",
+  ),
+  "wafer sort — cost rate 미확정(TBD)·오프셋 항목 요구사항 링크 포함": L(
+    "wafer sort — cost rate 미확정(TBD)·오프셋 항목 요구사항 링크 포함",
+    "wafer sort — cost rate TBD; includes offset-item requirement link",
+    "wafer sort — 原価レート未確定(TBD)・オフセット項目要求リンク含む",
+  ),
+  "공개된 mock 실행 — 게이트 MOCK_RESULT_PRESENT 블로커와 연동 (교육용)": L(
+    "공개된 mock 실행 — 게이트 MOCK_RESULT_PRESENT 블로커와 연동 (교육용)",
+    "published mock run — wired to the MOCK_RESULT_PRESENT gate blocker (training)",
+    "公開mock実行 — ゲートMOCK_RESULT_PRESENTブロッカーと連動 (教育用)",
+  ),
+  "동일 입력 재실행 — lineage_id가 SPICE-001과 동일해야 한다": L(
+    "동일 입력 재실행 — lineage_id가 SPICE-001과 동일해야 한다",
+    "identical-input rerun — lineage_id must equal SPICE-001's",
+    "同一入力の再実行 — lineage_idはSPICE-001と同一であること",
+  ),
+  "마스크 셋 리드타임 10주": L(
+    "마스크 셋 리드타임 10주",
+    "mask-set lead time 10 weeks",
+    "マスクセット導入期間10週",
+  ),
+  "외부 SPICE 실행 브리지 (real_adapter)": L(
+    "외부 SPICE 실행 브리지 (real_adapter)",
+    "external SPICE execution bridge (real_adapter)",
+    "外部SPICE実行ブリッジ (real_adapter)",
+  ),
+  // copilot — static summaries
+  "측정 가능한 수량(숫자+단위)이 문장에서 발견되지 않아 초안을 생성하지 않습니다.": L(
+    "측정 가능한 수량(숫자+단위)이 문장에서 발견되지 않아 초안을 생성하지 않습니다.",
+    "No measurable quantity (number + unit) found in the sentence — no drafts generated.",
+    "測定可能な数量(数値+単位)が文から見つからず、ドラフトを生成しません。",
+  ),
+  "검색 가능한 과거 FA 케이스가 없어 유사사례를 제시하지 않습니다.": L(
+    "검색 가능한 과거 FA 케이스가 없어 유사사례를 제시하지 않습니다.",
+    "No searchable past FA cases — no similar cases offered.",
+    "検索可能な過去FAケースがなく、類似事例を提示しません。",
+  ),
+  "토큰이 겹치는 과거 사례가 없습니다 — 유사사례 없음도 검색 결과이다.": L(
+    "토큰이 겹치는 과거 사례가 없습니다 — 유사사례 없음도 검색 결과이다.",
+    "No past case shares tokens — 'no similar case' is itself a search result.",
+    "トークンが重なる過去事例がありません — 類似事例なしも検索結果である。",
+  ),
+  "Corner/Monte-Carlo 연구가 없어 민감도를 설명할 수 없습니다.": L(
+    "Corner/Monte-Carlo 연구가 없어 민감도를 설명할 수 없습니다.",
+    "No corner/Monte-Carlo studies — sensitivity cannot be explained.",
+    "Corner/Monte-Carloスタディがなく、感度を説明できません。",
+  ),
+  "분석할 wafer map이 없습니다.": L("분석할 wafer map이 없습니다.", "No wafer maps to analyze.", "分析するウェハマップがありません。"),
+  "이 케이스는 RCA가 이미 승인되었습니다 — 가설 제안은 RCA 승인 전 단계의 도구입니다.": L(
+    "이 케이스는 RCA가 이미 승인되었습니다 — 가설 제안은 RCA 승인 전 단계의 도구입니다.",
+    "This case's RCA is already approved — hypothesis proposal is a pre-RCA-approval tool.",
+    "このケースのRCAは既に承認済みです — 仮説提案はRCA承認前段階のツールです。",
+  ),
+  "증상·관찰 기록에서 알려진 원인 계통 키워드를 찾지 못했습니다 — 보류 (근거 없는 가설을 만들지 않는다).": L(
+    "증상·관찰 기록에서 알려진 원인 계통 키워드를 찾지 못했습니다 — 보류 (근거 없는 가설을 만들지 않는다).",
+    "No known cause-family keyword in the symptom/observation records — abstaining (no evidence-free hypotheses).",
+    "症状・観察記録から既知の原因系キーワードが見つかりません — 保留 (根拠のない仮説は作らない)。",
+  ),
+  "테스트 플로우가 없어 효율 분석을 할 수 없습니다.": L(
+    "테스트 플로우가 없어 효율 분석을 할 수 없습니다.",
+    "No test flows — efficiency analysis unavailable.",
+    "テストフローがなく、効率分析ができません。",
+  ),
+  "시간 대비 검출 효율이 낮은 검토 후보가 없습니다 — 모든 항목이 커버리지 링크를 갖습니다.": L(
+    "시간 대비 검출 효율이 낮은 검토 후보가 없습니다 — 모든 항목이 커버리지 링크를 갖습니다.",
+    "No low-efficiency review candidates — every item carries coverage links.",
+    "時間対検出効率が低い検討候補なし — すべての項目がカバレージリンクを持ちます。",
+  ),
+  "게이트 블로커가 없습니다 — 누락 증적 요약도 없습니다 (MOCK 블로커는 정책상 항상 부과됨).": L(
+    "게이트 블로커가 없습니다 — 누락 증적 요약도 없습니다 (MOCK 블로커는 정책상 항상 부과됨).",
+    "No gate blockers — no missing-evidence summary either (the MOCK blocker is always imposed by policy).",
+    "ゲートブロッカーなし — 欠落エビデンス概要もありません (MOCKブロッカーはポリシー上常に賦課)。",
+  ),
+  "fa_case_id가 필요합니다.": L("fa_case_id가 필요합니다.", "fa_case_id is required.", "fa_case_idが必要です。"),
+  "[검토안] 이상 패턴이 관측된 웨이퍼에 FA 케이스 개시 또는 장비/site 교정 확인 — 인간이 개시한다.": L(
+    "[검토안] 이상 패턴이 관측된 웨이퍼에 FA 케이스 개시 또는 장비/site 교정 확인 — 인간이 개시한다.",
+    "[review] For wafers with observed anomalies: open an FA case or verify equipment/site calibration — initiated by a human.",
+    "[検討案] 異常パターンが観測されたウェハにFAケース起案または装置/site較正確認 — 人間が起案する。",
+  ),
+  "[검토안] 증적이 여러 설계 리비전에 걸쳐 있습니다 — 리비전 통일 재증적화 계획을 세우십시오 (충돌 리비전 요약).": L(
+    "[검토안] 증적이 여러 설계 리비전에 걸쳐 있습니다 — 리비전 통일 재증적화 계획을 세우십시오 (충돌 리비전 요약).",
+    "[review] Evidence spans multiple design revisions — plan a unified-revision re-evidentation (conflicting-revision summary).",
+    "[検討案] エビデンスが複数の設計リビジョンにまたがります — リビジョン統一の再エビデンス化計画を立ててください (競合リビジョン概要)。",
+  ),
+  // FA cause-family labels (join text in summaries/facts/evidence)
+  "ESD 계통 손상": L("ESD 계통 손상", "ESD-family damage", "ESD系ダメージ"),
+  "누설 전류 계통": L("누설 전류 계통", "leakage-current family", "リーク電流系"),
+  "단락 계통": L("단락 계통", "short family", "短絡系"),
+  "개방 계통": L("개방 계통", "open family", "開放系"),
+  "파라메트릭 드리프트(온도/경시)": L(
+    "파라메트릭 드리프트(온도/경시)",
+    "parametric drift (temperature / aging)",
+    "パラメトリックドリフト(温度・経時)",
+  ),
+  "노이즈/그라운드 결함": L("노이즈/그라운드 결함", "noise / ground defect", "ノイズ/グラウンド欠陥"),
+  "오프셋 보정 이상": L("오프셋 보정 이상", "offset calibration anomaly", "オフセット較正異常"),
+};
+
+Object.assign(EXACT, EXACT_R3);
+
 
 /** Overlay one stored/composed string into the ui language; a miss returns
  * the original text unchanged (honest fallback for data added later). */

@@ -2,66 +2,52 @@
 
 > **이 문서의 목적**: 이 저장소에서 개발 세션(사람 또는 Claude)이 맥락 없이
 > 병렬로 작업을 이어받을 수 있도록 현재 상태·실행 방법·규칙·남은 작업을 한
-> 문서에 정리한다. 최종 갱신: 2026-09-14 저녁 (S04 뷰어 수정 + AirInput 3D
-> CAD 모델 + 분해도 시뮬레이션 완료 시점 — **브라우저 라이브 검증 미완료,
-> 아래 §0 핸드오프 상태 먼저 읽을 것**).
+> 문서에 정리한다. 최종 갱신: 2026-09-16 (ASIC Twin v1.1 R3 완료 시점 —
+> 사용자 브라우저 테스트 대기 중, **아래 §0 핸드오프 상태 먼저 읽을 것**).
 
-## 0. 지금 세션 핸드오프 상태 (2026-09-14 저녁, 다음 세션이 먼저 읽을 것)
+## 0. 지금 세션 핸드오프 상태 (2026-09-16, 다음 세션이 먼저 읽을 것)
 
-**로컬 `main`에 9개 커밋 있음, origin에 미push** — 사용자가 직접
-`cd /Users/wizbase/works/alps && git push` 실행해야 함 (Claude Code
-auto-mode classifier가 main push를 계속 차단, 매번 사용자가 직접 실행).
-로그: `git log --oneline origin/main..HEAD`.
+**ASIC Twin v1.1 R3 완료** (EPIC I 동시설계 제어판 + EPIC J 근거 중심 AI
+Copilot + shadow evaluation) — 이번 세션 커밋은 로컬 `main`에만 있음.
+push는 사용자가 직접: `cd /Users/wizbase/works/alps && git push`
+(classifier가 main push를 차단). R1+R2는 `8af4a5e`로 origin까지
+push 완료 상태.
 
-이번 세션에 한 일 (전부 로컬 `main`에 병합·라이브 스택에 반영됨, DB
-재시드까지 완료 — 단 **브라우저로 직접 본 적은 한 번도 없음**, 전부
-OCCT 볼륨/와인딩 수치 검증 + matplotlib 오프라인 렌더로만 확인):
+이번 세션에 한 일 (전부 라이브 스택 반영 + DB 재시드 완료, pytest 175
+전부 통과 — **브라우저는 사용자가 직접 테스트할 예정**):
 
-1. **S04 뷰어 수정** (branch `fix/s04-viewer-issues`, 병합됨): 기본 카메라
-   각도(버튼이 옆면 슬리버로만 보이던 문제), 회전 시 바디가 투명해지는
-   버그(OCCT `TopAbs_REVERSED` 면 와인딩 미보정 — **모든 제품이 공유하는
-   `convert.py`의 버그**), 바디 투명도 X-ray 슬라이더 신규 추가. 상세:
-   AGENTS.md "S04 viewer fixes" 절.
-2. **누락된 alembic 병합 리비전 복구**: `a9f9769ac53e`가 스크래치
-   워크트리에만 존재하고 실제 커밋된 적이 없어서 head가 2개였음 — 복구·
-   커밋·적용 완료.
-3. **AN-04 시드 데이터 버그 수정**: `plunger_diameter_mm`/
-   `assembly_height_mm`이 모든 랏에서 상수라 DOE 회귀분석이 항상 422 —
-   실제 랏간 편차 부여. `seed_process_twin()`의 `approver_client`
-   NameError도 발견·수정(첫 풀 리시드에서만 드러난 버그).
-4. **AirInput Proximity Sensor 3D CAD 모델 신규 제작** (branch
-   `feature/airinput-3d-model`, 병합됨): 8-part 어셈블리(하우징/PCB/전극
-   [Variant A 솔리드 패드 vs B 스플릿링]/ASIC/저항/커패시터/커넥터/커버
-   렌즈), 변형별로 진짜 다른 지오메트리(다른 3제품과 달리 fixture 공유 안
-   함). 상세: AGENTS.md "AirInput vertical slice" 절.
-5. **스테일 TACT fixture 재생성 + idempotency 캐시로 인한 재변환 누락
-   발견·수정**: `scripts/fixtures/tact_switch_asm.step`이 필렛/단자 수정
-   이후에도 재생성된 적이 없었음 + 같은 세션 내 이전 재시드가 CAD 변환의
-   Idempotency-Key를 이미 소모해서 수정 이후에도 캐시된 버그 있는 변환
-   결과가 계속 재생됨. DB 전체 truncate+재시드로 해결, 4개 제품 전부
-   API로 재검증(모든 파트 winding-consistent + 양의 volume). 상세:
-   AGENTS.md "Stale STEP fixtures + exploded-view" 절.
-6. **분해도(Exploded view) 조립 시뮬레이션 신규 구현**: 0~100% 슬라이더 +
-   재생/정지 버튼(6초 주기 조립↔분해 사인파 애니메이션). 하우징/케이스는
-   고정, 나머지 부품은 조립체 중심 대비 자기 위치에 비례해 방사형으로
-   퍼짐 — 제품마다 스케일이 달라도 상수 하나로 작동.
+1. **EPIC I 백엔드**: 가정 레지스터(AsicAssumption) + 영향 스캔/
+   findings-done/clear + 근거 첨부 resolve + 이벤트 원장 + 편차(DE)
+   워크플로. 게이트 블로커 2종 추가(UNRESOLVED_HIGH_RISK_ASSUMPTION,
+   ASSUMPTION_OVERDUE) — ASM-01은 일부러 OPEN으로 시드해 차단이 살아있는
+   데모가 됨. 마이그레이션 `d6deeb514240_r3_*`.
+2. **EPIC J 백엔드** (`app/asic_copilot.py`): 규칙 기반(비 LLM)
+   7-유스케이스 copilot — 사실은 DB에서만, 제안엔 근거 링크 필수, 증거
+   부족 시 사유 코드와 함께 abstain, 수용은 클라이언트가 보낸
+   `sha256(diff)`와 서버 재계산 대조 일치 시에만. copilot은 게이트/증적
+   테이블에 쓰는 경로 자체가 없음. shadow interaction으로 이력 저장.
+3. **프론트엔드**: 8단계 "동시설계 제어판" + 9단계 "Copilot" 패널
+   (`asicLive.tsx`), http LAN origin용 동기 sha256 (`lib/sha256.ts` —
+   `crypto.subtle`은 http에 없음).
+4. **시드** `seed_asic_r3()`: ASM-01(고위험 OPEN)·ASM-02(등록→해결 전체
+   경로)·DEV-01 편차 승인·copilot shadow 3건.
+5. **l10n**: seedL10n R3 오버레이 + **검증기 신설**
+   `apps/web/scripts/verify_seed_l10n.mjs` (`npm run verify:seedl10n`) —
+   DB(JSONB 재귀 `lax $.**` 포함) + 라이브 게이트 리포트에서 한글 문자열
+   101개 수집, `seedTr(s,'en'/'ja')` 후 잔여 한글 0 확인. tsc / vite /
+   oxlint clean.
 
-**다음 세션이 반드시 할 일**:
+**다음 세션(또는 사용자)이 할 일**:
 - **`git push`** (사용자 직접 실행 필요, 위 참조)
-- **라이브 브라우저 검증** — 이번 세션 전체 작업(S04 카메라/투명도/X-ray
-  슬라이더, AirInput 3D 모델, 분해도 시뮬레이션)에 대해 실제 브라우저로
-  단 한 번도 확인 못 함. `/tmp/alps-browser-pass/*.mjs` 패턴으로 Playwright
-  CLEAN 패스 진행 필요.
-- **미결 질문**: Temporal에 완료 안 되고 계속 재시도만 하는 워크플로우가
-  107개 쌓여 있음(대부분 이 세션 이전부터, `mech-model.log`가 초당
-  ~20줄씩 계속 증가 중) — 정리(terminate) 여부를 사용자에게 물었지만
-  아직 답 없음. `docker exec alps-twin-temporal-1 temporal workflow list
-  --address 172.22.0.10:7233 --namespace default --query
-  "ExecutionStatus='Running'"` 로 확인 가능(컨테이너 내부에서 주소가
-  `172.22.0.10:7233`이지 `localhost`가 아님에 주의).
-- DB 백업 2개 남겨둠(재시드 전): `/tmp/alps-logs/backups/
-  alps_twin_pre_reseed_*.sql`, `alps_twin_pre_reseed2_*.sql` — 세션 종료
-  후 임시 디렉터리라 사라질 수 있음, 필요하면 옮겨둘 것.
+- **Temporal 좀비 워크플로 정리** — 이전 세션에 1개만 terminate되고
+  ~111개 Running이 남아 있음(재시드로 sim_run 행은 없는데 재시도만 반복).
+  사용자가 터미널에서 직접:
+  `! docker exec alps-twin-temporal-1 temporal workflow delete --query "ExecutionStatus='Running'" --address 172.22.0.10:7233 --namespace default --reason "zombie: sim_run rows wiped by reseed"`
+- **ASIC 브라우저 테스트는 사용자가 진행** — 8단계(가정/편차)·9단계
+  (copilot 7 유스케이스, ko/en/ja) 위주. 문제 발생 시 AGENTS.md "ASIC
+  v1.1 R3" 절의 함정 목록 먼저 볼 것.
+- 남은 별개 과제(이 세션 범위 아님): TACT AI-02 변경 영향분석, AirInput
+  나머지 위상, `seed_airinput_field_twin` UUID 직렬화 버그(선존재).
 
 ---
 
@@ -110,8 +96,9 @@ cd apps/web && npm run dev
 ## 3. 검증 루틴 (커밋/보고 전 필수)
 
 ```bash
-cd apps/api && .venv/bin/python -m pytest            # 105 tests (95 + P2 관리도/AI-03 10) — 병렬 세션 공유 시 POSTGRES_APP_DB=alps_twin_pm 로 격리
+cd apps/api && .venv/bin/python -m pytest            # 175 tests (ASIC R3 포함) — 병렬 세션 공유 시 POSTGRES_APP_DB=alps_twin_pm 로 격리
 cd apps/web && npx tsc -b && npx vite build && npx oxlint
+cd apps/web && npm run verify:seedl10n               # seedL10n 한글 누출 검증기 (DB+라이브 API → en/ja 잔여 한글 0) — API:8000·DB:5433·Keycloak:8081 기동 필요
 ```
 
 브라우저 패스: `/tmp/alps-browser-pass/*.mjs` (Playwright, headless
@@ -156,6 +143,15 @@ pageErrors / badResponses(≥400) 전부 0 = **CLEAN**. 스크린샷도 같은 �
 **브라우저 라이브 검증은 아직 없음**. 상세: AGENTS.md "S04 viewer
 fixes", "AirInput vertical slice", "Stale STEP fixtures + exploded-view"
 절.
+
+**ASIC Twin v1.1 R1+R2+R3 (2026-09-15~16, R1+R2는 push 완료 `8af4a5e`,
+R3는 로컬 — 위 §0 참조)** — ASIC 공동설계 루프 전체: R1 센서 신호체인
+9테이블 + 게이트 정책 `alps-asic-v1.1` + Readiness 6단계, R2 trade
+study/EDA ToolRun/테스트 프로그램 트윈/공급망/3개 언어 증적 보고서,
+R3 가정 레지스터·영향 스캔·편차·게이트 연동(EPIC I) + 규칙 기반
+근거-바운드 copilot 7 유스케이스 + shadow evaluation(EPIC J). pytest
+175 전부 통과, `verify:seedl10n` 잔여 한글 0. 브라우저 패스는 사용자가
+직접. 상세: AGENTS.md "ASIC v1.1 R2", "ASIC v1.1 R3" 절.
 
 ## 5. TACT 지시서 남은 작업 (병렬 작업 후보)
 

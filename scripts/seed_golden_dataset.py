@@ -2352,6 +2352,8 @@ def main() -> None:
         seed_asic_twin(client, temc_client, asic_client)
         # ASIC Twin v1.1 R2: EPIC B·C·D·H + 템플릿 4종 검증 팩 (P1-07).
         seed_asic_r2(client, temc_client, asic_client)
+        # ASIC Twin v1.1 R3: EPIC I 가정·편차 + EPIC J copilot shadow (§10 R3).
+        seed_asic_r3(client, temc_client, asic_client)
 
 
 
@@ -2802,6 +2804,105 @@ def _seed_template_pack(client: httpx.Client, asic_client: httpx.Client,
                  "expected_duration_s": 0.02, "site_count": 4},
             ],
         }, list_path=f"/api/v1/asic/templates/{t}/test-flows", match_bid=bid)
+
+
+# ── ASIC Twin v1.1 R3 (지시서 §10 R3: EPIC I·J) ──────────────────────────────
+
+def seed_asic_r3(client: httpx.Client, temc_client: httpx.Client, asic_client: httpx.Client) -> None:
+    """전류 센서 ASIC R3 한 판 (EPIC I Concurrent Engineering + EPIC J Copilot).
+
+    EPIC I: 고위험 가정 1건(ASIC-CS-ASM-01)을 일부러 OPEN으로 남겨 둔다 —
+    최종 게이트 블로커는 R1/R2의 MOCK_RESULT_PRESENT + CALIBRATION_EXPIRED에
+    UNRESOLVED_HIGH_RISK_ASSUMPTION이 더해진다 (mask release 차단 수용기준
+    시연). ASM-02는 등록→영향 findings 완료→clear→해결의 정상 경로 시연.
+    편차 ASIC-CS-DEV-01은 요청(demo.asic_engineer)→승인(demo.architect)
+    독립성 규칙 시연 — 생략 활동은 승인된 편차로 조회된다.
+    EPIC J: gate_gap / wafer_anomaly / test_efficiency 상호작록 3건을 shadow
+    evaluation 예시로 심는다 (라이브 패널에서도 언제든 재실행 가능).
+    """
+    t = ASIC_CS_TEMPLATE
+    have = {a["business_id"]: a for a in
+            client.get(f"/api/v1/asic/templates/{t}/assumptions").json()}
+
+    # ── ASM-01: 고위험 미해결 가정 (게이트 블로커 씨앗) ─────────────────────
+    if "ASIC-CS-ASM-01" not in have:
+        asic_post(asic_client, "/api/v1/asic/assumptions", "seed-asic-r3-asm-1", {
+            "business_id": "ASIC-CS-ASM-01", "template_id": t,
+            "title": "GMR 감도 온도 드리프트 ≤0.05 %/°C (공급사 데이터시트 미확증)",
+            "detail": "병행 설계 중인 AFE 온도 보정 계수는 이 가정에 의존한다. "
+                      "공급사 확증 시료는 10월 도착 예정 — 확증 전까지 가정 상태로 추적.",
+            "risk": "high", "confidence": 0.55, "owner": "demo.asic_engineer",
+            "due_at": "2026-10-31T00:00:00Z",
+            "downstream": [
+                {"kind": "circuit", "ref": "ASIC-CS-CHAIN-R2", "label": "신호체인 r2 온도 보정"},
+                {"kind": "test", "ref": "TP-CS-2026-09", "label": "양산 테스트 프로그램"},
+                {"kind": "quote", "ref": "ASIC-CS-TS-001", "label": "사업성 시나리오"},
+            ],
+            "note": "EPIC I 수용기준 시연 — 해결 전까지 mask release 차단",
+        }, list_path=f"/api/v1/asic/templates/{t}/assumptions", match_bid="ASIC-CS-ASM-01")
+
+    # ── ASM-02: 정상 경로 전체 (등록→findings 완료→clear→해결) ──────────────
+    if "ASIC-CS-ASM-02" not in have:
+        a2 = asic_post(asic_client, "/api/v1/asic/assumptions", "seed-asic-r3-asm-2", {
+            "business_id": "ASIC-CS-ASM-02", "template_id": t,
+            "title": "QFN-32 몰딩 컴파운드 유리전이온도 210°C 가정",
+            "detail": "패키지 열해석 입력값 — 공급사 Tg 데이터시트 확증 대기.",
+            "risk": "medium", "confidence": 0.7, "owner": "demo.asic_engineer",
+            "due_at": "2026-09-30T00:00:00Z",
+            "downstream": [
+                {"kind": "package", "ref": "QFN-32", "label": "패키지 열해석"},
+            ],
+        }, list_path=f"/api/v1/asic/templates/{t}/assumptions", match_bid="ASIC-CS-ASM-02")
+        scan = asic_client.get(f"/api/v1/asic/assumptions/{a2['id']}/impact-scans").json()[0]
+        for f in scan["findings"]:
+            r = asic_client.post(
+                f"/api/v1/asic/impact-scans/{scan['id']}/findings/done",
+                json={"ref": f["ref"], "note": "열해석 재검토 완료 — Tg 205°C 로 입력 갱신, 결과 유효"},
+                headers={"Idempotency-Key": f"seed-asic-r3-asm2-done-{f['ref']}"})
+            r.raise_for_status()
+        r = asic_client.post(f"/api/v1/asic/impact-scans/{scan['id']}/clear",
+                             headers={"Idempotency-Key": "seed-asic-r3-asm2-clear"})
+        r.raise_for_status()
+        r = asic_client.post(
+            f"/api/v1/asic/assumptions/{a2['id']}/resolve",
+            json={"decision": "resolved",
+                  "evidence": {"ref": "DS-QFN32-TG", "label": "공급사 Tg 데이터시트 확증 (205°C)"},
+                  "note": "가정 대비 -5°C — 열해석 결과 유효 범위 내"},
+            headers={"Idempotency-Key": "seed-asic-r3-asm2-resolve"})
+        r.raise_for_status()
+
+    # ── DEV-01: 편차 요청→타역할 승인 (독립성) ───────────────────────────────
+    devs = client.get(f"/api/v1/asic/templates/{t}/deviations").json()
+    if not any(d["business_id"] == "ASIC-CS-DEV-01" for d in devs):
+        dev = asic_post(asic_client, "/api/v1/asic/deviations", "seed-asic-r3-dev-1", {
+            "business_id": "ASIC-CS-DEV-01", "template_id": t,
+            "skipped": [{"stage": "ES", "ref": "ASIC-CS-ES-REG-001",
+                         "label": "ES 리그리션 전수 재실행"}],
+            "rationale": "CS 일정 단축 — ES 리그리션을 CS 초기 결과로 대체 검증한다.",
+            "residual_risk": "ES 회귀 없이 CS 진입 — CS 첫 2롯 fail률 1% 초과 시 ES 전수 재실행.",
+            "note": "승인 조건: CS 첫 2롯 fail률 <1%.",
+        }, list_path=f"/api/v1/asic/templates/{t}/deviations", match_bid="ASIC-CS-DEV-01")
+        if dev["status"] == "submitted":
+            r = client.post(f"/api/v1/asic/deviations/{dev['id']}/decide",
+                            json={"decision": "approved",
+                                  "note": "잔여 위험 수용 — 조건부 승인 (demo.architect)"},
+                            headers={"Idempotency-Key": "seed-asic-r3-dev-1-decide"})
+            if r.status_code not in (200, 409):
+                r.raise_for_status()
+
+    # ── EPIC J: shadow evaluation 상호작록 3건 (demo.architect 실행) ─────────
+    for usecase in ("gate_gap", "wafer_anomaly", "test_efficiency"):
+        r = client.post(f"/api/v1/asic/copilot/{t}/run", json={"usecase": usecase},
+                        headers={"Idempotency-Key": f"seed-asic-r3-copl-{usecase}"})
+        if r.status_code not in (200, 201, 409):
+            r.raise_for_status()
+    n_abstain = sum(
+        1 for it in client.get(f"/api/v1/asic/templates/{t}/copilot").json()
+        if (it["result"] or {}).get("abstain")
+    )
+    print(f"asic r3: assumptions=2 (1 open high-risk) · deviation approved · "
+          f"copilot shadow interactions=3 (abstain={n_abstain})")
+
 
 
 if __name__ == "__main__":

@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   asicApi,
+  type AsicAssumption,
+  type AsicAssumptionEvent,
+  type AsicCopilotDiff,
+  type AsicCopilotInteraction,
   type AsicCornerStudy,
+  type AsicDeviation,
   type AsicEvidenceReport,
   type AsicEco,
   type AsicFaCase,
@@ -10,6 +15,7 @@ import {
   type AsicFaultInjection,
   type AsicFmedaItem,
   type AsicGateReport,
+  type AsicImpactScan,
   type AsicLotTraveler,
   type AsicMeasurementRun,
   type AsicPartner,
@@ -21,7 +27,9 @@ import {
   type AsicTradeStudy,
   type AsicWaferMap,
 } from "../../lib/api";
+import { keycloak } from "../../lib/keycloak";
 import { makeSeedTr } from "../../lib/seedL10n";
+import { sha256Hex } from "../../lib/sha256";
 import { Histogram } from "./asicCharts";
 import { READINESS_LEVELS, round2, type AsicTemplate } from "./asicModel";
 import { Chip, LiveChip, SectionCard, td, th } from "./asicUi";
@@ -62,6 +70,11 @@ export type Live = {
   waferMaps: AsicWaferMap[];
   partners: AsicPartner[];
   travelers: AsicLotTraveler[];
+  // R3 (EPIC I·J)
+  assumptions: AsicAssumption[];
+  scans: Record<string, AsicImpactScan[]>;
+  deviations: AsicDeviation[];
+  copilot: AsicCopilotInteraction[];
 };
 
 export const EMPTY_LIVE: Live = {
@@ -82,6 +95,10 @@ export const EMPTY_LIVE: Live = {
   waferMaps: [],
   partners: [],
   travelers: [],
+  assumptions: [],
+  scans: {},
+  deviations: [],
+  copilot: [],
 };
 
 // ── data loading (best-effort: a backend miss degrades to the fixture view) ──
@@ -106,6 +123,10 @@ export async function loadLive(templateId: string): Promise<{ live: Live; state:
     asicApi.listWaferMaps(templateId),
     asicApi.listPartners(),
     asicApi.listLotTravelers(templateId),
+    // R3 — EPIC I·J (lists are open to every authenticated role)
+    asicApi.listAssumptions(templateId),
+    asicApi.listDeviations(templateId),
+    asicApi.listCopilot(templateId),
   ]);
   const pick = <T,>(i: number): T[] | null => (settled[i].status === "fulfilled" ? (settled[i] as PromiseFulfilledResult<T[]>).value : null);
   const one = <T,>(i: number): T | null => (settled[i].status === "fulfilled" ? (settled[i] as PromiseFulfilledResult<T>).value : null);
@@ -116,6 +137,13 @@ export async function loadLive(templateId: string): Promise<{ live: Live; state:
   const faEvents: Record<string, AsicFaEvent[]> = {};
   faCases.forEach((c, i) => {
     if (eventLists[i].status === "fulfilled") faEvents[c.id] = (eventLists[i] as PromiseFulfilledResult<AsicFaEvent[]>).value;
+  });
+  // per-assumption impact scans (가정 수가 적어 N+1 허용 — 패널이 findings 상태를 그려야 한다)
+  const assumptions = pick<AsicAssumption>(16) ?? [];
+  const scanLists = await Promise.allSettled(assumptions.map((a) => asicApi.listImpactScans(a.id)));
+  const scans: Record<string, AsicImpactScan[]> = {};
+  assumptions.forEach((a, i) => {
+    if (scanLists[i].status === "fulfilled") scans[a.id] = (scanLists[i] as PromiseFulfilledResult<AsicImpactScan[]>).value;
   });
   const live: Live = {
     chains: pick<AsicSignalChain>(0) ?? [],
@@ -135,6 +163,10 @@ export async function loadLive(templateId: string): Promise<{ live: Live; state:
     waferMaps: pick<AsicWaferMap>(13) ?? [],
     partners: pick<AsicPartner>(14) ?? [],
     travelers: pick<AsicLotTraveler>(15) ?? [],
+    assumptions,
+    scans,
+    deviations: pick<AsicDeviation>(17) ?? [],
+    copilot: pick<AsicCopilotInteraction>(18) ?? [],
   };
   const hasData =
     live.chains.length + live.studies.length + live.runs.length + live.plans.length + live.safety.length +
@@ -1338,6 +1370,433 @@ export function EvidenceReportPanel({ tplId }: { tplId: string }) {
           </button>
         </div>
       )}
+    </SectionCard>
+  );
+}
+
+// ══ R3 · EPIC I: Concurrent Engineering 제어판 (가정·영향 탐색·편차) ═════════
+
+const ACT_BTN: React.CSSProperties = {
+  border: "1px solid #38bdf8",
+  background: "#38bdf822",
+  color: "#7dd3fc",
+  borderRadius: 6,
+  padding: "2px 8px",
+  fontSize: 10,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
+const RISK_COLOR: Record<string, string> = { high: "#f87171", medium: "#fbbf24", low: "#94a3b8" };
+const STATUS_COLOR: Record<string, string> = {
+  open: "#fbbf24", resolved: "#34d399", invalidated: "#f87171", superseded: "#64748b",
+  submitted: "#fbbf24", approved: "#34d399", rejected: "#f87171",
+};
+const CE_ROLES = new Set(["system_architect", "electrical_asic_engineer"]); // CAN_DESIGN
+const DECIDE_ROLES = new Set(["system_architect", "reviewer_approver"]); // CAN_CE_DECIDE
+
+function useRoles(): Set<string> {
+  // 백엔드 security.py와 같은 소스(realm_access.roles) — keycloak-js 타입에는
+  // 없는 필드라 한 번 캐스팅한다. 미로그인/토큰 전이면 빈 집합 (버튼만 숨김).
+  const parsed = keycloak.tokenParsed as { realm_access?: { roles?: string[] } } | undefined;
+  return new Set(parsed?.realm_access?.roles ?? []);
+}
+
+function myUsername(): string {
+  const parsed = keycloak.tokenParsed as { preferred_username?: string } | undefined;
+  return parsed?.preferred_username ?? "";
+}
+
+export function ConcurrentEngineeringPanel({
+  live, liveState, onChanged,
+}: { live: Live; liveState: LiveState; onChanged: () => void }) {
+  const { t } = useTranslation();
+  const { i18n } = useTranslation();
+  const tr = makeSeedTr(i18n.resolvedLanguage);
+  const roles = useRoles();
+  const me = myUsername();
+  const canDesign = [...roles].some((r) => CE_ROLES.has(r));
+  const canDecide = [...roles].some((r) => DECIDE_ROLES.has(r));
+  const [err, setErr] = useState<string | null>(null);
+  const [events, setEvents] = useState<Record<string, AsicAssumptionEvent[] | null>>({});
+  const [openScan, setOpenScan] = useState<Record<string, boolean>>({});
+  const [resolveRef, setResolveRef] = useState<Record<string, string>>({});
+
+  const act = async (label: string, fn: () => Promise<unknown>) => {
+    setErr(null);
+    try {
+      await fn();
+      onChanged();
+    } catch (e) {
+      setErr(`${label}: ${String(e).slice(0, 160)}`);
+    }
+  };
+  const idem = () => crypto.randomUUID();
+
+  const openScansOf = (a: AsicAssumption) => (live.scans[a.id] ?? []).filter((s) => s.status === "open");
+
+  return (
+    <SectionCard title={t("asic.r3.ce.title")} right={<LiveChip state={liveState} />}>
+      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>{t("asic.r3.ce.hint")}</div>
+      {err && <div style={{ fontSize: 11, color: "#f87171", marginBottom: 8 }}>⚠ {err}</div>}
+      <div style={{ display: "grid", gap: 8 }}>
+        {live.assumptions.length === 0 && <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>}
+        {live.assumptions.map((a) => {
+          const scans = live.scans[a.id] ?? [];
+          const openScans = openScansOf(a);
+          const ev = events[a.id];
+          return (
+            <div key={a.id} style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, background: "#0f172a" }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <b style={{ fontFamily: "monospace", color: "#7dd3fc", fontSize: 12 }}>{a.business_id}</b>
+                <span style={{ fontSize: 12, flex: 1 }}>{tr(a.title)}</span>
+                <Chip color={RISK_COLOR[a.risk] ?? "#94a3b8"}>{a.risk}</Chip>
+                <Chip color={STATUS_COLOR[a.status] ?? "#94a3b8"}>{a.status}</Chip>
+              </div>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                {tr(a.detail)}
+              </div>
+              <div style={{ fontSize: 10, color: "#64748b", marginTop: 4, display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <span>{t("asic.r3.ce.confidence")}: {(a.confidence * 100).toFixed(0)}% ({t("asic.r3.ce.heuristic")})</span>
+                <span>{t("asic.r3.ce.owner")}: {a.owner}</span>
+                {a.due_at && <span>{t("asic.r3.ce.due")}: {a.due_at.slice(0, 10)}</span>}
+                {a.resolved_evidence != null && (
+                  <span style={{ color: "#34d399" }}>
+                    ✓ {String((a.resolved_evidence as Record<string, unknown>).ref ?? "")}
+                  </span>
+                )}
+              </div>
+              {a.downstream.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                  {a.downstream.map((d, i) => (
+                    <Chip key={i} color="#38bdf8" title={tr(d.label)}>{d.kind} · {d.ref}</Chip>
+                  ))}
+                </div>
+              )}
+              {/* 영향 탐색 — findings는 pending→done→clear 순서로만 종결된다 */}
+              <div style={{ marginTop: 8 }}>
+                <button style={{ ...ACT_BTN, border: "1px solid #475569", background: "transparent", color: "#94a3b8" }}
+                  onClick={() => setOpenScan((m) => ({ ...m, [a.id]: !m[a.id] }))}>
+                  {t("asic.r3.ce.scans")} ({scans.length}){openScans.length > 0 ? ` · ${t("asic.r3.ce.openCount")} ${openScans.length}` : ""}
+                </button>
+                {openScan[a.id] && (
+                  <div style={{ display: "grid", gap: 6, marginTop: 6 }}>
+                    {scans.map((s) => (
+                      <div key={s.id} style={{ border: "1px solid #141c2e", borderRadius: 6, padding: 8 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 11 }}>
+                          <b style={{ fontFamily: "monospace", color: "#a78bfa" }}>{s.business_id}</b>
+                          <span style={{ color: "#64748b" }}>{t(`asic.r3.ce.trigger.${s.trigger}` as never)}</span>
+                          <Chip color={s.status === "open" ? "#fbbf24" : "#34d399"}>{s.status}</Chip>
+                          {s.status === "open" && canDesign && openScans.length === 1 && s.findings.every((f) => f.status === "done") && (
+                            <button style={ACT_BTN} onClick={() => act("clear", () => asicApi.clearScan(s.id, idem()))}>
+                              {t("asic.r3.ce.clear")}
+                            </button>
+                          )}
+                        </div>
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 4 }}>
+                          <tbody>
+                            {s.findings.map((f, i) => (
+                              <tr key={i}>
+                                <td style={{ ...td, color: "#7dd3fc", fontFamily: "monospace", width: 70 }}>{f.kind}</td>
+                                <td style={{ ...td, fontFamily: "monospace", color: "#94a3b8" }}>{f.ref}</td>
+                                <td style={td}>{tr(f.reason)}</td>
+                                <td style={td}>
+                                  <Chip color={f.action === "rerun" ? "#fbbf24" : "#38bdf8"}>{t(`asic.r3.ce.action.${f.action}` as never)}</Chip>
+                                </td>
+                                <td style={td}>
+                                  {f.status === "done"
+                                    ? <Chip color="#34d399">✓ {t("asic.r3.ce.done")}</Chip>
+                                    : canDesign
+                                      ? <button style={ACT_BTN} onClick={() => act("done", () => asicApi.findingDone(s.id, f.ref, t("asic.r3.ce.doneNote"), idem()))}>
+                                          {t("asic.r3.ce.markDone")}
+                                        </button>
+                                      : <Chip color="#64748b">{t("asic.r3.ce.pending")}</Chip>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* 해결 — 열린 탐색이 남아 있으면 서버가 412로 거부한다 */}
+              {a.status === "open" && (
+                <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <input
+                    value={resolveRef[a.id] ?? ""}
+                    onChange={(e) => setResolveRef((m) => ({ ...m, [a.id]: e.target.value }))}
+                    placeholder={t("asic.r3.ce.resolvePlaceholder")}
+                    style={{ background: "#020617", border: "1px solid #1e293b", borderRadius: 6, color: "#cbd5e1", fontSize: 11, padding: "3px 8px", minWidth: 220 }}
+                  />
+                  <button style={ACT_BTN} disabled={!canDesign}
+                    onClick={() => act("resolve", () => asicApi.resolveAssumption(
+                      a.id, "resolved",
+                      { ref: resolveRef[a.id] || `MANUAL-${new Date().toISOString().slice(0, 10)}`, label: t("asic.r3.ce.resolveEvidence") },
+                      t("asic.r3.ce.resolveNote"), idem(),
+                    ))}>
+                    {t("asic.r3.ce.resolve")}
+                  </button>
+                </div>
+              )}
+              {/* 변경 이력 — append-only ledger (created/field_changed/resolved…) */}
+              <div style={{ marginTop: 8 }}>
+                <button style={{ ...ACT_BTN, border: "1px solid #475569", background: "transparent", color: "#94a3b8" }}
+                  onClick={() => {
+                    if (ev) { setEvents((m) => ({ ...m, [a.id]: null })); return; }
+                    asicApi.listAssumptionEvents(a.id).then((rows) => setEvents((m) => ({ ...m, [a.id]: rows })));
+                  }}>
+                  {t("asic.r3.ce.ledger")}
+                </button>
+                {ev && (
+                  <div style={{ marginTop: 4, fontSize: 10, color: "#94a3b8" }}>
+                    {ev.map((e) => (
+                      <div key={e.id}>
+                        · <span style={{ fontFamily: "monospace", color: "#a78bfa" }}>{e.kind}</span>{" "}
+                        {e.created_at.slice(0, 16).replace("T", " ")} {e.created_by} — {Object.keys(e.payload).join(", ")}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 편차 — 생략 활동은 숨겨지지 않고 승인된 편차로 조회된다 (수용기준 3) */}
+      <div style={{ fontSize: 12, color: "#7dd3fc", fontWeight: 600, margin: "14px 0 6px" }}>{t("asic.r3.ce.deviations")}</div>
+      <div style={{ display: "grid", gap: 8 }}>
+        {live.deviations.length === 0 && <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>}
+        {live.deviations.map((d) => (
+          <div key={d.id} style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, background: "#0f172a" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <b style={{ fontFamily: "monospace", color: "#7dd3fc", fontSize: 12 }}>{d.business_id}</b>
+              <Chip color={STATUS_COLOR[d.status] ?? "#94a3b8"}>{d.status}</Chip>
+              <span style={{ fontSize: 10, color: "#64748b" }}>
+                {d.requested_by}{d.decided_by ? ` → ${d.decided_by}` : ""}
+                {d.decided_at ? ` · ${d.decided_at.slice(0, 16).replace("T", " ")}` : ""}
+              </span>
+              {d.status === "submitted" && canDecide && d.requested_by !== me && (
+                <span style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+                  <button style={ACT_BTN} onClick={() => act("approve", () => asicApi.decideDeviation(d.id, "approved", t("asic.r3.ce.decideNote"), idem()))}>
+                    ✓ {t("asic.r3.ce.approve")}
+                  </button>
+                  <button style={{ ...ACT_BTN, border: "1px solid #f87171", background: "#f8717122", color: "#f87171" }}
+                    onClick={() => act("reject", () => asicApi.decideDeviation(d.id, "rejected", t("asic.r3.ce.decideRejectNote"), idem()))}>
+                    ✕ {t("asic.r3.ce.reject")}
+                  </button>
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+              {t("asic.r3.ce.skipped")}: {d.skipped.map((s) => `${s.stage} · ${s.ref} — ${tr(s.label)}`).join(" / ")}
+            </div>
+            <div style={{ fontSize: 11, color: "#94a3b8" }}>{tr(d.rationale)}</div>
+            <div style={{ fontSize: 11, color: "#fbbf24" }}>⚠ {t("asic.r3.ce.residual")}: {tr(d.residual_risk)}</div>
+            {d.note && <div style={{ fontSize: 10, color: "#64748b" }}>{tr(d.note)}</div>}
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ══ R3 · EPIC J: 근거 중심 AI Copilot (유스케이스 7종 · diff 수락) ════════════
+
+const COPILOT_ROLES = new Set(["system_architect", "electrical_asic_engineer", "quality_engineer", "test_emc_engineer"]);
+const USECASES = ["req_draft", "similar_fa", "corner_sensitivity", "wafer_anomaly", "test_efficiency", "gate_gap", "fa_hypothesis"] as const;
+type Usecase = (typeof USECASES)[number];
+const TEXT_USECASES: Set<Usecase> = new Set(["req_draft", "similar_fa"]);
+
+const ABSTAIN_COLOR = "#fbbf24";
+
+export function CopilotPanel({
+  live, liveState, tplId, onChanged,
+}: { live: Live; liveState: LiveState; tplId: string; onChanged: () => void }) {
+  const { t } = useTranslation();
+  const { i18n } = useTranslation();
+  const tr = makeSeedTr(i18n.resolvedLanguage);
+  const roles = useRoles();
+  const canCopilot = [...roles].some((r) => COPILOT_ROLES.has(r));
+  const [usecase, setUsecase] = useState<Usecase>("gate_gap");
+  const [text, setText] = useState("");
+  const [faCaseId, setFaCaseId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [diffs, setDiffs] = useState<Record<string, AsicCopilotDiff | undefined>>({});
+  const openCases = live.faCases.filter(
+    (c) => !c.root_cause_confirmed && !["rca_approved", "eco_open", "verified", "closed"].includes(c.status),
+  );
+
+  const run = async () => {
+    setErr(null);
+    setBusy(true);
+    try {
+      await asicApi.runCopilot(
+        tplId,
+        usecase,
+        TEXT_USECASES.has(usecase) && text.trim() ? text.trim() : undefined,
+        usecase === "fa_hypothesis" ? faCaseId || undefined : undefined,
+      );
+      onChanged();
+    } catch (e) {
+      setErr(String(e).slice(0, 200));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loadDiff = (iid: string, pid: string) => {
+    const k = `${iid}:${pid}`;
+    if (diffs[k]) { setDiffs((m) => ({ ...m, [k]: undefined })); return; }
+    asicApi.copilotDiff(iid, pid).then((d) => setDiffs((m) => ({ ...m, [k]: d })));
+  };
+
+  const accept = async (iid: string, pid: string) => {
+    setErr(null);
+    const k = `${iid}:${pid}`;
+    const d = diffs[k];
+    if (!d) return;
+    try {
+      // 수용기준 2: 브라우저에서 diff 본문의 sha256을 계산해 대조 — 서버가
+      // 재계산한 해시와 어긋나면 422 (diff를 확인하지 않은 수락은 없다)
+      await asicApi.acceptCopilotProposal(iid, pid, sha256Hex(d.diff));
+      onChanged();
+    } catch (e) {
+      setErr(String(e).slice(0, 200));
+    }
+  };
+
+  const recent = live.copilot.slice(0, 5);
+
+  return (
+    <SectionCard title={t("asic.r3.copilot.title")} right={<LiveChip state={liveState} />}>
+      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>{t("asic.r3.copilot.hint")}</div>
+      {err && <div style={{ fontSize: 11, color: "#f87171", marginBottom: 8 }}>⚠ {err}</div>}
+      {/* 실행 바 — 유스케이스 7종 (근거 없는 제안은 엔진이 만들지 않는다) */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+        {USECASES.map((u) => (
+          <button key={u}
+            onClick={() => setUsecase(u)}
+            style={{
+              ...ACT_BTN,
+              ...(usecase === u ? {} : { border: "1px solid #475569", background: "transparent", color: "#94a3b8" }),
+            }}>
+            {t(`asic.r3.copilot.uc.${u}` as never)}
+          </button>
+        ))}
+      </div>
+      {TEXT_USECASES.has(usecase) && (
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={t("asic.r3.copilot.textPlaceholder")}
+          style={{ width: "100%", background: "#020617", border: "1px solid #1e293b", borderRadius: 6, color: "#cbd5e1", fontSize: 11, padding: "5px 8px", marginBottom: 8 }}
+        />
+      )}
+      {usecase === "fa_hypothesis" && (
+        <select value={faCaseId} onChange={(e) => setFaCaseId(e.target.value)}
+          style={{ background: "#020617", border: "1px solid #1e293b", borderRadius: 6, color: "#cbd5e1", fontSize: 11, padding: "4px 8px", marginBottom: 8, maxWidth: "100%" }}>
+          <option value="">{t("asic.r3.copilot.selectCase")}</option>
+          {openCases.map((c) => (
+            <option key={c.id} value={c.id}>{c.business_id} — {tr(c.symptom).slice(0, 40)}</option>
+          ))}
+        </select>
+      )}
+      <div style={{ marginBottom: 12 }}>
+        <button style={ACT_BTN} disabled={busy || !canCopilot || (usecase === "fa_hypothesis" && !faCaseId)}
+          onClick={run}>
+          {busy ? "…" : `▶ ${t("asic.r3.copilot.run")}`}
+        </button>
+        {!canCopilot && <span style={{ fontSize: 10, color: "#fbbf24", marginLeft: 8 }}>{t("asic.r3.copilot.roleNeeded")}</span>}
+      </div>
+      {/* 최근 상호작록 — 감사 재현 메타데이터(input_hash·engine_version) 표시 */}
+      {recent.length === 0 && <div style={{ fontSize: 12, color: "#64748b" }}>— {t("asic.r2.none")}</div>}
+      <div style={{ display: "grid", gap: 8 }}>
+        {recent.map((it) => {
+          const r = it.result;
+          const acceptedPids = new Set((it.accepted_proposals ?? []).map((p) => p.pid));
+          return (
+            <div key={it.id} style={{ border: "1px solid #1e293b", borderRadius: 8, padding: 10, background: "#0f172a" }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <Chip color="#38bdf8">{t(`asic.r3.copilot.uc.${it.usecase}` as never)}</Chip>
+                <span style={{ fontSize: 10, color: "#64748b", fontFamily: "monospace" }}>
+                  {it.engine_version} · {it.input_hash.slice(0, 10)}… · {it.created_by}
+                </span>
+                <span style={{ fontSize: 10, color: "#64748b" }}>
+                  {t("asic.r3.copilot.confidence")}: {(r.confidence * 100).toFixed(0)}% ({t("asic.r3.ce.heuristic")})
+                </span>
+                {r.abstain && <Chip color={ABSTAIN_COLOR}>{t("asic.r3.copilot.abstain")}: {t(`asic.r3.copilot.abstainReason.${r.abstain_reason}` as never)}</Chip>}
+              </div>
+              <div style={{ fontSize: 12, color: "#e2e8f0", marginTop: 6 }}>{tr(r.summary)}</div>
+              {r.abstain && (
+                <div style={{ fontSize: 11, color: ABSTAIN_COLOR, marginTop: 4, border: `1px solid ${ABSTAIN_COLOR}44`, borderRadius: 6, padding: "4px 8px" }}>
+                  ⚠ {t("asic.r3.copilot.abstainNote")}
+                </div>
+              )}
+              {(r.facts ?? []).length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{t("asic.r3.copilot.facts")}</div>
+                  {r.facts.map((f, i) => (
+                    <div key={i} style={{ fontSize: 11, color: "#94a3b8", paddingLeft: 10 }}>· {tr(f)}</div>
+                  ))}
+                </div>
+              )}
+              {(r.evidence ?? []).length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                  {r.evidence.map((e, i) => (
+                    <Chip key={i} color="#34d399" title={`${e.kind}:${e.ref}`}>{e.kind} · {e.ref}</Chip>
+                  ))}
+                </div>
+              )}
+              {(r.proposals ?? []).length > 0 && (
+                <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{t("asic.r3.copilot.proposals")}</div>
+                  {r.proposals.map((p) => {
+                    const k = `${it.id}:${p.pid}`;
+                    const d = diffs[k];
+                    const accepted = acceptedPids.has(p.pid);
+                    return (
+                      <div key={p.pid} style={{ border: "1px solid #141c2e", borderRadius: 6, padding: 8 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                          <b style={{ fontFamily: "monospace", color: "#a78bfa", fontSize: 10 }}>{p.pid}</b>
+                          <span style={{ fontSize: 11, color: "#cbd5e1", flex: 1 }}>{tr(p.text)}</span>
+                          {accepted
+                            ? <Chip color="#34d399">✓ {t("asic.r3.copilot.accepted")}</Chip>
+                            : (
+                              <>
+                                <button style={ACT_BTN} onClick={() => loadDiff(it.id, p.pid)}>{d ? "▲" : t("asic.r3.copilot.showDiff")}</button>
+                                {d && (
+                                  <button style={{ ...ACT_BTN, border: "1px solid #34d399", background: "#34d39922", color: "#34d399" }}
+                                    onClick={() => accept(it.id, p.pid)}>
+                                    ✓ {t("asic.r3.copilot.accept")}
+                                  </button>
+                                )}
+                              </>
+                            )}
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                          {p.evidence.map((e, i) => (
+                            <Chip key={i} color="#34d399" title={`${e.kind}:${e.ref}`}>🔗 {e.kind} · {e.ref}{e.label ? ` — ${tr(e.label)}` : ""}</Chip>
+                          ))}
+                        </div>
+                        {d && (
+                          <pre style={{ margin: "6px 0 0", padding: 8, background: "#020617", borderRadius: 6, fontSize: 10, fontFamily: "monospace", color: "#94a3b8", overflowX: "auto" }}>
+                            {d.diff}
+                            {"\n"}sha256 = {d.sha256.slice(0, 16)}…
+                          </pre>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </SectionCard>
   );
 }

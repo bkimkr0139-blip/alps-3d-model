@@ -89,6 +89,12 @@ _TABLES = (
     "asic_partner_changes",
     "asic_lot_travelers",
     "asic_partners",
+    # ASIC Twin v1.1 R3 (EPIC I·J)
+    "asic_copilot_interactions",
+    "asic_deviations",
+    "asic_impact_scans",
+    "asic_assumption_events",
+    "asic_assumptions",
     "variants",
     "products",
 )

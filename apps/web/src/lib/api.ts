@@ -1129,6 +1129,110 @@ export interface AsicEvidenceReport {
   sections: { key: string; title: string; rows: { label: string; value: unknown }[]; source_class?: string }[];
 }
 
+// ── ASIC Twin v1.1 R3 (EPIC I Concurrent Engineering + EPIC J Copilot) ──────
+
+export interface AsicDownstreamRef {
+  kind: "circuit" | "layout" | "package" | "test" | "quote";
+  ref: string;
+  label: string;
+}
+
+export interface AsicAssumption {
+  id: string;
+  business_id: string;
+  template_id: string;
+  title: string;
+  detail: string;
+  status: "open" | "resolved" | "invalidated" | "superseded";
+  risk: "low" | "medium" | "high";
+  confidence: number;
+  owner: string;
+  due_at: string | null;
+  downstream: AsicDownstreamRef[];
+  resolved_evidence: Record<string, unknown> | null;
+  resolved_at: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AsicAssumptionEvent {
+  id: string;
+  business_id: string;
+  assumption_id: string;
+  kind: string;
+  payload: Record<string, unknown>;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AsicImpactScan {
+  id: string;
+  business_id: string;
+  assumption_id: string;
+  trigger: string;
+  status: "open" | "cleared";
+  findings: {
+    kind: AsicDownstreamRef["kind"];
+    ref: string;
+    label: string;
+    action: "rerun" | "review";
+    status: "pending" | "done";
+    reason: string;
+  }[];
+  note: string | null;
+  created_at: string;
+}
+
+export interface AsicDeviation {
+  id: string;
+  business_id: string;
+  template_id: string;
+  skipped: { stage: string; ref: string; label: string }[];
+  rationale: string;
+  residual_risk: string;
+  status: "submitted" | "approved" | "rejected" | "superseded";
+  requested_by: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface AsicCopilotProposal {
+  pid: string;
+  kind: string;
+  text: string;
+  diff_base: string | null;
+  evidence: { kind: string; ref: string; label?: string }[];
+}
+
+export interface AsicCopilotInteraction {
+  id: string;
+  business_id: string;
+  template_id: string;
+  usecase: string;
+  input_hash: string;
+  engine_version: string;
+  result: {
+    summary: string;
+    facts: string[];
+    abstain: boolean;
+    abstain_reason: string | null;
+    confidence: number;
+    proposals: AsicCopilotProposal[];
+    evidence: { kind: string; ref: string; label?: string }[];
+  };
+  accepted_proposals: { pid: string; accepted_by: string; accepted_at: string }[];
+  created_by: string;
+  created_at: string;
+}
+
+export interface AsicCopilotDiff {
+  pid: string;
+  diff: string;
+  sha256: string;
+}
+
 export const asicApi = {
   listSignalChains: (templateId: string) =>
     request<AsicSignalChain[]>(`/api/v1/asic/templates/${templateId}/signal-chains`),
@@ -1168,4 +1272,56 @@ export const asicApi = {
     request<AsicEvidenceReport>(
       `/api/v1/asic/templates/${templateId}/evidence-report?lang=${lang}`,
     ),
+  // R3 — EPIC I assumptions/impact scans/deviations + EPIC J copilot
+  listAssumptions: (templateId: string) =>
+    request<AsicAssumption[]>(`/api/v1/asic/templates/${templateId}/assumptions`),
+  listAssumptionEvents: (assumptionId: string) =>
+    request<AsicAssumptionEvent[]>(`/api/v1/asic/assumptions/${assumptionId}/events`),
+  listImpactScans: (assumptionId: string) =>
+    request<AsicImpactScan[]>(`/api/v1/asic/assumptions/${assumptionId}/impact-scans`),
+  findingDone: (scanId: string, ref: string, note: string, idem: string) =>
+    request<AsicImpactScan>(`/api/v1/asic/impact-scans/${scanId}/findings/done`, {
+      method: "POST",
+      body: JSON.stringify({ ref, note }),
+      headers: { "Content-Type": "application/json", "Idempotency-Key": idem },
+    }),
+  clearScan: (scanId: string, idem: string) =>
+    request<AsicImpactScan>(`/api/v1/asic/impact-scans/${scanId}/clear`, {
+      method: "POST",
+      body: JSON.stringify({}),
+      headers: { "Content-Type": "application/json", "Idempotency-Key": idem },
+    }),
+  resolveAssumption: (assumptionId: string, decision: string, evidence: Record<string, unknown>, note: string, idem: string) =>
+    request<AsicAssumption>(`/api/v1/asic/assumptions/${assumptionId}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ decision, evidence, note }),
+      headers: { "Content-Type": "application/json", "Idempotency-Key": idem },
+    }),
+  listDeviations: (templateId: string) =>
+    request<AsicDeviation[]>(`/api/v1/asic/templates/${templateId}/deviations`),
+  decideDeviation: (deviationId: string, decision: string, note: string, idem: string) =>
+    request<AsicDeviation>(`/api/v1/asic/deviations/${deviationId}/decide`, {
+      method: "POST",
+      body: JSON.stringify({ decision, note }),
+      headers: { "Content-Type": "application/json", "Idempotency-Key": idem },
+    }),
+  listCopilot: (templateId: string) =>
+    request<AsicCopilotInteraction[]>(`/api/v1/asic/templates/${templateId}/copilot`),
+  runCopilot: (templateId: string, usecase: string, text?: string, faCaseId?: string) =>
+    request<AsicCopilotInteraction>(`/api/v1/asic/copilot/${templateId}/run`, {
+      method: "POST",
+      body: JSON.stringify(
+        text ? { usecase, text } : faCaseId ? { usecase, fa_case_id: faCaseId } : { usecase },
+      ),
+      // 실행마다 새 감사 행 — 재시도만 멱등 (이미 cmd+R 이중 클릭 가드는 서버 409)
+      headers: { "Idempotency-Key": `copilot-${crypto.randomUUID()}` },
+    }),
+  copilotDiff: (interactionId: string, pid: string) =>
+    request<AsicCopilotDiff>(`/api/v1/asic/copilot/interactions/${interactionId}/proposals/${pid}/diff`),
+  acceptCopilotProposal: (interactionId: string, pid: string, diffSha256: string) =>
+    request<AsicCopilotInteraction>(`/api/v1/asic/copilot/interactions/${interactionId}/proposals/accept`, {
+      method: "POST",
+      body: JSON.stringify({ pid, diff_sha256: diffSha256 }),
+      headers: { "Content-Type": "application/json" },
+    }),
 };

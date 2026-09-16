@@ -10,6 +10,11 @@ a real Variant so the existing gate/evidence chain can reference it.
     EPIC F  QualificationPlan/Result, SafetyItem, FmedaItem, FaultInjectionRun
     EPIC G  FaCase / FaEvent / AsicEco          — failure-analysis closed loop
 
+    R3 additions:
+    EPIC I  AsicAssumption / AsicAssumptionEvent / AsicImpactScan / AsicDeviation
+            — concurrent-engineering control panel (가정·영향 탐색·승인 편차)
+    EPIC J  AsicCopilotInteraction             — evidence-grounded AI copilot log
+
 Conventions:
   - Status/class fields are String + pydantic Literal (NOT pg Enum) — greenfield
     tables keep the migration free of ENUM-copy gotchas (HANDOFF §8).
@@ -683,4 +688,129 @@ class QualityAction(Base, IdentifiedMixin, ProvenanceMixin):
         UUID(as_uuid=True), ForeignKey("asic_fa_cases.id"), nullable=True
     )
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class AsicAssumption(Base, IdentifiedMixin, ProvenanceMixin):
+    """EPIC I (R3) — Concurrent Engineering 가정 (지시서 §4 EPIC I).
+
+    확정 요구사항과 달리 아직 근거가 확정되지 않은 채 병행 설계를 진행하는
+    가정을 등록한다. `requirement_id`로 ASSUMPTION_BASED 요구사항과 연결되고
+    `downstream`에 영향 받는 회로/레이아웃/패키지/시험/견적을 명시한다 —
+    가정 변경 시 이 목록이 AsicImpactScan 생성의 입력이 된다.
+    수용기준: 미해결 고위험 가정이 있으면 mask release가 차단된다
+    (asic_gate_policy.UNRESOLVED_HIGH_RISK_ASSUMPTION).
+    """
+
+    __tablename__ = "asic_assumptions"
+
+    template_id: Mapped[str] = mapped_column(String(32), index=True)
+    variant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("variants.id"), nullable=True, index=True
+    )
+    requirement_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("requirements.id"), nullable=True, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255))
+    detail: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default="open")  # open|resolved|invalidated|superseded
+    risk: Mapped[str] = mapped_column(String(16))  # low|medium|high
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)  # 0.0..1.0 owner self-report
+    owner: Mapped[str] = mapped_column(String(255))
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 영향 대상 [{kind: circuit|layout|package|test|quote, ref, label}]
+    downstream: Mapped[list] = mapped_column(JSONB, default=list)
+    resolved_evidence: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    events: Mapped[list["AsicAssumptionEvent"]] = relationship(back_populates="assumption")
+    impact_scans: Mapped[list["AsicImpactScan"]] = relationship(back_populates="assumption")
+
+
+class AsicAssumptionEvent(Base, IdentifiedMixin, ProvenanceMixin):
+    """EPIC I — 가정 변경 장부 (append-only, 불변규칙 1과 동일 원칙).
+
+    `payload`는 변경 필드의 old/new를 담는다. 감사 목적상 행을 지우거나
+    고치지 않는다 — 가정 이력은 이 장부로 재구성한다.
+    """
+
+    __tablename__ = "asic_assumption_events"
+
+    assumption_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("asic_assumptions.id"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(32))  # created|field_changed|resolved|invalidated|superseded
+    payload: Mapped[dict] = mapped_column(JSONB)  # {field: {old, new}, ...} or resolution summary
+
+    assumption: Mapped[AsicAssumption] = relationship(back_populates="events")
+
+
+class AsicImpactScan(Base, IdentifiedMixin, ProvenanceMixin):
+    """EPIC I — 가정 변경 영향 탐색 결과 (수용기준 2).
+
+    가정의 내용/신뢰도/리스크가 바뀌면 자동 생성되고, `downstream` 각 항목에
+    `action: rerun|review` 상태로 매핑된다. findings가 모두 done이 되기 전까지
+    scan은 open — open scan이 남아 있으면 해당 가정은 resolved로 닫을 수 없다.
+    """
+
+    __tablename__ = "asic_impact_scans"
+
+    assumption_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("asic_assumptions.id"), index=True
+    )
+    trigger: Mapped[str] = mapped_column(String(32))  # assumption_changed|created|manual
+    # [{kind, ref, label, action: rerun|review, status: pending|done, reason}]
+    findings: Mapped[list] = mapped_column(JSONB, default=list)
+    status: Mapped[str] = mapped_column(String(24), default="open")  # open|cleared
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    assumption: Mapped[AsicAssumption] = relationship(back_populates="impact_scans")
+
+
+class AsicDeviation(Base, IdentifiedMixin, ProvenanceMixin):
+    """EPIC I — CS 공정 단축/변형의 승인 편차 (수용기준 3).
+
+    일정 단축으로 생략·병행한 활동을 숨기지 않고 문서로 남긴다.
+    독립성 규칙 (FA/CAPA 게이트와 동일): `requested_by != decided_by` —
+    승인 엔드포인트가 강제한다. 잔여 위험(`residual_risk`)은 승인 조건의 일부.
+    """
+
+    __tablename__ = "asic_deviations"
+
+    template_id: Mapped[str] = mapped_column(String(32), index=True)
+    # 생략·병행 활동 [{ref, label, stage, reason}]
+    skipped: Mapped[list] = mapped_column(JSONB, default=list)
+    rationale: Mapped[str] = mapped_column(Text)
+    residual_risk: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default="submitted")  # submitted|approved|rejected|superseded
+    requested_by: Mapped[str] = mapped_column(String(255))
+    decided_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class AsicCopilotInteraction(Base, IdentifiedMixin, ProvenanceMixin):
+    """EPIC J (R3) — 근거 중심 AI Copilot 상호작록 (지시서 §4 EPIC J).
+
+    한 번의 질의 = 한 행. 감사 재현 수용기준을 위해 `input_snapshot`(입력 +
+    검색 스냅샷)과 그 sha256(`input_hash`)을 남긴다 — 같은 입력·엔진 버전이면
+    result가 결정론적으로 재현된다(룰 엔진은 DB 상태에서만 팩트를 수집).
+    `result.evidence`의 근거 링크 없는 제안은 게이트 증적으로 첨부될 수
+    없다(구조적으로: copilot은 gate/evidence 테이블에 절대 쓰지 않는다).
+    `result.abstain`은 OOD·근거 부족·충돌 시 답변 대신 보류를 기록한다.
+    """
+
+    __tablename__ = "asic_copilot_interactions"
+
+    template_id: Mapped[str] = mapped_column(String(32), index=True)
+    usecase: Mapped[str] = mapped_column(String(32))  # req_draft|similar_fa|corner_sensitivity|wafer_anomaly|fa_hypothesis|test_efficiency|gate_gap
+    input_snapshot: Mapped[dict] = mapped_column(JSONB)  # 입력 + 검색된 근거 ref 목록
+    input_hash: Mapped[str] = mapped_column(String(64), index=True)
+    result: Mapped[dict] = mapped_column(JSONB)
+    # {summary, facts: [...], evidence: [{kind, ref, label}], proposals: [...],
+    #  confidence: float, abstain: bool, abstain_reason}
+    engine_version: Mapped[str] = mapped_column(String(64))  # asic-copilot-rules-v1
+    accepted_proposals: Mapped[list] = mapped_column(JSONB, default=list)
+    # 수락 기록 [{pid, accepted_by, accepted_at, diff_sha256, applied_ref}]
     note: Mapped[str | None] = mapped_column(Text, nullable=True)

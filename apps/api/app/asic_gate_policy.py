@@ -26,6 +26,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.asic import (
+    AsicAssumption,
     AsicEco,
     AsicPartner,
     CornerStudy,
@@ -303,6 +304,44 @@ def evaluate_gate(db: Session, template_id: str, gate_id: str = "RELEASE_SIGNED"
               f"unapproved={len(unapproved)} lineage={len(bad_lineage)} "
               f"pcn={len(pending_pcns)} qa={len(open_actions)}",
               "all=0", [])
+
+    # ── R3 EPIC I: concurrent-engineering assumptions ───────────────────
+    # 수용기준 1: 미해결 고위험 가정이 있으면 mask release가 차단된다.
+    # resolved 전에는 열린 impact scan이 남아 있어서도 안 된다(재실행·재검토가
+    # 끝나지 않은 가정은 해제 불가 — 수용기준 2의 강제).
+    assumptions = db.query(AsicAssumption).filter_by(template_id=template_id).all()
+    open_high = [
+        a for a in assumptions
+        if a.status == "open" and a.risk == "high"
+    ]
+    overdue = [
+        a for a in assumptions
+        if a.status == "open" and a.due_at and a.due_at < now
+    ]
+    if open_high:
+        blockers.append(
+            GateBlocker(
+                code="UNRESOLVED_HIGH_RISK_ASSUMPTION",
+                detail=(
+                    f"미해결 고위험 가정 {len(open_high)}건이 있습니다 — mask release가 차단됩니다 "
+                    "(지시서 §4 EPIC I 수용기준 1)."
+                ),
+                evidence=[a.business_id for a in open_high],
+            )
+        )
+    if overdue:
+        blockers.append(
+            GateBlocker(
+                code="ASSUMPTION_OVERDUE",
+                detail=f"해결 기한이 지난 가정 {len(overdue)}건이 있습니다.",
+                evidence=[a.business_id for a in overdue],
+            )
+        )
+    add_check("high_risk_assumptions_resolved",
+              not open_high,
+              f"open_high={len(open_high)} overdue={len(overdue)}",
+              "open_high=0",
+              [a.business_id for a in open_high])
 
     # ── readiness rung from evidence depth ─────────────────────────────
     if not runs and not studies:

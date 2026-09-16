@@ -429,6 +429,26 @@ def test_optimization_proposals_are_review_only(client: TestClient):
     assert apply_attempt.status_code == 405
 
 
+def test_optimization_proposals_on_wafer_sort_flow(client: TestClient):
+    """wafer_sort flow 자신의 proposals도 조회 가능해야 한다 (drop 후보는 이 flow 쪽
+    항목을 가리킨다) — regression: final_item_id 하드코딩 StopIteration → 500."""
+    ws = _flow(client, "R2-TF-PROP-WS2", "wafer_sort")
+    _flow(client, "R2-TF-PROP-FT2", "final_test", extra_items=[
+        {"stage": "analog", "name": "Contact 전도성 확인", "expected_duration_s": 0.08,
+         "site_count": 8, "limits": {"high": 5.0, "unit": "ohm"}},  # sort 쪽과 중복
+    ])
+    r = client.get(f"/api/v1/asic/test-flows/{ws['id']}/proposals")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    own_ids = {it["id"] for it in ws["items"]}
+    dups = [p for p in body["proposals"] if p["kind"] == "duplicate_removal_review"]
+    assert dups, "sort 측 중복 항목이 검토안으로 나와야 한다"
+    for p in dups:
+        assert p["item_id"] in own_ids  # 이 flow(=wafer sort)의 항목을 가리킴
+        assert "wafer sort 반복" in p["rationale"]
+        assert p["review_only"] is True
+
+
 # ── EPIC H ──────────────────────────────────────────────────────────────────
 
 def test_partner_lifecycle_and_approval_role(client: TestClient):

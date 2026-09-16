@@ -262,20 +262,29 @@ def optimization_proposals(flow, twin_items: list | None = None,
 
     # 1) wafer sort ↔ final test 중복 → 시간 절감 후보
     if twin_items:
+        # drop_candidate는 final 측 기준이므로, 제안 대상은 "지금 보는 flow 쪽"
+        # 항목이다 — wafer_sort flow라면 sort_item_id, final_test면 final_item_id.
+        own_is_sort = flow.target == "wafer_sort"
         sort_side, final_side = (
-            (items, twin_items) if flow.target == "wafer_sort" else (twin_items, items)
+            (items, twin_items) if own_is_sort else (twin_items, items)
         )
         x = cross_target_analysis(sort_side, final_side)
         for dup in x["duplicates"]:
             if not dup["drop_candidate"]:
                 continue
-            it = next(i for i in items if str(i.id) == dup["final_item_id"])
+            own_id = dup["sort_item_id"] if own_is_sort else dup["final_item_id"]
+            it = next(i for i in items if str(i.id) == own_id)
+            if it.stage in _ESSENTIAL_STAGES:
+                continue  # trim/cal·bin 등 본 측 필수 항목은 제거 검토 대상 아님
             sites = max(1, int(it.site_count or 1))
             proposals.append({
                 "kind": "duplicate_removal_review",
-                "item_id": dup["final_item_id"], "name": dup["name"],
+                "item_id": own_id, "name": dup["name"],
                 "basis": {"wall_time_s_per_die": round(float(it.expected_duration_s) / sites, 3)},
-                "rationale": dup["reason"],
+                "rationale": (
+                    "final test에서 동일 limits로 재검출 — wafer sort 반복은 검토 후 제거 가능"
+                    if own_is_sort else dup["reason"]
+                ),
                 "review_only": True,
             })
 

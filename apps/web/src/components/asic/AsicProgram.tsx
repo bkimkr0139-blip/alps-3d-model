@@ -40,6 +40,8 @@ import { btn, card, Chip, ConfidenceBadge, GateDot, Kpi, SectionCard, td, th } f
 import {
   ChainBudgetPanel,
   ChainRevisionPanel,
+  ConcurrentEngineeringPanel,
+  CopilotPanel,
   CornerStudiesPanel,
   EvidenceReportPanel,
   EMPTY_LIVE,
@@ -115,6 +117,9 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
   //    workspace below keeps working when the API is unreachable) ──
   const [live, setLive] = useState<Live>(EMPTY_LIVE);
   const [liveState, setLiveState] = useState<LiveState>("loading");
+  // R3 패널의 쓰기(가정 해결·findings·편차 결정·copilot 수락) 후 라이브 재적재
+  const [liveVer, setLiveVer] = useState(0);
+  const reloadLive = () => setLiveVer((v) => v + 1);
   useEffect(() => {
     let on = true;
     setLiveState("loading");
@@ -127,7 +132,7 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
     return () => {
       on = false;
     };
-  }, [tpl.id]);
+  }, [tpl.id, liveVer]);
 
   // ── Gate evaluation (§2 완료 게이트 / §10 rule style) ──
   const gates = useMemo(() => {
@@ -734,6 +739,8 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
 
           {stage === "s8" && (
             <>
+              {/* R3 EPIC I: 가정·영향 탐색·편차 — 게이트 블로커의 원인이 되는 데이터 */}
+              <ConcurrentEngineeringPanel live={live} liveState={liveState} onChanged={reloadLive} />
               <SectionCard title={`${t("asic.stage.s8")} — ${t("asic.s8.pack")}`}>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -823,6 +830,8 @@ function Workbench({ tpl }: { tpl: AsicTemplate }) {
 
           {stage === "s9" && (
             <>
+              {/* R3 EPIC J: 근거 중심 AI Copilot — 모든 제안은 근거 링크 + diff 확인 후 수락 */}
+              <CopilotPanel live={live} liveState={liveState} tplId={tpl.id} onChanged={reloadLive} />
               <FaStudio live={live} liveState={liveState} />
               <SupplyChainPanel live={live} liveState={liveState} />
               <SectionCard title={`${t("asic.stage.s9")} — ${t("asic.s9.quality")}`} right={<Chip color="#a78bfa">{t("asic.conf.synthetic_fixture")}</Chip>}>

@@ -1409,6 +1409,66 @@ packs, P1-08 three-language evidence report. Backend `app/asic_trade.py`,
   access — `b.code` is an AttributeError that only fires when a blocker
   actually exists.
 
+## ASIC v1.1 R3 — concurrent-engineering control plane + evidence-bound AI copilot (DONE, pytest 175 + l10n coverage 101/0 CLEAN)
+
+Spec v1.1 §10 R3 on top of R1+R2: EPIC I (assumption register → impact
+scans → findings-done → clear → resolve-with-evidence; deviation
+workflow; gate integration) and EPIC J (deterministic, evidence-bound AI
+copilot with shadow evaluation). Models `AsicAssumption`/`AsicAssumptionEvent`/
+`AsicImpactScan`/`AsicDeviation`/`AsicCopilotInteraction` (models/asic.py),
+endpoints in routers/asic.py under `/assumptions*`, engine in
+`app/asic_copilot.py`, blockers in `asic_gate_policy.py`
+(UNRESOLVED_HIGH_RISK_ASSUMPTION, ASSUMPTION_OVERDUE), migration
+`d6deeb514240_r3_*`, 15-test suite `test_asic_r3.py`. Frontend:
+`ConcurrentEngineeringPanel` (s8) + `CopilotPanel` (s9) in
+`asicLive.tsx`, accept-hash helper `lib/sha256.ts`, seed in
+`seed_asic_r3()`. Gotchas:
+
+- **Copilot honesty is structural, not prompt discipline**: a deterministic
+  rule engine (ENGINE_VERSION in the source) reads only DB facts; every
+  proposal carries ≥1 evidence link; no evidence ⇒ the run *abstains* with
+  a reason code; proposals are review_only text diffs — accepting one
+  requires the client to send back `sha256(diff)` and the server only
+  applies when its own recomputed diff hashes equal (acceptance criterion
+  4: AI never writes gate/evidence tables — the copilot has no write
+  paths at all). Don't "help" by adding LLM calls or auto-apply.
+- **`crypto.subtle` is undefined on plain-http LAN origins**, and the
+  workbench is routinely opened that way — the accept flow must hash
+  client-side, so `lib/sha256.ts` is a compact sync implementation verified
+  against FIPS vectors + a multi-block UTF-8 Korean string. Never "simplify"
+  it back to `crypto.subtle.digest` or accept silently breaks off-localhost.
+- **Rationale strings come from two sources with different surfaces**: the
+  testprog dup-review candidates compose `business_id · label: kind — …`
+  facts whose *label group* is itself a stored Korean string. RULES
+  entries must `seedTr()` those groups (non-greedy `(.+?)` for the label
+  in the `[검토안]` rule — greedy `(.+)` swallows past the first ` — `
+  and the rationale then misses its EXACT key). The l10n verifier (below)
+  is what catches this; eyeballing composed strings never does.
+- **`apps/web/scripts/verify_seed_l10n.mjs` is the programmatic l10n gate**
+  (npm run verify:seedl10n, API :8000 + postgres :5433 + Keycloak :8081
+  up): it loads seedL10n.ts via Node's native TS type-stripping (vite 8 is
+  rolldown-based — there is no esbuild to bundle with), pulls every Korean
+  string from the DB (recursive `jsonb_path_query(col, 'lax $.**')` for
+  JSONB columns) *plus* live-composed gate-blocker details, and fails on
+  any Hangul left after `seedTr(s, 'en'|'ja')`. `},  },`-style brace slips
+  in seedL10n.ts surface here first (tsc catches them too, but this runs
+  the actual rules).
+- **Wafer-sort flows are first-class in testprog optimizations**: the
+  duplicate-removal candidate row flips on `flow.target == "wafer_sort"`
+  (`sort_item_id` vs `final_item_id`) and its own side skips essential
+  stages; `_test_efficiency` candidates carry `wafer_ref`, not `name` —
+  label fallback chain required. Both shipped as 500s first (StopIteration /
+  KeyError) because only the dev DB had wafer_sort flows with retest bins.
+  Regression tests for each are in test_asic_r2/r3.
+- Copilot seed runs are *shadow* (persisted interactions with
+  input_hash/engine_version, no writes anywhere); the demo gate blockers
+  for the current ASIC template end up
+  [CALIBRATION_EXPIRED, MOCK_RESULT_PRESENT, UNRESOLVED_HIGH_RISK_ASSUMPTION]
+  — ASM-01 is seeded *deliberately open* (high-risk, overdue-blocking) so
+  the blocker reads live; ASM-02 walks the full happy path
+  (findings-done → clear → resolve-with-evidence DS-QFN32-TG) and is the
+  EPIC I demo.
+
 ## Known gaps / deliberately deferred
 
 - **Read endpoints have no auth.** There is no router-level/global auth
