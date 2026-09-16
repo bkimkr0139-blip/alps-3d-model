@@ -63,8 +63,11 @@ MATERIAL_BY_KEYWORD: list[tuple[str, PBRMaterial]] = [
                            metallicFactor=0.85, roughnessFactor=0.4)),
     ("port", PBRMaterial(name="ppa_natural", baseColorFactor=[0.85, 0.83, 0.75, 1.0],
                          metallicFactor=0.0, roughnessFactor=0.45)),
-    ("terminal", PBRMaterial(name="silver_brass", baseColorFactor=[0.85, 0.86, 0.88, 1.0],
-                             metallicFactor=1.0, roughnessFactor=0.35)),
+    # Terminals/pins on real ALPS parts are stamped copper alloy (phosphor
+    # bronze) — the earlier silver-brass tint read as bare tin plate, not as
+    # the warm copper the physical parts show.
+    ("terminal", PBRMaterial(name="copper_terminal", baseColorFactor=[0.80, 0.45, 0.28, 1.0],
+                             metallicFactor=1.0, roughnessFactor=0.32)),
     ("plunger", PBRMaterial(name="pom_white", baseColorFactor=[0.92, 0.92, 0.9, 1.0],
                             metallicFactor=0.0, roughnessFactor=0.4)),
     # Subtle translucency (0.85, not 0.55): a strongly transparent cap renders
@@ -94,10 +97,13 @@ MATERIAL_BY_KEYWORD: list[tuple[str, PBRMaterial]] = [
     # same reason (avoid three.js depth-sort ghosting on a translucent cap).
     ("lens", PBRMaterial(name="pc_lens", baseColorFactor=[0.85, 0.9, 0.95, 0.8],
                          metallicFactor=0.0, roughnessFactor=0.15, alphaMode="BLEND")),
+    # Molded LCP reads glossy, not chalky — 0.42 keeps a soft specular sweep
+    # across the housing faces instead of the flat matte wash that made the
+    # case read as untextured gray clay under bright fill light.
     ("housing", PBRMaterial(name="lcp_black", baseColorFactor=[0.04, 0.04, 0.045, 1.0],
-                            metallicFactor=0.0, roughnessFactor=0.55)),
+                            metallicFactor=0.0, roughnessFactor=0.42)),
     ("base", PBRMaterial(name="pbt_black", baseColorFactor=[0.06, 0.06, 0.065, 1.0],
-                         metallicFactor=0.0, roughnessFactor=0.5)),
+                         metallicFactor=0.0, roughnessFactor=0.42)),
 ]
 NEUTRAL_MATERIAL = PBRMaterial(name="neutral", baseColorFactor=[0.62, 0.65, 0.68, 1.0],
                                metallicFactor=0.1, roughnessFactor=0.5)

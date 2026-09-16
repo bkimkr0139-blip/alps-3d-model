@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Bounds, ContactShadows, OrbitControls } from "@react-three/drei";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { Group, Mesh } from "three";
 import type { ComponentDto } from "../lib/api";
@@ -391,9 +390,15 @@ function PlaceholderPart({ component, index }: { component: ComponentDto; index:
   );
 }
 
-// Image-based lighting from three's built-in RoomEnvironment — photoreal
-// reflections with zero external assets (drei's Environment presets fetch
-// remote HDRIs, which this deployment can't reach).
+// Image-based lighting from a generated dark studio — the same recipe as the
+// EDA scenes' drei <Environment>: a few bright area panels on a near-black
+// shell, PMREM'd into an env map. RoomEnvironment (a uniformly white room)
+// was tried first and washed dark plastics into a milky mid-gray — an LCP
+// housing at 4% albedo still picked up so much white-room irradiance that it
+// rendered like untextured clay. Area lights on black keep molded black
+// black and give metals crisp, believable highlights, with zero external
+// assets (drei's Environment presets fetch remote HDRIs, which this
+// deployment can't reach).
 // Exported for the Test Bench board — its metallic parts need the same
 // image-based lighting or metalness=1 renders black.
 export function ViewerEnvironment() {
@@ -402,18 +407,51 @@ export function ViewerEnvironment() {
 
   useEffect(() => {
     const pmrem = new THREE.PMREMGenerator(gl);
-    const room = new RoomEnvironment();
-    const target = pmrem.fromScene(room, 0.04);
+    const studio = new THREE.Scene();
+    studio.background = new THREE.Color("#05070d");
+    // MeshBasicMaterial color channels exceed 1.0 on purpose — PMREM captures
+    // that as HDR area lights, no texture needed.
+    const panel = (
+      color: string,
+      intensity: number,
+      size: [number, number],
+      position: [number, number, number]
+    ) => {
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(size[0], size[1]),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity) })
+      );
+      mesh.position.set(...position);
+      mesh.lookAt(0, 0, 0);
+      studio.add(mesh);
+    };
+    panel("#eaf1ff", 2.6, [16, 16], [0, 8, 0]); // overhead softbox
+    // Side panels run TALL (studio strip lights): a curved metal part — the
+    // encoder's stainless shaft — picks up a long vertical highlight, the way
+    // product photography lights a turned surface.
+    panel("#cfe0ff", 1.3, [10, 9], [9, 4, 6]); // cool strip, camera-right
+    panel("#ffe7c4", 0.9, [10, 7], [-9, 3, -5]); // warm strip, camera-left
+    // Back fill: without it, faces angled away from the strips mirror pure
+    // black and polished metal reads as black plastic.
+    panel("#aac4e8", 0.6, [12, 8], [0, 3, -9]);
+    panel("#2c3d58", 0.55, [16, 16], [0, -8, 0]); // dim floor bounce
+    const target = pmrem.fromScene(studio, 0.04);
     // Assigning the env map to the R3F-managed scene is the documented
     // pattern (drei's own Environment does exactly this inside an effect).
     // oxlint-disable-next-line react/immutability
     scene.environment = target.texture;
     // oxlint-disable-next-line react/immutability
-    scene.environmentIntensity = 0.9;
+    scene.environmentIntensity = 1.0;
     return () => {
       scene.environment = null;
       target.dispose();
-      room.dispose();
+      studio.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.isMesh) {
+          mesh.geometry.dispose();
+          (mesh.material as THREE.Material).dispose();
+        }
+      });
       pmrem.dispose();
     };
   }, [gl, scene]);
@@ -700,9 +738,11 @@ export function ThreeViewer({ components, controlsTop = 10 }: { components: Comp
         style={{ background: "#0f172a", borderRadius: 8 }}
       >
         <ViewerEnvironment />
-        {/* env map supplies the fill; keep direct lights for shape definition */}
-        <ambientLight intensity={0.2} />
-        <directionalLight position={[5, 10, 5]} intensity={1.6} />
+        {/* env map supplies the fill; keep direct lights for shape definition.
+            Kept dim — the earlier 0.2/1.6 pair plus the old white-room env map
+            lifted even 4%-albedo black plastic into washed-out mid-gray. */}
+        <ambientLight intensity={0.1} />
+        <directionalLight position={[5, 10, 5]} intensity={1.35} />
         <directionalLight position={[-6, 4, -4]} intensity={0.35} />
         <Bounds fit clip observe margin={2.0} key={sceneKey}>
           {/* STEP geometry is Z-up, glTF/three is Y-up. No <Center>: Bounds
