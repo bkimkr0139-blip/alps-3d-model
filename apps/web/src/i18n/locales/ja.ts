@@ -673,6 +673,7 @@ const ja: Resources = {
     view3dProcess: "プロセス3D (ウェーハ→FEOL→BEOL)",
     view3dSynth: "合成3D (ゲート種別クラスタ)",
     view3dLayout: "レイアウト3D (工程層構造)",
+    view3dChip: "ツイン対象チップ",
     view3dHint: "合成・P&R 実行後に有効化 — ドラッグで回転、スライダーで層分離、チップクリックでレイヤー表示/非表示。",
     processPlay: "ステップ再生",
     processStop: "停止",

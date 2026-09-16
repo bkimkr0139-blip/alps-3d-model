@@ -675,6 +675,7 @@ const en = {
     view3dProcess: "Process 3D (wafer→FEOL→BEOL)",
     view3dSynth: "Synthesis 3D (clusters by gate type)",
     view3dLayout: "Layout 3D (process layer stack)",
+    view3dChip: "Twin chip",
     view3dHint: "Enabled after Synthesis/P&R — drag to orbit, slider to explode layers, click a chip to toggle a layer.",
     processPlay: "Play steps",
     processStop: "Stop",

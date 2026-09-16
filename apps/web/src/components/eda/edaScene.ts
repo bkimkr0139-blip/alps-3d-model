@@ -64,6 +64,155 @@ export const LAYER_REGISTRY: { key: string; y: number; color: RGB }[] = [
 const LAYER_Y = Object.fromEntries(LAYER_REGISTRY.map((l) => [l.key, l.y])) as Record<string, number>;
 const LAYER_COLOR = Object.fromEntries(LAYER_REGISTRY.map((l) => [l.key, l.color])) as Record<string, RGB>;
 
+// ── Per-mission silicon profile ────────────────────────────────────────
+// The Python original drew one generic sample die for every project. The
+// training missions now represent the workbench's own product silicon
+// (see MISSIONS in edaRunner.ts), so each mission carries the chip
+// identity of the product block it models: die footprint, floorplan
+// defaults, real floorplan macros (functional blocks), an analog AFE
+// island and a memory array. The builders key off mission.slug via
+// silProfileOf(); unknown slugs keep the old generic sample.
+export type SilMacro = [label: string, w: number, d: number, color: RGB, fx: number, fz: number];
+
+type SilAnalog = {
+  label: string;
+  w: number;
+  d: number;
+  /** region center as a fraction of the process-scene die (−0.5..0.5) */
+  fx: number;
+  fz: number;
+  /** touch-style electrode combs (top metal, 0 = no touch front-end) */
+  electrodes: number;
+  /** MIM cap pairs (FEOL analog structures) */
+  caps: number;
+  /** poly resistor serpentine segments */
+  res: number;
+};
+type SilMem = { label: string; cols: number; rows: number; fx: number; fz: number };
+
+export type SilProfile = {
+  /** training part code — heuristic label for the twin (◈-class data) */
+  chip: string;
+  /** process-scene die footprint (scene units) */
+  dieW: number;
+  dieD: number;
+  /** synthesis floor aspect (w/d) — the product's die proportion */
+  aspect: number;
+  /** floorplan defaults merged over DEFAULT_FLOORPLAN */
+  fp: Partial<FloorplanConfig>;
+  /** floorplan macro catalog; fp.numMacros picks the first N */
+  macros: SilMacro[];
+  /** analog front-end island (mixed-signal missions only) */
+  analog?: SilAnalog;
+  /** dense memory array (process scene) */
+  mem?: SilMem;
+  /** bond-pad counts: tb = per top/bottom edge, side = per left edge */
+  pads: { tb: number; side: number };
+};
+
+export const SIL_PROFILES: Record<string, SilProfile> = {
+  // TACT-DB4 — pure-digital contact-filter block: small die, no analog.
+  counter_4bit: {
+    chip: "TACT-DB4",
+    dieW: 9.5,
+    dieD: 7.0,
+    aspect: 1.3,
+    fp: { dieW: 6, dieD: 4.5, numMacros: 1, padDensity: "low" },
+    macros: [
+      ["DEBCNT", 2.2, 1.4, [0.96, 0.62, 0.1], -0.22, -0.2],
+      ["SYNC2", 1.2, 1.0, [0.55, 0.3, 0.85], 0.3, 0.28],
+      ["EDGDET", 1.3, 1.0, [0.3, 0.85, 0.55], 0.28, -0.25],
+      ["KEYIF", 1.4, 1.1, [0.65, 0.3, 0.65], -0.25, 0.3],
+    ],
+    pads: { tb: 4, side: 1 },
+  },
+  // TCH-ALU4 — touch snap judgement: digital ALU + capacitive AFE island.
+  alu_4bit: {
+    chip: "TCH-ALU4",
+    dieW: 11.0,
+    dieD: 8.0,
+    aspect: 1.35,
+    fp: { dieW: 7, dieD: 5.5, numMacros: 2, padDensity: "medium" },
+    macros: [
+      ["TOUCH_AFE", 2.0, 1.6, [0.1, 0.65, 0.6], -0.24, 0.0],
+      ["ALU4", 2.2, 1.4, [0.13, 0.83, 0.93], 0.24, -0.24],
+      ["SNAPCTL", 1.6, 1.2, [0.96, 0.62, 0.1], 0.26, 0.26],
+      ["REGF", 1.4, 1.1, [0.65, 0.3, 0.65], -0.24, 0.3],
+    ],
+    analog: { label: "TOUCH_AFE", w: 2.6, d: 2.2, fx: -0.26, fz: 0.05, electrodes: 8, caps: 6, res: 4 },
+    pads: { tb: 6, side: 2 },
+  },
+  // AFE-FIFO — AFE sample ring buffer: AFE island + dense ring RAM.
+  fifo_sync: {
+    chip: "AFE-FIFO",
+    dieW: 12.0,
+    dieD: 8.5,
+    aspect: 1.4,
+    fp: { dieW: 8, dieD: 6, numMacros: 2, padDensity: "medium", utilization: 0.6 },
+    macros: [
+      ["AFE", 1.9, 1.5, [0.1, 0.65, 0.6], -0.26, 0.0],
+      ["RING_RAM", 2.6, 1.6, [0.2, 0.55, 0.78], 0.24, -0.22],
+      ["RDPTR", 1.2, 1.0, [0.96, 0.62, 0.1], 0.28, 0.28],
+      ["WRPTR", 1.2, 1.0, [0.96, 0.45, 0.1], -0.26, 0.3],
+    ],
+    analog: { label: "AFE", w: 2.4, d: 2.0, fx: -0.28, fz: 0.05, electrodes: 0, caps: 8, res: 3 },
+    mem: { label: "RING_RAM", cols: 10, rows: 6, fx: 0.24, fz: -0.18 },
+    pads: { tb: 7, side: 2 },
+  },
+  // SNS-UART — sensor UART TX: narrow SOIC-style die, AFE + serial logic.
+  uart_tx: {
+    chip: "SNS-UART",
+    dieW: 13.0,
+    dieD: 7.5,
+    aspect: 1.6,
+    fp: { dieW: 8.5, dieD: 5.5, numMacros: 2, padDensity: "medium" },
+    macros: [
+      ["AFE", 1.9, 1.5, [0.1, 0.65, 0.6], -0.3, 0.0],
+      ["TX_SHFT", 2.0, 1.2, [0.13, 0.83, 0.93], 0.26, -0.22],
+      ["BAUD16", 1.5, 1.1, [0.55, 0.3, 0.85], 0.28, 0.26],
+      ["PCTL", 1.3, 1.0, [0.96, 0.62, 0.1], -0.28, 0.3],
+    ],
+    analog: { label: "AFE", w: 2.6, d: 2.0, fx: -0.3, fz: 0.0, electrodes: 0, caps: 6, res: 5 },
+    pads: { tb: 7, side: 2 },
+  },
+  // AFE-SOC1 — AFE/SoC control core: largest die, AFE + RISC + memories.
+  risc32: {
+    chip: "AFE-SOC1",
+    dieW: 15.0,
+    dieD: 11.0,
+    aspect: 1.35,
+    fp: { dieW: 12, dieD: 9, numMacros: 3, padDensity: "high", utilization: 0.65 },
+    macros: [
+      ["AFE", 1.9, 1.5, [0.1, 0.65, 0.6], -0.3, 0.0],
+      ["RISC_CORE", 2.6, 1.8, [0.96, 0.62, 0.1], 0.22, -0.24],
+      ["SRAM32K", 2.4, 1.6, [0.2, 0.55, 0.78], 0.24, 0.28],
+      ["BOOT_ROM", 1.8, 1.2, [0.65, 0.3, 0.65], -0.28, 0.3],
+    ],
+    analog: { label: "AFE", w: 2.6, d: 2.2, fx: -0.3, fz: 0.05, electrodes: 0, caps: 8, res: 4 },
+    mem: { label: "SRAM32K", cols: 12, rows: 8, fx: 0.24, fz: -0.16 },
+    pads: { tb: 10, side: 3 },
+  },
+};
+
+const GENERIC_PROFILE: SilProfile = {
+  chip: "GEN-EDA",
+  dieW: 12.5,
+  dieD: 8.5,
+  aspect: 1.0,
+  fp: {},
+  macros: [
+    ["SRAM", 2.8, 1.8, [0.2, 0.55, 0.78], -0.33, 0.28],
+    ["REGS", 2.4, 1.6, [0.65, 0.3, 0.65], 0.3, -0.28],
+    ["PLL", 1.8, 1.3, [0.25, 0.7, 0.5], -0.36, -0.3],
+    ["DSP", 2.0, 1.4, [0.85, 0.45, 0.2], 0.33, 0.3],
+  ],
+  pads: { tb: 8, side: 2 },
+};
+
+export function silProfileOf(slug: string): SilProfile {
+  return SIL_PROFILES[slug] ?? GENERIC_PROFILE;
+}
+
 // ── Synthesis scene — per-cell-type cluster diagram ──
 // Port of build_synthesis_scene: every cell from the yosys-style
 // cells_by_type breakdown becomes a cube, grouped into ⌈√N⌉×⌈N/⌈√N⌉⌉ blocks
@@ -171,7 +320,11 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
   const stripDepths = strips.map((s) => Math.max(1, ...s.map((b) => b.td)));
   const totalWCubes = Math.max(1, ...stripWidths);
   const totalDCubes = stripDepths.reduce((a, b) => a + b, 0) + INTER * (strips.length - 1);
-  const floorW = totalWCubes * spacing + 2.0;
+  // The floor plane follows the product's die aspect (silProfileOf), so a
+  // narrow sensor die and a square SoC no longer share the same slab — the
+  // unused margin is the chip's real floorplan headroom.
+  const prof = silProfileOf(projectTitle);
+  const floorW = totalWCubes * spacing * prof.aspect + 2.0;
   const floorD = totalDCubes * spacing + 1.5;
 
   const rng = mulberry32(strSeed(projectTitle));
@@ -186,6 +339,60 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
     color: [0.06, 0.1, 0.18],
     roughness: 0.95,
   });
+
+  // Analog macro island — a mixed-signal part's AFE never comes out of the
+  // synthesizer as gates; it sits beside the standard-cell sea as a hard
+  // macro with its own cap array and guard ring.
+  if (prof.analog) {
+    const a = prof.analog;
+    const marginX = (floorW - totalWCubes * spacing) / 2;
+    const aW = Math.min(a.w * 0.8, Math.max(1.0, marginX - 0.7));
+    const aD = Math.min(a.d, Math.max(1.2, totalDCubes * spacing * 0.6));
+    // near (+x, +z) corner — the default camera looks from there, so the
+    // AFE island is the first thing a mixed-signal twin shows
+    const ax = floorW / 2 - aW / 2 - 0.55;
+    const az = floorD / 2 - aD / 2 - 0.75;
+    boxes.push({
+      name: `eda_analog_${a.label}`,
+      layer: "analog",
+      pos: [ax, 0.3, az],
+      size: [aW, 0.6, aD],
+      color: [0.1, 0.65, 0.6],
+      metalness: 0.3,
+      roughness: 0.5,
+      emissive: 0.18,
+    });
+    for (let i = 0; i < Math.min(a.caps, 8); i++) {
+      const cx = ax - aW / 2 + 0.35 + (i % 4) * ((aW - 0.5) / 3.5);
+      const cz = az - aD / 2 + 0.28 + Math.floor(i / 4) * (aD - 0.5);
+      boxes.push({
+        name: `eda_analog_mim${i}`,
+        layer: "analog",
+        pos: [cx, 0.68, cz],
+        size: [0.22, 0.14, 0.16],
+        color: [0.3, 0.85, 0.75],
+        metalness: 0.6,
+        roughness: 0.35,
+        emissive: 0.25,
+      });
+    }
+    for (const [px, pz, sx, sz] of [
+      [ax, az - aD / 2 - 0.08, aW + 0.24, 0.08],
+      [ax, az + aD / 2 + 0.08, aW + 0.24, 0.08],
+      [ax - aW / 2 - 0.08, az, 0.08, aD + 0.24],
+      [ax + aW / 2 + 0.08, az, 0.08, aD + 0.24],
+    ] as const)
+      boxes.push({
+        name: "eda_analog_guard",
+        layer: "analog",
+        pos: [px, 0.3, pz],
+        size: [sx, 0.2, sz],
+        color: [0.3, 0.85, 0.75],
+        metalness: 0.5,
+        roughness: 0.4,
+        emissive: 0.2,
+      });
+  }
 
   let cellIdx = 0;
   const zTop = -(totalDCubes / 2.0) * spacing;
@@ -261,6 +468,8 @@ export function buildSynthesisScene(report: SynthResult, projectTitle: string): 
     color: b.color,
     count: b.count,
   }));
+  if (prof.analog)
+    legend.push({ key: "analog", label: `${prof.analog.label} ×1`, color: [0.1, 0.65, 0.6], count: 1 });
 
   const radius = Math.max(floorW, floorD);
   return { mode: "synthesis", boxes, legend, target: [0, 1, 0], distance: radius * 1.6 + 4 };
@@ -341,21 +550,24 @@ export function buildLayoutScene(fp: FloorplanConfig, drcViolations: number, pro
     size: [CORE_W, 0.04, CORE_D], color: [0.07, 0.1, 0.18], roughness: 0.85,
   });
 
-  // 5. Macros (generic catalog, first numMacros of it)
-  const macroCatalog: [string, number, number, number, number, RGB][] = [
-    ["SRAM", -CORE_W / 2 + 1.55, CORE_D / 2 - 1.2, 2.8, 1.8, [0.2, 0.55, 0.78]],
-    ["REGS", CORE_W / 2 - 1.3, -CORE_D / 2 + 1.0, 2.4, 1.6, [0.65, 0.3, 0.65]],
-    ["PLL", -CORE_W / 2 + 1.1, -CORE_D / 2 + 0.85, 1.8, 1.3, [0.25, 0.7, 0.5]],
-    ["DSP", CORE_W / 2 - 1.2, CORE_D / 2 - 0.95, 2.0, 1.4, [0.85, 0.45, 0.2]],
-  ];
-  const macros = macroCatalog.slice(0, fp.numMacros);
+  // 5. Macros — the mission's real functional blocks (silProfileOf: an AFE
+  // chip places its analog front-end, the SoC places RISC + memories), the
+  // first numMacros of the catalog, clamped inside the core area.
+  const prof = silProfileOf(projectTitle);
+  const macros = prof.macros.slice(0, fp.numMacros).map(([label, mw0, md0, color, fx, fz]) => {
+    const mw = Math.min(mw0, CORE_W * 0.46);
+    const md = Math.min(md0, CORE_D * 0.44);
+    const mx = Math.max(-(CORE_W - mw) / 2 + 0.15, Math.min((CORE_W - mw) / 2 - 0.15, fx * CORE_W));
+    const mz = Math.max(-(CORE_D - md) / 2 + 0.15, Math.min((CORE_D - md) / 2 - 0.15, fz * CORE_D));
+    return { label, mx, mz, mw, md, color };
+  });
   const macroBboxes: [number, number, number, number][] = [];
-  for (const [name, mx, mz, mw, md, color] of macros) {
+  for (const m of macros) {
     boxes.push({
-      name: `eda_macro_${name}`, layer: "macro", pos: [mx, LAYER_Y.macro, mz],
-      size: [mw, 0.2, md], color, metalness: 0.25, roughness: 0.55, emissive: 0.08,
+      name: `eda_macro_${m.label}`, layer: "macro", pos: [m.mx, LAYER_Y.macro, m.mz],
+      size: [m.mw, 0.2, m.md], color: m.color, metalness: 0.25, roughness: 0.55, emissive: 0.08,
     });
-    macroBboxes.push([mx, mz, mw, md]);
+    macroBboxes.push([m.mx, m.mz, m.mw, m.md]);
   }
   const hitsMacro = (x: number, z: number, w = 0.0, d = 0.0) =>
     macroBboxes.some(
@@ -569,10 +781,34 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
   // Standard-cell row count scales with the gate count (6..12 rows)
   const ROWS = Math.min(12, Math.max(6, Math.round(4 + Math.sqrt(gates) / 4)));
   const COLS = 10; // poly gate lines per row span
-  const W = 12.5;
-  const D = 8.5;
+  // Die footprint follows the product chip (silProfileOf): the SNS-UART
+  // die is a narrow strip, the AFE/SoC die is the largest, and the pad /
+  // analog / memory placements below all hang off the same profile.
+  const prof = silProfileOf(projectTitle);
+  const W = prof.dieW;
+  const D = prof.dieD;
   const rowZ = (r: number) => -D / 2 + 1.0 + ((r + 0.5) * (D - 2.0)) / ROWS;
   const colX = (c: number) => -W / 2 + 1.2 + ((c + 0.5) * (W - 2.4)) / COLS;
+
+  // Mission-specific regions: analog AFE island + dense memory array.
+  const anaRect = () => {
+    const a = prof.analog;
+    if (!a) return null;
+    const w = Math.min(a.w, W * 0.3);
+    const d = Math.min(a.d, D * 0.36);
+    const cx = Math.max(-(W - w) / 2 + 0.4, Math.min((W - w) / 2 - 0.4, a.fx * W));
+    const cz = Math.max(-(D - d) / 2 + 0.4, Math.min((D - d) / 2 - 0.4, a.fz * D));
+    return { a, cx, cz, w, d };
+  };
+  const memRect = () => {
+    const m = prof.mem;
+    if (!m) return null;
+    const w = Math.min(m.cols * 0.24 + 0.4, W * 0.3);
+    const d = Math.min(m.rows * 0.24 + 0.4, D * 0.36);
+    const cx = Math.max(-(W - w) / 2 + 0.4, Math.min((W - w) / 2 - 0.4, m.fx * W));
+    const cz = Math.max(-(D - d) / 2 + 0.4, Math.min((D - d) / 2 - 0.4, m.fz * D));
+    return { m, cx, cz, w, d };
+  };
 
   // corner alignment keys (photo-lithography step detail, reused twice)
   const alignmentKeys = (s: ProcStep, y: number, size: number) => {
@@ -601,6 +837,9 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
     put(s, "flat", [W / 2 - 0.12, -0.1, 0], [0.24, 0.3, D - 0.6], [0.3, 0.33, 0.38], { metalness: 0.4 });
     for (let i = 0; i < 10; i++)
       put(s, `scribe${i}`, [-3.6 + i * 0.42, 0.005, D / 2 - 0.5], [0.2, 0.02, 0.1], [0.08, 0.09, 0.12]); // laser-scribe serial digits
+    // stepper reticle field: this product's die repeats in a 2×2 field grid
+    for (const [ffx, ffz] of [[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]] as const)
+      put(s, `field_${ffx > 0 ? "e" : "w"}${ffz > 0 ? "s" : "n"}`, [ffx * W, -0.02, ffz * D], [W * 0.42, 0.02, D * 0.42], [0.95, 0.95, 0.6], { opacity: 0.22, emissive: 0.2 });
   }
 
   // ── S01 STI: shallow-trench isolation fill + CMP planarity check bar ──
@@ -620,6 +859,8 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
     put(s, "nwell_top", [0, 0.16, -D / 2 + 1.6], [W - 1.6, 0.16, 2.4], s.color, { opacity: 0.4 });
     put(s, "nwell_bot", [0, 0.16, D / 2 - 1.6], [W - 1.6, 0.16, 2.4], s.color, { opacity: 0.4 });
     put(s, "pwell", [0, 0.16, 0], [W - 1.6, 0.16, D - 5.4], [0.85, 0.5, 0.2], { opacity: 0.4 });
+    const ar = anaRect();
+    if (ar) put(s, "dnwell", [ar.cx, 0.16, ar.cz], [ar.w + 0.5, 0.18, ar.d + 0.5], [0.16, 0.5, 0.5], { opacity: 0.45 }); // deep n-well: the AFE's isolated island
     put(s, "ion_beam", [0, 1.3, 0], [0.14, 2.0, 0.14], [0.9, 0.95, 1], { cyl: true, opacity: 0.5, emissive: 0.9 }); // implanter beam
     put(s, "beamline", [-W / 2 - 0.8, 1.3, 0], [0.5, 0.2, 0.2], [0.7, 0.75, 0.85], { emissive: 0.3 }); // beamline stub
     alignmentKeys(s, 0.26, 0.5);
@@ -632,6 +873,19 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
       put(s, `gox_${r}`, [0, 0.26, rowZ(r)], [W - 1.6, 0.03, 0.56], [0.1, 0.75, 0.75], { emissive: 0.3 });
     for (let c = 0; c < COLS; c++)
       put(s, `poly_${c}`, [colX(c), 0.32, 0], [0.34, 0.1, D - 2.0], s.color, { metalness: 0.3, roughness: 0.5 });
+    const ar = anaRect();
+    if (ar) {
+      // analog FEOL: island outline + MIM cap pairs + poly resistor serpentine
+      put(s, "ana_frame", [ar.cx, 0.3, ar.cz], [ar.w + 0.3, 0.03, ar.d + 0.3], [0.85, 0.85, 0.85], { opacity: 0.3 });
+      for (let i = 0; i < Math.min(ar.a.caps, 8); i++) {
+        const cx = ar.cx - ar.w / 2 + 0.42 + (i % 4) * ((ar.w - 0.7) / 3);
+        const cz = ar.cz - ar.d / 2 + 0.35 + Math.floor(i / 4) * ((ar.d - 0.6) / 1.2);
+        put(s, `mim${i}a`, [cx, 0.3, cz], [0.3, 0.03, 0.2], [0.3, 0.85, 0.75], { emissive: 0.2 });
+        put(s, `mim${i}b`, [cx, 0.34, cz], [0.24, 0.03, 0.16], [0.13, 0.83, 0.93], { emissive: 0.3 });
+      }
+      for (let i = 0; i < ar.a.res; i++)
+        put(s, `ares${i}`, [ar.cx + ar.w / 2 - 0.35, 0.3, ar.cz - ar.d / 2 + 0.3 + i * 0.16], [0.3, 0.03, 0.1], [0.55, 0.32, 0.18], { emissive: 0.15 });
+    }
     reticleFrame(s, 1.7);
   }
 
@@ -673,6 +927,13 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
         put(s, `sil_sd_${r}_${c}`, [x, 0.36, z], [0.5, 0.04, 0.44], s.color, metal);
         put(s, `plug_${r}_${c}`, [x, 0.55, z], [0.2, 0.3, 0.2], [0.55, 0.58, 0.62], { cyl: true, metalness: 0.85, roughness: 0.3 }); // tungsten plug
       }
+    const mr = memRect();
+    if (mr) {
+      // dense memory array: the mission's RAM/ROM core, pitch-tight cells
+      for (let r = 0; r < mr.m.rows; r++)
+        for (let c = 0; c < mr.m.cols; c++)
+          put(s, `mcell_${r}_${c}`, [mr.cx - (mr.w - 0.3) / 2 + c * 0.24, 0.42, mr.cz - (mr.d - 0.3) / 2 + r * 0.24], [0.16, 0.12, 0.16], [0.2, 0.55, 0.78], { emissive: 0.18, roughness: 0.45 });
+    }
   }
 
   // ── S07 M1: cell rails + stubs, M1 mask reticle ──
@@ -683,6 +944,21 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
     for (let r = 0; r < ROWS; r++)
       for (let c = 0; c < COLS - 1; c++)
         put(s, `m1_${r}_${c}`, [(colX(c) + colX(c + 1)) / 2, 0.78, rowZ(r)], [0.22, 0.13, 0.22], s.color, { metalness: 0.8, roughness: 0.35 });
+    const ar = anaRect();
+    if (ar) {
+      // guard/shield ring closing the analog island off from the digital sea
+      for (const [px, pz, sx, sz] of [
+        [ar.cx, ar.cz - ar.d / 2 - 0.1, ar.w + 0.5, 0.1],
+        [ar.cx, ar.cz + ar.d / 2 + 0.1, ar.w + 0.5, 0.1],
+        [ar.cx - ar.w / 2 - 0.1, ar.cz, 0.1, ar.d + 0.5],
+        [ar.cx + ar.w / 2 + 0.1, ar.cz, 0.1, ar.d + 0.5],
+      ] as const)
+        put(s, "ana_shield", [px, 0.78, pz], [sx, 0.13, sz], [0.3, 0.85, 0.75], { metalness: 0.8, roughness: 0.35, emissive: 0.15 });
+    }
+    const mr = memRect();
+    if (mr)
+      for (let c = 0; c < Math.min(mr.m.cols, 10); c++)
+        put(s, `membit${c}`, [mr.cx - (mr.w - 0.3) / 2 + c * 0.24, 0.78, mr.cz], [0.06, 0.13, mr.d + 0.2], [0.3, 0.55, 0.95], { metalness: 0.8, roughness: 0.35 }); // bitlines
     reticleFrame(s, 1.9);
   }
 
@@ -708,6 +984,12 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
       put(s, `m5_vdd${zz > 0 ? "p" : "n"}`, [0, 1.84, zz], [sx, 0.2, sz], [0.55, 0.3, 0.85], { metalness: 0.85, roughness: 0.3 });
     for (const xx of [-W / 2 + 0.8, 0, W / 2 - 0.8])
       put(s, `m6_${xx < 0 ? "n" : xx > 0 ? "p" : "m"}`, [xx, 2.08, 0], [0.8, 0.22, D - 0.4], [0.85, 0.85, 0.3], { metalness: 0.85, roughness: 0.3 });
+    const ar = anaRect();
+    if (ar && ar.a.electrodes > 0) {
+      // touch front-end: electrode comb array over the AFE island (top metal)
+      for (let i = 0; i < ar.a.electrodes; i++)
+        put(s, `electrode${i}`, [ar.cx - ar.w / 2 + 0.35 + (i * (ar.w - 0.6)) / Math.max(1, ar.a.electrodes - 1), 2.2, ar.cz], [0.14, 0.06, ar.d - 0.3], [0.3, 0.85, 0.75], { metalness: 0.7, roughness: 0.3, emissive: 0.25 });
+    }
   }
 
   // ── S10 passivation + die-ID dot matrix (traceability) ──
@@ -724,13 +1006,16 @@ export function buildProcessScene(report: SynthResult, projectTitle: string): Ed
   {
     const s = stepOf("S11 pad/seal/PCM");
     const pad: Partial<EdaBox> = { metalness: 1.0, roughness: 0.28, emissive: 0.08 };
-    // periphery bond pads (two rows top/bottom, one column each side)
-    for (let i = 0; i < 8; i++) {
-      const x = -W / 2 + 1.4 + (i * (W - 2.8)) / 7;
+    // periphery bond pads — count from the product's pad ring (profile)
+    for (let i = 0; i < prof.pads.tb; i++) {
+      const x = -W / 2 + 1.4 + (i * (W - 2.8)) / Math.max(1, prof.pads.tb - 1);
       put(s, `pad_b${i}`, [x, 2.42, D / 2 - 0.55], [0.55, 0.1, 0.55], s.color, pad);
       put(s, `pad_t${i}`, [x, 2.42, -D / 2 + 0.55], [0.55, 0.1, 0.55], s.color, pad);
     }
-    for (const zz of [-1.6, 1.6]) put(s, `pad_s${zz}`, [-W / 2 + 0.55, 2.42, zz], [0.55, 0.1, 0.55], s.color, pad);
+    for (let i = 0; i < prof.pads.side; i++) {
+      const zz = prof.pads.side === 1 ? 0 : -1.6 + (3.2 * i) / (prof.pads.side - 1);
+      put(s, `pad_s${i}`, [-W / 2 + 0.55, 2.42, zz], [0.55, 0.1, 0.55], s.color, pad);
+    }
     // seal ring
     const seal = stepOf("S11 pad/seal/PCM");
     for (const [px, pz, sx, sz] of [

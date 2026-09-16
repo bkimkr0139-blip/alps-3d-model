@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  DEFAULT_FLOORPLAN,
   MISSIONS,
   mergedFloorplan,
   runLint,
@@ -15,7 +14,7 @@ import {
   type SimResult,
   type SynthResult,
 } from "./edaRunner";
-import { buildLayoutScene, buildProcessScene, buildSynthesisScene } from "./edaScene";
+import { buildLayoutScene, buildProcessScene, buildSynthesisScene, silProfileOf } from "./edaScene";
 import { pickL } from "../../lib/lstr";
 import { Eda3DViewer } from "./Eda3DViewer";
 import { EdaWaveform } from "./EdaWaveform";
@@ -56,7 +55,9 @@ export function EdaTraining() {
   const [mission, setMission] = useState<Mission>(MISSIONS[0]);
   const [rtl, setRtl] = useState(MISSIONS[0].starterRtl);
   const [clockPeriod, setClockPeriod] = useState(10);
-  const [fp, setFp] = useState<FloorplanConfig>(DEFAULT_FLOORPLAN);
+  // The floorplan starts from the selected product's die defaults, not a
+  // generic sample — pickMission re-applies them on every switch.
+  const [fp, setFp] = useState<FloorplanConfig>(mergedFloorplan(silProfileOf(MISSIONS[0].slug).fp));
   const [lint, setLint] = useState<LintResult | null>(null);
   const [sim, setSim] = useState<SimResult | null>(null);
   const [synth, setSynth] = useState<SynthResult | null>(null);
@@ -161,6 +162,7 @@ export function EdaTraining() {
   const pickMission = (m: Mission) => {
     setMission(m);
     setRtl(m.starterRtl);
+    setFp(mergedFloorplan(silProfileOf(m.slug).fp));
     setLint(null);
     setSim(null);
     setSynth(null);
@@ -487,6 +489,10 @@ export function EdaTraining() {
           >
             {t("eda.view3dLayout")}
           </button>
+          <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: "monospace", color: "#fbbf24" }}>
+            ◈ {t("eda.view3dChip")}: {silProfileOf(mission.slug).chip} · {mission.topModule}
+            {synth?.status === "success" ? ` · ${synth.gateCount} gates` : ""}
+          </span>
           <span style={{ fontSize: 11, color: "#64748b" }}>{t("eda.view3dHint")}</span>
         </div>
         <div style={{ height: 430 }}>

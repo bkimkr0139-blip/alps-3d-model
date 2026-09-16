@@ -673,6 +673,7 @@ const ko: Resources = {
     view3dProcess: "공정 3D (웨이퍼→FEOL→BEOL)",
     view3dSynth: "합성 3D (게이트 타입별 클러스터)",
     view3dLayout: "레이아웃 3D (공정 층 구조)",
+    view3dChip: "트윈 대상 칩",
     view3dHint: "합성·P&R 실행 후 활성화 — 드래그로 회전, 슬라이더로 층 분리, 칩 클릭으로 레이어 표시/숨김.",
     processPlay: "단계 재생",
     processStop: "정지",
