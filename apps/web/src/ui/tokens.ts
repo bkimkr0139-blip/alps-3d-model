@@ -2,22 +2,47 @@
 // shared control metrics. Every value here mirrors a hex already in use across
 // the twin (App shell, asicUi, TwinControls, the 3D scenes); files adopt them
 // opportunistically as they are touched, not in one big sweep.
+//
+// Depth model ("precision instrument", grounded in a survey of industrial HMI
+// practice — ISA-101-style muted surfaces with color reserved for signal,
+// Siemens-dark-theme-style layered tonal panels, product-photo metalwork):
+// surfaces are LAYERED darks, never flat black — each level one step lighter
+// with a 1px top rim light, controls are embossed metal, and the saturated
+// palette (status + accent below) is the only strong color on screen.
 
 export const bg = {
-  page: "#020617",
-  card: "#0b1220",
-  panel: "#0f172a",
-  panelAlt: "#141c2e",
-  raise: "#1e293b",
+  page: "#060b15",
+  card: "#0c1322",
+  panel: "#101a2c",
+  panelAlt: "#152034",
+  raise: "#1d2940",
   // Canvas-overlay glass — the HUD family background (TwinControls, cockpit
   // drawers, factory station drawer all share it so overlays read as one system).
-  hud: "rgba(15, 23, 42, 0.88)",
+  hud: "rgba(13, 20, 35, 0.86)",
+  // Brushed-metal faces: subtle vertical gradients (never flat fills) for the
+  // header bar, panels and raised controls.
+  metalHeader: "linear-gradient(180deg, #1c2740 0%, #141e31 52%, #101828 100%)",
+  metalPanel: "linear-gradient(180deg, #131c2e 0%, #0f1725 100%)",
+  metalRaise: "linear-gradient(180deg, #26334d 0%, #1c2839 100%)",
+  metalWell: "linear-gradient(180deg, #0a101d 0%, #0e1626 100%)",
 } as const;
 
 export const border = {
-  subtle: "#141c2e",
+  subtle: "#17203366",
   base: "#1e293b",
   strong: "#334155",
+  // Hairline rim light — the top edge of an embossed surface catches light.
+  rim: "rgba(148, 178, 255, 0.14)",
+} as const;
+
+// Layered shadow recipes. Inline styles compose these with gradients.
+export const emboss = {
+  // A raised control: lit top edge, soft drop.
+  lift: "inset 0 1px 0 rgba(255,255,255,0.08), 0 1px 2px rgba(2,6,23,0.55), 0 2px 8px rgba(2,6,23,0.3)",
+  // A panel: gentler rim, tighter drop.
+  panel: "inset 0 1px 0 rgba(255,255,255,0.05), 0 1px 3px rgba(2,6,23,0.4)",
+  // A pressed control / sunken readout well.
+  well: "inset 0 2px 5px rgba(2,6,23,0.6), inset 0 0 0 1px rgba(2,6,23,0.4)",
 } as const;
 
 export const text = {
@@ -26,6 +51,15 @@ export const text = {
   muted: "#94a3b8",
   faint: "#64748b",
 } as const;
+
+export const font = {
+  ui: "'Pretendard Variable', Pretendard, Inter, system-ui, 'Segoe UI', Roboto, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif",
+  mono: "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
+} as const;
+
+// Micro-label tracking — uppercase captions get loosened spacing the way
+// instrument front panels do.
+export const tracking = { micro: "0.55px", wider: "1.1px" } as const;
 
 // Status palette. Rule everywhere: a mark/label always accompanies the color —
 // never colour alone (the §5.1 legend rule the process chart already follows).
@@ -61,4 +95,4 @@ export const tabColor = {
 
 export const radius = { sm: 6, md: 8, pill: 9 } as const;
 
-export const fontMono = "monospace";
+export const fontMono = font.mono;

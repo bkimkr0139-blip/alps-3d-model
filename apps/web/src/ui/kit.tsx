@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { bg, border, text, status, accent, radius, fontMono } from "./tokens";
+import { bg, border, text, status, accent, radius, fontMono, emboss, tracking } from "./tokens";
 
 // Shared UI kit for the whole twin — the primitives that used to live only in
 // the ASIC workbench (asicUi.tsx, now a re-export shim) plus the canvas-overlay
@@ -14,17 +14,22 @@ export const card: React.CSSProperties = {
   border: `1px solid ${border.base}`,
   borderRadius: radius.md,
   padding: 12,
-  background: bg.card,
+  background: bg.metalPanel,
+  boxShadow: emboss.panel,
 };
 
+// Table headers read like instrument panel silkscreen: uppercase, tracked,
+// hairline-ruled.
 export const th: React.CSSProperties = {
   textAlign: "left",
   fontSize: 10,
   color: text.faint,
-  fontWeight: 500,
+  fontWeight: 600,
   padding: "4px 8px",
   borderBottom: `1px solid ${border.base}`,
   whiteSpace: "nowrap",
+  textTransform: "uppercase",
+  letterSpacing: tracking.micro,
 };
 
 export const td: React.CSSProperties = {
@@ -82,11 +87,13 @@ export function GateDot({ status: gate }: { status: "pass" | "blocked" }) {
   );
 }
 
+// KPI tile: a sunken readout well with a mono value — the number sits in the
+// panel the way a meter reading sits in its bezel.
 export function Kpi({ label, value, color = accent.kpi }: { label: string; value: string | number; color?: string }) {
   return (
-    <div style={{ background: bg.panel, borderRadius: radius.sm, padding: "5px 9px", minWidth: 84 }}>
-      <div style={{ fontSize: 10, color: text.faint, whiteSpace: "nowrap" }}>{label}</div>
-      <div style={{ fontSize: 14, fontFamily: fontMono, color }}>{value}</div>
+    <div style={{ background: bg.metalWell, borderRadius: radius.sm, padding: "5px 9px", minWidth: 84, boxShadow: emboss.well }}>
+      <div style={{ fontSize: 10, color: text.faint, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: tracking.micro }}>{label}</div>
+      <div style={{ fontSize: 14, fontFamily: fontMono, fontWeight: 500, color }}>{value}</div>
     </div>
   );
 }
@@ -95,7 +102,7 @@ export function SectionCard({ title, right, children }: { title: string; right?:
   return (
     <div style={{ ...card, marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <h3 style={{ margin: 0, fontSize: 13, color: text.body }}>{title}</h3>
+        <h3 style={{ margin: 0, fontSize: 13, color: text.bright, fontWeight: 600, letterSpacing: tracking.micro }}>{title}</h3>
         {right}
       </div>
       {children}
@@ -103,13 +110,23 @@ export function SectionCard({ title, right, children }: { title: string; right?:
   );
 }
 
+// Embossed instrument key: a brushed-metal face with a lit top edge when at
+// rest; when active the key glows in its own status color and the label
+// brightens. `:hover`/`:active` polish (press travel, sheen) lives in
+// index.css so every button in the app inherits it for free.
 export const btn = (active: boolean, color: string = status.info): React.CSSProperties => ({
   fontSize: 11,
   padding: "4px 10px",
   borderRadius: radius.sm,
   border: `1px solid ${active ? color : border.strong}`,
-  background: active ? `${color}22` : bg.panel,
-  color: active ? text.body : text.muted,
+  background: active
+    ? `linear-gradient(180deg, ${color}33 0%, ${color}1f 100%)`
+    : bg.metalRaise,
+  boxShadow: active
+    ? `inset 0 1px 0 ${color}44, inset 0 0 6px ${color}22, 0 1px 2px rgba(2,6,23,0.5)`
+    : emboss.lift,
+  color: active ? text.bright : text.body,
+  textShadow: active ? `0 0 8px ${color}55` : "none",
   cursor: "pointer",
 });
 
@@ -160,8 +177,9 @@ export function HudPanel({
         overflowY: "auto",
         background: bg.hud,
         border: `1px solid ${border.strong}`,
+        boxShadow: `inset 0 1px 0 ${border.rim}, 0 4px 16px rgba(2, 6, 23, 0.5)`,
         borderRadius: radius.md,
-        backdropFilter: "blur(6px)",
+        backdropFilter: "blur(8px)",
         padding: 10,
         zIndex: 5,
         ...style,

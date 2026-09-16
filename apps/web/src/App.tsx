@@ -22,7 +22,7 @@ import { AssistantPanel } from "./components/AssistantPanel";
 import { CockpitHud } from "./components/cockpit/CockpitHud";
 import { GlassDrawer } from "./ui/GlassDrawer";
 import { useIsMobile } from "./ui/useIsMobile";
-import { bg, border, text, tabColor } from "./ui/tokens";
+import { bg, border, text, tabColor, font, emboss, tracking } from "./ui/tokens";
 
 type CenterTab = "model" | "bench" | "sysmodel" | "proc" | "air" | "eda" | "asic" | "docs";
 
@@ -70,17 +70,26 @@ function tabLabel(tab: CenterTab, t: (key: string) => string): string {
 
 // Shared micro-caption for the control bar — the same label style on the
 // context selects and on the two tab groups is what makes the bar read as
-// one navigation system rather than two separate widgets.
-const captionStyle: React.CSSProperties = { fontSize: 9, color: text.faint, textTransform: "uppercase", letterSpacing: 0.5 };
+// one navigation system rather than two separate widgets. Uppercase with
+// loosened tracking, like instrument front-panel silkscreen.
+const captionStyle: React.CSSProperties = {
+  fontSize: 9,
+  color: text.faint,
+  textTransform: "uppercase",
+  letterSpacing: tracking.wider,
+  fontWeight: 600,
+};
 
 // One shared control spec (height / radius / font) for every control in the
 // bar — selects and tab pills were previously two different widget families.
+// Brushed-metal face with a lit top edge, per the shared emboss recipe.
 const selectStyle: React.CSSProperties = {
   padding: "6px 10px",
   borderRadius: 6,
-  background: bg.raise,
+  background: bg.metalRaise,
   color: "white",
   border: `1px solid ${border.strong}`,
+  boxShadow: emboss.lift,
   fontFamily: "inherit",
   fontSize: 13,
 };
@@ -130,17 +139,36 @@ function TabButton({
         padding: "6px 10px",
         borderRadius: 6,
         border: "1px solid",
-        borderColor: active ? color : "transparent",
-        background: active ? `${color}22` : "transparent",
+        borderColor: active ? `${color}88` : "transparent",
+        // Embossed key cap: inactive keys sit slightly raised on the metal
+        // bar; the active key glows in its own identity color with an LED
+        // pip that brightens (the dot is the tab's status LED).
+        background: active
+          ? `linear-gradient(180deg, ${color}2e 0%, ${color}16 100%)`
+          : "linear-gradient(180deg, rgba(38,51,77,0.55) 0%, rgba(24,34,53,0.55) 100%)",
+        boxShadow: active
+          ? `inset 0 1px 0 ${color}55, inset 0 0 8px ${color}26, 0 1px 2px rgba(2,6,23,0.5)`
+          : "inset 0 1px 0 rgba(148,178,255,0.09), 0 1px 2px rgba(2,6,23,0.4)",
         color: active ? text.bright : text.muted,
         fontFamily: "inherit",
         fontWeight: active ? 600 : 400,
         fontSize: 13,
+        textShadow: active ? `0 0 10px ${color}66` : "none",
         cursor: "pointer",
         whiteSpace: "nowrap",
       }}
     >
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: color,
+          flexShrink: 0,
+          boxShadow: active ? `0 0 7px ${color}` : "none",
+          transition: "box-shadow 150ms ease",
+        }}
+      />
       {label}
     </button>
   );
@@ -262,15 +290,60 @@ function Workbench() {
   const cockpitMode = centerTab === "model" && !isMobile;
 
   return (
-    <div style={{ minHeight: "100vh", background: bg.page, color: text.body, padding: isMobile ? 12 : 20, fontFamily: "system-ui, sans-serif" }}>
-      <header style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 20 }}>{t("app.title")}</h1>
-          <div style={{ opacity: 0.6, fontSize: 13 }}>{product?.name}</div>
+    <div style={{ minHeight: "100vh", background: bg.page, color: text.body, padding: isMobile ? 12 : 20, fontFamily: font.ui }}>
+      <header
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 10,
+          padding: "10px 14px",
+          borderRadius: 10,
+          background: bg.metalHeader,
+          border: `1px solid ${border.strong}`,
+          boxShadow: `inset 0 1px 0 ${border.rim}, 0 2px 10px rgba(2,6,23,0.45)`,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Brand pip: a machined accent edge, the one strong-color element
+              on the header — everything else stays graphite. */}
+          <span
+            aria-hidden
+            style={{ width: 4, alignSelf: "stretch", minHeight: 34, borderRadius: 3, background: "linear-gradient(180deg, #ff8a50, #e05a1e)", boxShadow: "0 0 10px rgba(255,107,53,0.45)" }}
+          />
+          <div>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 16 : 19, fontWeight: 700, letterSpacing: "0.2px", color: text.bright }}>{t("app.title")}</h1>
+            <div style={{ opacity: 0.62, fontSize: 12, letterSpacing: tracking.micro }}>{product?.name}</div>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 13, opacity: 0.7 }}>{keycloak.tokenParsed?.preferred_username}</span>
-          <button onClick={() => keycloak.logout()} style={{ padding: "6px 10px", borderRadius: 6 }}>
+          <span
+            style={{
+              fontSize: 12,
+              fontFamily: font.mono,
+              padding: "4px 10px",
+              borderRadius: 6,
+              background: bg.metalWell,
+              border: `1px solid ${border.base}`,
+              boxShadow: emboss.well,
+              color: text.muted,
+            }}
+          >
+            {keycloak.tokenParsed?.preferred_username}
+          </span>
+          <button
+            onClick={() => keycloak.logout()}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 6,
+              background: bg.metalRaise,
+              border: `1px solid ${border.strong}`,
+              boxShadow: emboss.lift,
+              color: text.body,
+            }}
+          >
             {t("app.logout")}
           </button>
         </div>

@@ -1,14 +1,15 @@
 :root {
   color-scheme: dark;
-  font: 14px/1.5 system-ui, "Segoe UI", Roboto, sans-serif;
+  font: 14px/1.5 "Pretendard Variable", Pretendard, Inter, system-ui, "Segoe UI", Roboto,
+    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
 
   /* Mirrors of src/ui/tokens.ts — CSS-side copies so plain CSS (this file)
      and any future non-inline styling share the same palette. The TS tokens
      stay the source of truth for the inline styles the app is built with. */
-  --alps-bg-page: #020617;
-  --alps-bg-card: #0b1220;
-  --alps-bg-panel: #0f172a;
-  --alps-bg-raise: #1e293b;
+  --alps-bg-page: #060b15;
+  --alps-bg-card: #0c1322;
+  --alps-bg-panel: #101a2c;
+  --alps-bg-raise: #1d2940;
   --alps-border: #1e293b;
   --alps-border-strong: #334155;
   --alps-text: #e2e8f0;
@@ -35,12 +36,66 @@ body {
   min-height: 100vh;
 }
 
+/* ── Instrument polish (global, cheap, inherited by every inline-styled
+   control): press travel + sheen on hover, a readable focus ring, and thin
+   dark scrollbars. No layout impact — pure surface feedback. ── */
 button {
   font: inherit;
   cursor: pointer;
   background: var(--alps-bg-raise);
   color: white;
   border: 1px solid var(--alps-border-strong);
+  transition:
+    filter 120ms ease,
+    transform 60ms ease,
+    box-shadow 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+  filter: brightness(0.96);
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--alps-info);
+  outline-offset: 1px;
+}
+
+select,
+input[type="range"],
+input[type="text"] {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(255, 107, 53, 0.35);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3750 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #2e3c58, #22304a);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* ── Mobile (breakpoint matches useIsMobile() in App.tsx) ──
