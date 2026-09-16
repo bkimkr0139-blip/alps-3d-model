@@ -44,16 +44,18 @@ function gridFor(pins: number): [number, number] {
   return best;
 }
 
-// Stepped bond-wire arc: short cylinder segments between consecutive samples
-// of a parabola from die pad (yTop) to substrate finger (yEnd). Each segment
-// spans only its own arc slice — drawing whole columns from the PCB instead
-// made the wires read as pins sticking out of the package. The arc peak
-// (≈ yEnd + 0.35 + (yTop−yEnd)) stays under the mold cap (y 2.1), so the
-// wires are fully encapsulated: a normal molded product, with the internals
-// visible only through the layer chips (mold off) or the explode slider.
+// Bond wire: a thin gold tube arcing from the die pad (ball bond) down to
+// the lead finger (stitch bond) — a real Au bonding wire. EdaBox has no
+// rotation, so the arc is sampled finely enough that consecutive vertical
+// cylinders overlap into one continuous tube (the earlier sparse chunky
+// segments read as loose pin pieces). The arc peak (≈ yEnd + 0.35 +
+// (yTop−yEnd)) stays under the mold cap (y 2.1), so the wires stay fully
+// encapsulated in the molded product.
 function bondWire(x1: number, z1: number, x2: number, z2: number, yTop: number, yEnd: number): EdaBox[] {
   const out: EdaBox[] = [];
-  const N = 7;
+  const R = 0.06; // schematic ≈3× the real 25 µm — at 1:1 the wire would vanish
+  const len = Math.hypot(x2 - x1, z2 - z1);
+  const N = Math.min(26, Math.max(10, Math.ceil(len / (R * 1.8))));
   const at = (t: number) => ({
     x: x1 + (x2 - x1) * t,
     z: z1 + (z2 - z1) * t,
@@ -66,7 +68,7 @@ function bondWire(x1: number, z1: number, x2: number, z2: number, yTop: number, 
       name: `bond${k}`,
       layer: "bond",
       pos: [(prev.x + cur.x) / 2, (prev.y + cur.y) / 2, (prev.z + cur.z) / 2],
-      size: [0.16, Math.max(0.08, Math.abs(cur.y - prev.y)), 0.16],
+      size: [R * 2, Math.max(R * 1.1, Math.abs(cur.y - prev.y)), R * 2],
       color: GOLD,
       cyl: true,
       metalness: 0.9,
@@ -74,6 +76,9 @@ function bondWire(x1: number, z1: number, x2: number, z2: number, yTop: number, 
     });
     prev = cur;
   }
+  // ball bond melts onto the die pad; the stitch bond flattens on the finger
+  out.push({ name: "bond-ball", layer: "bond", pos: [x1, yTop - 0.02, z1], size: [0.17, 0.09, 0.17], color: GOLD, cyl: true, metalness: 0.9, roughness: 0.25 });
+  out.push({ name: "bond-stitch", layer: "bond", pos: [x2, yEnd - 0.02, z2], size: [0.13, 0.05, 0.13], color: GOLD, cyl: true, metalness: 0.9, roughness: 0.25 });
   return out;
 }
 
@@ -288,7 +293,7 @@ export function buildPackageScene(tpl: AsicTemplate, pkg = tpl.options[0]?.pkg ?
       for (const s of [-1, 1] as const) {
         const [px, pz] = [sensX + sm(0.9) + 0.53, s * sm(0.55)];
         put({ name: "sens-pad", layer: "package", pos: [px, 1.14, pz], size: [0.26, 0.05, 0.3], color: GOLD, metalness: 0.9 });
-        boxes.push(...bondWire(sensX + sm(0.9), s * sm(0.9), px, pz, 1.42, 1.12));
+        boxes.push(...bondWire(sensX + sm(0.9), s * sm(0.9), px, pz, 1.42, 1.19));
       }
     }
     // monolithic MEMS needs no wires — the electrodes route into the die metal
@@ -354,12 +359,14 @@ export function buildPackageScene(tpl: AsicTemplate, pkg = tpl.options[0]?.pkg ?
       const [fx, fz] = fingers[m === 1 ? Math.floor(n / 2) : Math.round((i * (n - 1)) / (m - 1))];
       const [px, pz]: [number, number] = axis === "z" ? [dieX + a, s * dieD / 2] : [dieX + (s * dieW) / 2, a];
       put({ name: "pad", layer: "die", pos: [px, dieY + 0.22, pz], size: [0.26, 0.05, 0.26], color: GOLD, metalness: 0.95, roughness: 0.2 });
-      boxes.push(...bondWire(px, pz, fx, fz, dieY + 0.24, 1.12));
-      // gold inner-finger tip on the substrate, plus the connection down:
-      // QFN wraps the lead tip to its land; LGA drops a via to the land grid
-      put({ name: "finger", layer: "package", pos: [fx, 1.12, fz], size: axis === "z" ? [0.34, 0.04, 0.5] : [0.5, 0.04, 0.34], color: [0.8, 0.68, 0.35], metalness: 0.8 });
+      boxes.push(...bondWire(px, pz, fx, fz, dieY + 0.24, 1.16));
+      // inner lead tip: lead-frame families are silver-plated copper, one
+      // piece with the outer lead; substrate (LGA) fingers keep the ENIG
+      // gold finish. QFN wraps the tip down to its land; LGA drops a via
+      const fingerColor = family === "lga" ? GOLD : LEAD;
+      put({ name: "finger", layer: "package", pos: [fx, 1.12, fz], size: axis === "z" ? [0.38, 0.045, 0.5] : [0.5, 0.045, 0.38], color: fingerColor, metalness: 0.85, roughness: 0.3 });
       if (family === "qfn")
-        put({ name: "finger-drop", layer: "package", pos: [fx + (axis === "x" ? s * 0.22 : 0), 0.92, fz + (axis === "z" ? s * 0.22 : 0)], size: [0.14, 0.4, 0.14], color: [0.8, 0.68, 0.35], metalness: 0.8 });
+        put({ name: "finger-drop", layer: "package", pos: [fx + (axis === "x" ? s * 0.22 : 0), 0.92, fz + (axis === "z" ? s * 0.22 : 0)], size: [0.14, 0.4, 0.14], color: LEAD, metalness: 0.85, roughness: 0.3 });
       if (family === "lga")
         put({ name: "finger-via", layer: "package", pos: [fx, 1.1, fz], size: [0.16, 0.05, 0.16], color: [0.3, 0.26, 0.2], cyl: true, metalness: 0.6 });
     }
