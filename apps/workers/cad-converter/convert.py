@@ -53,6 +53,22 @@ MATERIAL_BY_KEYWORD: list[tuple[str, PBRMaterial]] = [
                           metallicFactor=1.0, roughnessFactor=0.2)),
     ("detent", PBRMaterial(name="spring_steel", baseColorFactor=[0.55, 0.58, 0.66, 1.0],
                            metallicFactor=1.0, roughnessFactor=0.3)),
+    # MEMS pressure-sensor interior (industrial absolute construction).
+    # These entries MUST precede "substrate"/"die": the scan takes the first
+    # matching keyword, and e.g. "Substrate Bond Pads" contains "substrate"
+    # while "Die Bond Pads" contains "die".
+    ("bond wire", PBRMaterial(name="gold_bond_wire", baseColorFactor=[0.94, 0.78, 0.35, 1.0],
+                              metallicFactor=1.0, roughnessFactor=0.2)),
+    ("seal ring", PBRMaterial(name="kovar_seal", baseColorFactor=[0.70, 0.68, 0.66, 1.0],
+                              metallicFactor=0.95, roughnessFactor=0.35)),
+    ("diaphragm", PBRMaterial(name="si_membrane", baseColorFactor=[0.44, 0.52, 0.63, 1.0],
+                              metallicFactor=0.85, roughnessFactor=0.12)),
+    ("die attach", PBRMaterial(name="silver_epoxy", baseColorFactor=[0.56, 0.57, 0.60, 1.0],
+                               metallicFactor=0.7, roughnessFactor=0.45)),
+    ("die bond pad", PBRMaterial(name="aluminum_pad", baseColorFactor=[0.88, 0.89, 0.91, 1.0],
+                                 metallicFactor=0.95, roughnessFactor=0.3)),
+    ("bond pad", PBRMaterial(name="eni_gold_pad", baseColorFactor=[0.92, 0.85, 0.55, 1.0],
+                             metallicFactor=1.0, roughnessFactor=0.22)),
     ("substrate", PBRMaterial(name="fr4_green", baseColorFactor=[0.05, 0.12, 0.08, 1.0],
                               metallicFactor=0.0, roughnessFactor=0.6)),
     ("die", PBRMaterial(name="silicon", baseColorFactor=[0.32, 0.34, 0.4, 1.0],
