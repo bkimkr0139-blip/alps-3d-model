@@ -7,6 +7,16 @@
 
 ## 0. 지금 세션 핸드오프 상태 (2026-09-17, 다음 세션이 먼저 읽을 것)
 
+**핫픽스: ASIC 9단계 ④ ASIC 설계 빈 화면(사용자 리포트)** — 원인은
+`asicCharts.tsx` Histogram의 `counts.map((c, i)` 매개변수 `c`가 테마 토글
+작업(3468143)에서 도입된 팔레트 `const c = useSvgPalette()`를 가려
+`c.series[0]` 크래시 → 에러 바운더리 없어 탭 전체가 배경만 남음.
+매개변수를 `n`으로 개명해 픽스. 회귀 시점은 git으로 입증(3468143 이전엔
+fill이 리터럴 hex라 무해). 교훈: **컴포넌트 스코프의 짧은 변수명(c/p/s)에
+map 매개변수 이름을 재사용 금지 — tsc가 못 잡는 런타임 셰도잉 크래시.**
+검증: Playwright로 9단계 전수 클릭 ALL PASS + s4 히스토그램 rect 24개 렌더 +
+pageerror 0 (`/tmp/alps-logs/asic-s4-check.mjs`).
+
 **AXOS 피드백 버튼 폐루프 이식 완료(사용자 지시 "피드백 버튼을 이렇게
 만들어줘")** — 하이퐁 IOC 포털의 AXOS 피드백 버튼(우측 고정 세로 토글 탭 +
 Context Drawer + 제출 모달)을 ALPS에 이식했다. 설계 원칙: **웹 접수는

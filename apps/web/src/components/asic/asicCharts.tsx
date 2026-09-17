@@ -140,8 +140,9 @@ export function Histogram({
   return (
     <svg width={W} height={height} style={{ display: "block", maxWidth: "100%" }}>
       <line x1={P} y1={height - 20} x2={W - 8} y2={height - 20} stroke={c.axis} />
-      {counts.map((c, i) => (
-        <rect key={i} x={x(lo + i * w)} y={y(c)} width={Math.max(1, (W - P - 8) / nb - 1)} height={height - 20 - y(c)} fill={c.series[0]} opacity={0.75} rx={1} />
+      {/* bin 개수 매개변수는 n — c(팔레트)로 두면 가려져 c.series 크래시 */}
+      {counts.map((n, i) => (
+        <rect key={i} x={x(lo + i * w)} y={y(n)} width={Math.max(1, (W - P - 8) / nb - 1)} height={height - 20 - y(n)} fill={c.series[0]} opacity={0.75} rx={1} />
       ))}
       {specMin != null && (
         <>
