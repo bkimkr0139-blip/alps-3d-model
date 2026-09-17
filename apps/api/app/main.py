@@ -11,6 +11,7 @@ from app.routers import (
     correlations,
     doe,
     fa_capa,
+    feedback,
     gates,
     model_canvas,
     products,
@@ -54,6 +55,7 @@ app.include_router(process_monitoring.router)
 app.include_router(fa_capa.router)
 app.include_router(asic.router)
 app.include_router(doe.router)
+app.include_router(feedback.router)
 app.include_router(assistant.router)
 
 

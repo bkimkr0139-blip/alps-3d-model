@@ -2,11 +2,49 @@
 
 > **이 문서의 목적**: 이 저장소에서 개발 세션(사람 또는 Claude)이 맥락 없이
 > 병렬로 작업을 이어받을 수 있도록 현재 상태·실행 방법·규칙·남은 작업을 한
-> 문서에 정리한다. 최종 갱신: 2026-09-17 (UI/UX 고도화 + 시스템 문서 v1.1 + MEMS·TACT 내부 구성 산업표준화 —
-> 사용자 브라우저 테스트 대기 중,
-> **아래 §0 핸드오프 상태 먼저 읽을 것**).
+> 문서에 정리한다. 최종 갱신: 2026-09-17 (AXOS 피드백 버튼 폐루프 이식 —
+> 아래 §0 최상단 블록, **아래 §0 핸드오프 상태 먼저 읽을 것**).
 
 ## 0. 지금 세션 핸드오프 상태 (2026-09-17, 다음 세션이 먼저 읽을 것)
+
+**AXOS 피드백 버튼 폐루프 이식 완료(사용자 지시 "피드백 버튼을 이렇게
+만들어줘")** — 하이퐁 IOC 포털의 AXOS 피드백 버튼(우측 고정 세로 토글 탭 +
+Context Drawer + 제출 모달)을 ALPS에 이식했다. 설계 원칙: **웹 접수는
+axos-si 플러그인 피드백 큐의 또 하나의 채널** — 레코드는 저장소 루트
+`feedback/FB-####.json`(axos-si `feedback.py`와 동일 스키마, 플러그인 이식
+지시서의 자동 기록 맥락은 `channel` 키로 추가: source/menu/filters/
+screen_version/reference_time). 개발팀은 같은 큐를 CLI로 소비:
+
+```bash
+python3 ~/works/axos-si/skills/axos-feedback-loop/scripts/feedback.py --root . list
+# approve → dev_queue/FB-####.md 지시서 생성(Claude 세션이 읽어 실행)
+```
+
+이번 작업 (커밋 상단의 피드백 버튼 커밋):
+
+- **API** `apps/api/app/routers/feedback.py` + `app/schemas/feedback.py` —
+  `POST/GET /api/v1/feedback`(파일 저장소, DB 아님; ID는 `.sequence` 상수위
+  방식이라 반려 후에도 번호 재발급 안 됨; 우선순위는 정규 어휘 상/중/하만),
+  `app/main.py` 라우트 등록. **STORE_DIR은 `parents[4]` = 저장소 루트 —
+  단수 오차면 `apps/feedback`에 기록되는 버그(실제 발생, 회귀 테스트로 고정).**
+- **웹** `components/AxosFeedbackWidget.tsx`(named export, 전역 1회 마운트 —
+  App.tsx에서 standalone 모드 포함 전 탭) + `lib/screenContext.ts`(탭→경로/
+  메뉴라벨/목적) + `lib/api.ts` `feedbackApi` + i18n 3 로케일 `axos` 섹션.
+  위젯 동작은 이식 지시서 그대로: 우측 중앙 세로 "AXOS" 탭(zIndex 1150,
+  AssistantPanel FAB 1000과 비충돌) → 드로어(화면 목적+최근 피드백 5건,
+  w320/max85vw, 오버레이 클릭 닫힘) → 모달(분류 5종·제목*·현행*·목표·
+  기대효과·우선순위 4단계→상/중/하 사상, 경로·메뉴·필터·화면버전·제출자·
+  시각 자동 기록, 빈 필수값은 제출 버튼 비활성) → 성공 화면 1.4초 후 폼
+  초기화. Tailwind 없음 → 토큰 인라인 스타일(AXOS 브랜드 시안 =
+  color-mix(info 62%, #061724)), 신규 npm 디펜던시 0(아이콘 인라인 SVG).
+- **설정** 저장소 루트 `axos.config.yml`(feedback_loop.enabled) 신설,
+  `.gitignore` += `/feedback/`, `/dev_queue/`(제출자 계정 포함 런타임 기록).
+- **검증** pytest 186건 전부 통과(test_feedback.py 6건 포함), tsc/
+  vite 빌드 + oxlint 27 warnings 베이스라인 유지, Playwright 브라우저 e2e
+  25항목 ALL PASS(`/tmp/alps-logs/axos-fb-check.mjs` — 로그인→버튼→드로어→
+  빈 제출 차단→접수→1.4초 성공→레코드 스키마·자동 맥락 검증→드로어 목록
+  반영→오버레이 닫힘→proc 탭·라이트 테마), CLI `--root . list/show` 로 웹
+  접수 건 그대로 조회 확인(폐루프 1회전 중 접수 구간 실증).
 
 **UI/UX 3D-트윈 퍼스트 고도화 완료** — 사용자 지시("텍스트·숫자 위주 대신
 실제 제품·부품·장비의 3D 디지털 트윈을 보고 체험하고 활용하는 화면으로")에

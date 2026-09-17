@@ -22,3 +22,6 @@ infra/pg-data/
 infra/opensearch-data/
 .claude/
 
+# AXOS 피드백 폐루프 — 런타임 기록(제출자 계정 포함, 커밋 금지)
+/feedback/
+/dev_queue/

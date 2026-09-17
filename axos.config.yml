@@ -1,0 +1,17 @@
+# axos.config.yml — AXOS 피드백 폐루프용 최소 설정.
+# 레코드(feedback/)는 화면의 AXOS 피드백 버튼(웹 접수 채널)이 기록하고,
+# 개발팀은 axos-si 플러그인의 실행 도구로 같은 큐를 소비한다:
+#   python3 ~/works/axos-si/skills/axos-feedback-loop/scripts/feedback.py --root . list
+
+project:
+  name: "ALPS Twin"
+
+feedback_loop:
+  enabled: true
+  # 개발 지시서(FB-####.md — Claude Code 세션이 그대로 읽어 실행) 저장 위치.
+  instruction_dir: "dev_queue/"
+  # 피드백 ID 접두사(레코드·지시서 파일명 공통).
+  instruction_prefix: "FB-"
+  # 피드백 레코드(피드백 1건 = FB-####.json 1파일) 저장 위치. 개인정보(제출자
+  # 계정)를 담으므로 커밋 대상이 아니다(.gitignore 참조).
+  feedback_dir: "feedback/"

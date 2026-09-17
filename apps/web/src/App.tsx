@@ -19,6 +19,7 @@ import { SweepChart } from "./components/SweepChart";
 import { TestCorrelationPanel } from "./components/TestCorrelationPanel";
 import { GatePanel } from "./components/GatePanel";
 import { AssistantPanel } from "./components/AssistantPanel";
+import { AxosFeedbackWidget } from "./components/AxosFeedbackWidget";
 import { CockpitHud } from "./components/cockpit/CockpitHud";
 import { GlassDrawer } from "./ui/GlassDrawer";
 import { useIsMobile } from "./ui/useIsMobile";
@@ -631,6 +632,15 @@ function Workbench() {
           <AssistantPanel />
         </>
       )}
+
+      {/* AXOS 피드백 버튼 — standalone 모드(EDA/ASIC/docs) 포함 전 화면에서 1회 마운트. */}
+      <AxosFeedbackWidget
+        tab={centerTab}
+        getFilters={() => ({
+          product: product?.name ?? "",
+          variant: variants.find((v) => v.id === variantId)?.name ?? "",
+        })}
+      />
     </div>
   );
 }

@@ -1325,3 +1325,39 @@ export const asicApi = {
       headers: { "Content-Type": "application/json" },
     }),
 };
+
+// AXOS 피드백 폐루프 — 웹 접수 채널. 레코드는 ALPS 루트 feedback/의 FB-####.json
+// (axos-si 플러그인 feedback.py와 같은 스키마), 개발팀이 같은 큐를 소비한다.
+export interface FeedbackCreate {
+  title: string;
+  as_is: string;
+  to_be: string;
+  expected_effect: string;
+  category: string;
+  priority: string;
+  source_route: string;
+  source_menu: string;
+  applied_filters: Record<string, string>;
+  screen_version: string;
+  data_reference_time: string;
+  org: string;
+}
+
+export interface FeedbackSummary {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  category: string;
+  created_at: string;
+}
+
+export const feedbackApi = {
+  submit: (payload: FeedbackCreate) =>
+    request<{ id: string; status: string }>("/api/v1/feedback", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  listByRoute: (route: string, limit = 5) =>
+    request<FeedbackSummary[]>(`/api/v1/feedback?route=${encodeURIComponent(route)}&limit=${limit}`),
+};
