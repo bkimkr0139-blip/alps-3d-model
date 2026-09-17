@@ -2,8 +2,8 @@
 
 > **이 문서의 목적**: 이 저장소에서 개발 세션(사람 또는 Claude)이 맥락 없이
 > 병렬로 작업을 이어받을 수 있도록 현재 상태·실행 방법·규칙·남은 작업을 한
-> 문서에 정리한다. 최종 갱신: 2026-09-16 (UI/UX 3D-트윈 퍼스트 고도화 +
-> S04 실물 재질·상용 수준 프리미엄 UI 완료 — 사용자 브라우저 테스트 대기 중,
+> 문서에 정리한다. 최종 갱신: 2026-09-17 (UI/UX 고도화 + 시스템 문서 v1.1 + MEMS·TACT 내부 구성 산업표준화 —
+> 사용자 브라우저 테스트 대기 중,
 > **아래 §0 핸드오프 상태 먼저 읽을 것**).
 
 ## 0. 지금 세션 핸드오프 상태 (2026-09-17, 다음 세션이 먼저 읽을 것)
@@ -206,6 +206,25 @@ verify:seedl10n 101/0 + Playwright 헤드리스 CLEAN):
     (SystemDocs.tsx). 검증: 빌드+lint 27+seedl10n 101/0, Playwright
     `/tmp/alps-logs/sysdoc_check.mjs`(ko/en/ja v1.1 렌더+puck/
     FactoryViewer/QFN 행 단정, 0 콘솔 에러), sysdoc_ko.png 육안 확인.
+24. `2249db6` **MEMS 압력센서 내부 구성 산업표준화**(사용자 지시 "내부 부품
+    구성도 산업표준 cad기준으로 정확하게") —
+    `generate_pressure_sensor_step.py` 5→12부품 재작성: Kovar 씰 링(리드가
+    그 위에 심용접 — 이전엔 기판 위 0.35 mm 공중 부양), 은 에포키 다이 어태치,
+    에칭 기준 진공 공동 + 감지 다이어프램 캡, 피조 브리지 스트레인 바 4본,
+    Al 다이 패드/Ni-Au 기판 패드, Au 베지어 튜브 본드 와이어 4가닥
+    (`BRepOffsetAPI_MakePipe`+`OCP.collections.Array1_gp_Pnt`). convert.py에
+    신규 키워드 6종("substrate"/"die" 제너릭 항목 **앞**에 삽입 — 스캔은
+    첫 매치 승리). VAR-SEN-A/B 라이브 cad_convert 재링크 0 실패,
+    `internals_check.mjs` 브라우저 검증(X-ray+폭발에서 내부 전노출, 0 콘솔
+    에러).
+25. `783cd15` **TACT 스위치 내부 구성 산업표준화**(동일 지시) —
+    `generate_sample_step.py` 7→10부품: 하우징을 몰딩 컵(바닥 0.5/벽 0.35
+    mm)으로 파고 중앙 컬럼으로 우물 바닥 지지, 링 캐비티에 **Stationary
+    Contacts**(스탬프 레그 4본 — 돔 림이 맞닿는 정접점, 신규), 돔을 팁 위에
+    안착(패드 상 0.12 mm 스냅 갭 = ThreeViewer DOME_TRAVEL_MM와 일치),
+    Terminal 3/4 추가로 4단자 완성. 필렛 술어를 외곽 모서리 한정으로 축소
+    (얇은 내벽 모서리에 0.3 mm 필렛 → 실패 시 폴백이 필렛 전부 상실).
+    VAR-TACT-A/B 재링크 0 실패, MEMS와 동일 스크립트로 브라우저 검증.
 
 **검증 스크립트**(`/tmp/alps-logs/`, 전부 PASS): cockpit_e2e(W2),
 proc_e2e/proc_mobile_e2e(W3), bench_e2e(W4), review_e2e(W5), w6_sweep(8탭
@@ -223,6 +242,9 @@ pkg 칩 + B OPT-2 → TSSOP-16 재표적), pkg_internals_e2e(⑤ mold-off+분해
   **헤더 우상단 언어 선택기**(4ccad34), **벤치 탭 AirInput puck 보드**
   (509e6b5 — 변량 A/B 전극 레이아웃 추종, 손끝 버튼→스코프),
   **시스템 문서 탭 v1.1**(b6531c3 — 3개 로케일, 다운로드 파일명도 v1.1).
+  **MEMS·TACT 3D 내부 구성**(2249db6/783cd15 — model 탭에서 X-ray 슬라이더를
+  최소로, 폭발 슬라이더를 최대로: MEMS는 리드·씰 링·다이 공동·다이어프램·본드
+  와이어, TACT는 컵 하우징·정접점 팁 위 돔·4단자).
 - **세션 시작 참고**: 시스템 문서는 이제 구현과 1:1 동기 상태(b6531c3).
   이후 기능을 추가하면 §3 해당 소절과 버전/날짜 줄을 함께 갱신할 것 —
   문서는 앱에 번들(`?raw`)되므로 md 수정만으로 라이브 반영된다.
