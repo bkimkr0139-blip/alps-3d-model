@@ -4,13 +4,35 @@ for a real customer CAD file (§18: "자료가 없을 경우 합성 데이터로
 part names survive the STEP round trip and the converter can emit one named,
 PBR-materialized mesh per part.
 
-Seven parts, modeled on a 4.5×4.5 mm SMD tact switch (Z-up, mm, absolute
+Ten parts, modeled on a 4.5×4.5 mm SMD tact switch (Z-up, mm, absolute
 coordinates baked into each solid). "Metal Dome", "Switch Housing" and
 "Contact Pad" must exactly match the seeded Component names in
 scripts/seed_golden_dataset.py — the viewer maps GLB node names to components
 by name. This is deliberately enough geometry to exercise assembly
 tessellation, per-part materials and bbox/volume metadata — not a validated
 switch mechanical design.
+
+The interior parts complete the industry-standard 4-terminal construction.
+The previous model had three defects against a real tact-switch CAD: the
+housing was a solid block (the mechanism sat in a top pocket of a solid
+body — no molded cup), the dome rim was electrically connected to nothing
+(a real dome rests on stationary contact legs that extend the terminals
+inward), and there were only 2 terminals where a 4.5 mm SMD part has 4:
+
+- Switch Housing — reworked into a molded cup: 0.5 mm floor, 0.35 mm walls,
+  with an integral centre column supporting the well floor and a ring cavity
+  between column and walls that carries the contacts.
+- Stationary Contacts — four stamped legs in the ring cavity, rising from
+  the floor and bending inward so their tips sit just under the dome rim
+  (drawn at readable scale like every cutaway diagram).
+- Metal Dome — its base rim now RESTS on those tips, 0.12 mm above the
+  centre pad: the visible snap gap (matches ThreeViewer's DOME_TRAVEL_MM).
+- Terminal 1–4 — gull-wing terminals on all four sides; 1/2 pair with the
+  legs under their inner ends the way a real stamped lead frame does.
+
+"Stationary Contacts" and "Terminal 3/4" are visual detail, deliberately NOT
+seeded components (no DB migration needed — same policy as the encoder's
+knurl flutes and the pressure sensor's interior).
 """
 
 import math
@@ -18,6 +40,7 @@ import sys
 
 from OCP.BRepAdaptor import BRepAdaptor_Curve
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
+from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet
 from OCP.BRepPrimAPI import (
     BRepPrimAPI_MakeBox,
@@ -36,12 +59,28 @@ from OCP.TopoDS import TopoDS
 from OCP.TDocStd import TDocStd_Document
 from OCP.XCAFApp import XCAFApp_Application
 from OCP.XCAFDoc import XCAFDoc_DocumentTool
-from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
+from OCP.gp import gp_Ax1, gp_Ax2, gp_Dir, gp_Pnt, gp_Trsf
 
 HOUSING_HALF = 2.25  # 4.5 × 4.5 mm body
 HOUSING_TOP = 3.0
-POCKET_RADIUS = 1.8  # Ø3.6 dome pocket, depth 1.0 from the top face
+POCKET_RADIUS = 1.8  # Ø3.6 dome well, depth 1.0 from the top face
 POCKET_FLOOR = HOUSING_TOP - 1.0  # z = 2.0
+# Molded cup: hollowed underside leaves a 0.5 mm floor and 0.35 mm walls;
+# the ring cavity between the wall inner face and the centre column carries
+# the stationary-contact legs.
+INNER_HALF = 1.9
+FLOOR_TOP = 0.5
+COLUMN_R = 1.55  # supports the well floor under the centre pad (r 1.5)
+# Stamped stationary-contact leg (+x profile): foot on the cavity floor,
+# riser up the cavity, inward shelf whose top face meets the dome rim.
+LEG_HALF_W = 0.3
+LEG_TIP_HALF_W = 0.22  # the tip nears the Ø3.6 well wall — narrower ribbon
+LEG_T = 0.08
+LEG_TIP_TOP = DOME_BASE_Z = 2.2  # rim rests here; 0.12 over the pad top
+DOME_R = 3.4
+DOME_RIM_R = 1.775  # Ø3.55 base circle
+DOME_CENTER_Z = DOME_BASE_Z - math.sqrt(DOME_R**2 - DOME_RIM_R**2)  # ≈ -0.70
+DOME_APEX_Z = DOME_CENTER_Z + DOME_R  # ≈ 2.70 — the plunger stem seats here
 
 
 def _fillet_edges(shape, radius: float, predicate) -> object:
@@ -78,6 +117,26 @@ def _vertical_edges(curve: BRepAdaptor_Curve) -> bool:
     return curve.GetType() == GeomAbs_Line and abs(curve.Line().Direction().Z()) > 0.999
 
 
+def _outer_vertical_edges(curve: BRepAdaptor_Curve) -> bool:
+    """Vertical edges at the four OUTER corners only. The hollowed cup also
+    creates inner-wall corner edges whose 0.35 mm walls are too thin for a
+    0.3 mm fillet on both faces — filleting those would fail and the
+    fallback above would then drop every fillet, including the outer ones."""
+    return _vertical_edges(curve) and max(
+        abs(curve.Line().Location().X()), abs(curve.Line().Location().Y())
+    ) > HOUSING_HALF - 0.1
+
+
+def _horizontal_edge_above(z: float):
+    def check(curve: BRepAdaptor_Curve) -> bool:
+        # Any point on the line works: a horizontal edge has constant Z
+        return curve.GetType() == GeomAbs_Line and abs(curve.Line().Direction().Z()) < 1e-6 and (
+            curve.Line().Location().Z() > z
+        )
+
+    return check
+
+
 def _circular_edge_at_z(z: float):
     """Matches the pocket-floor-to-wall edge for filleting. A real molded
     part always rounds this reentrant corner — sharp internal corners
@@ -93,14 +152,12 @@ def _circular_edge_at_z(z: float):
     return check
 
 
-def _horizontal_edge_above(z: float):
-    def check(curve: BRepAdaptor_Curve) -> bool:
-        # Any point on the line works: a horizontal edge has constant Z
-        return curve.GetType() == GeomAbs_Line and abs(curve.Line().Direction().Z()) < 1e-6 and (
-            curve.Line().Location().Z() > z
-        )
-
-    return check
+def _rotated_z(shape, angle: float) -> object:
+    """Copy of `shape` rotated about the world Z axis (for the ±y legs and
+    terminals, stamped from the same +x die)."""
+    trsf = gp_Trsf()
+    trsf.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), angle)
+    return BRepBuilderAPI_Transform(shape, trsf, True).Shape()
 
 
 def _build_housing():
@@ -108,35 +165,79 @@ def _build_housing():
         gp_Pnt(-HOUSING_HALF, -HOUSING_HALF, 0.0),
         gp_Pnt(HOUSING_HALF, HOUSING_HALF, HOUSING_TOP),
     ).Shape()
-    # Dome pocket opening the top face (the plunger enters through it, so no
+    # Dome well opening the top face (the plunger enters through it, so no
     # separate through-hole is needed)
     pocket = BRepPrimAPI_MakeCylinder(
         gp_Ax2(gp_Pnt(0, 0, POCKET_FLOOR), gp_Dir(0, 0, 1)), POCKET_RADIUS, 1.0
     ).Shape()
     housing = BRepAlgoAPI_Cut(housing, pocket).Shape()
+    # Hollow the underside into the molded cup — this is what gives the
+    # mechanism an interior at all (the contacts live in the ring cavity).
+    inner = BRepPrimAPI_MakeBox(
+        gp_Pnt(-INNER_HALF, -INNER_HALF, FLOOR_TOP),
+        gp_Pnt(INNER_HALF, INNER_HALF, POCKET_FLOOR),
+    ).Shape()
+    housing = BRepAlgoAPI_Cut(housing, inner).Shape()
+    # Fuse the centre column back so the well floor under the contact pad
+    # (r 1.5) is supported by material instead of spanning the cavity.
+    column = BRepPrimAPI_MakeCylinder(
+        gp_Ax2(gp_Pnt(0, 0, FLOOR_TOP), gp_Dir(0, 0, 1)), COLUMN_R, POCKET_FLOOR - FLOOR_TOP
+    ).Shape()
+    housing = BRepAlgoAPI_Fuse(housing, column).Shape()
     housing = _fillet_edges(housing, 0.15, _circular_edge_at_z(POCKET_FLOOR))
-    return _fillet_edges(housing, 0.3, _vertical_edges)
+    return _fillet_edges(housing, 0.3, _outer_vertical_edges)
 
 
 def _build_contact_pad():
-    # Gold pad on the pocket floor, under the dome
+    # Gold pad on the well floor, under the dome centre — the contact the
+    # snapped-through dome closes against.
     return BRepPrimAPI_MakeCylinder(
         gp_Ax2(gp_Pnt(0, 0, POCKET_FLOOR), gp_Dir(0, 0, 1)), 1.5, 0.08
     ).Shape()
 
 
+def _contact_leg() -> object:
+    """One stamped stationary-contact leg (+x profile): foot on the cavity
+    floor reaching back to the wall inner face, riser up the cavity, and an
+    inward shelf whose top face (z = LEG_TIP_TOP) meets the dome rim. Tip
+    geometry clears both the column (r 1.55) and the Ø3.6 well wall."""
+    foot = BRepPrimAPI_MakeBox(
+        gp_Pnt(COLUMN_R, -LEG_HALF_W, FLOOR_TOP),
+        gp_Pnt(INNER_HALF, LEG_HALF_W, FLOOR_TOP + LEG_T),
+    ).Shape()
+    riser = BRepPrimAPI_MakeBox(
+        gp_Pnt(1.62, -LEG_TIP_HALF_W, FLOOR_TOP + LEG_T),
+        gp_Pnt(1.70, LEG_TIP_HALF_W, LEG_TIP_TOP - LEG_T),
+    ).Shape()
+    tip = BRepPrimAPI_MakeBox(
+        gp_Pnt(1.62, -LEG_TIP_HALF_W, LEG_TIP_TOP - LEG_T),
+        gp_Pnt(1.78, LEG_TIP_HALF_W, LEG_TIP_TOP),
+    ).Shape()
+    return BRepAlgoAPI_Fuse(BRepAlgoAPI_Fuse(foot, riser).Shape(), tip).Shape()
+
+
+def _build_stationary_contacts():
+    # Four legs (±x, ±y) fused into one part — in a real switch they are the
+    # inward extensions of the terminal lead frame, and the dome rim rests
+    # on all four tips.
+    legs = None
+    for k in range(4):
+        leg = _rotated_z(_contact_leg(), k * math.pi / 2)
+        legs = leg if legs is None else BRepAlgoAPI_Fuse(legs, leg).Shape()
+    return legs
+
+
 def _build_metal_dome():
-    # Spherical cap: base circle Ø3.55 rests on the contact pad (z≈2.08),
-    # apex ≈ z 2.58 — a snap dome, not a validated membrane design.
-    # OCCT MakeSphere angle1/angle2 are LATITUDES FROM THE EQUATOR
-    # ([-pi/2, pi/2]), not polar angles — the cap runs from the base circle's
-    # latitude up to the pole (pi/2).
-    dome_radius = 3.4
-    center_z = -0.82
-    base_latitude = math.asin((2.08 - center_z) / dome_radius)  # ≈1.0196 rad
+    # Spherical cap whose base rim rests on the four contact tips at
+    # DOME_BASE_Z — 0.12 above the pad top, the visible snap gap the dome
+    # travels when it snaps through onto the pad. OCCT MakeSphere
+    # angle1/angle2 are LATITUDES FROM THE EQUATOR ([-pi/2, pi/2]), not
+    # polar angles — the cap runs from the base circle's latitude up to the
+    # pole (pi/2).
+    base_latitude = math.asin((DOME_BASE_Z - DOME_CENTER_Z) / DOME_R)
     return BRepPrimAPI_MakeSphere(
-        gp_Ax2(gp_Pnt(0, 0, center_z), gp_Dir(0, 0, 1)),
-        dome_radius,
+        gp_Ax2(gp_Pnt(0, 0, DOME_CENTER_Z), gp_Dir(0, 0, 1)),
+        DOME_R,
         base_latitude,
         math.pi / 2,
     ).Shape()
@@ -144,8 +245,8 @@ def _build_metal_dome():
 
 def _build_plunger():
     stem = BRepPrimAPI_MakeCylinder(
-        gp_Ax2(gp_Pnt(0, 0, 2.58), gp_Dir(0, 0, 1)), 0.7, 0.92
-    ).Shape()  # z 2.58..3.50 — reaches the dome apex
+        gp_Ax2(gp_Pnt(0, 0, DOME_APEX_Z), gp_Dir(0, 0, 1)), 0.7, 3.5 - DOME_APEX_Z
+    ).Shape()  # seats on the dome apex, reaches the housing top
     head = BRepPrimAPI_MakeCylinder(
         gp_Ax2(gp_Pnt(0, 0, 3.5), gp_Dir(0, 0, 1)), 1.3, 0.75
     ).Shape()  # z 3.50..4.25 — the pressable button above the body
@@ -184,11 +285,15 @@ def build_assembly_parts() -> list[tuple[str, object]]:
     return [
         ("Switch Housing", _build_housing()),
         ("Contact Pad", _build_contact_pad()),
+        ("Stationary Contacts", _build_stationary_contacts()),
         ("Metal Dome", _build_metal_dome()),
         ("Plunger", _build_plunger()),
         ("Epoxy Seal", _build_epoxy_seal()),
         ("Terminal 1", _build_terminal(-1)),
         ("Terminal 2", _build_terminal(1)),
+        # +90° about Z maps the ±x terminal profiles onto the −y/+y sides.
+        ("Terminal 3", _rotated_z(_build_terminal(-1), math.pi / 2)),
+        ("Terminal 4", _rotated_z(_build_terminal(1), math.pi / 2)),
     ]
 
 
