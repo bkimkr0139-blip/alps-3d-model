@@ -2,10 +2,37 @@
 
 > **이 문서의 목적**: 이 저장소에서 개발 세션(사람 또는 Claude)이 맥락 없이
 > 병렬로 작업을 이어받을 수 있도록 현재 상태·실행 방법·규칙·남은 작업을 한
-> 문서에 정리한다. 최종 갱신: 2026-09-17 (AXOS 피드백 폐루프 이식 adeb9da +
-> ASIC ④설계 빈화면 핫픽스 6d0900f — 아래 §0 최상단 블록 2개, **아래 §0 핸드오프 상태 먼저 읽을 것**).
+> 문서에 정리한다. 최종 갱신: 2026-09-21 (AXOS 피드백 폐루프 1회전 완주 —
+> FB-0001 승인→구현→반영완료, **아래 §0 핸드오프 상태 먼저 읽을 것**).
 
-## 0. 지금 세션 핸드오프 상태 (2026-09-17, 다음 세션이 먼저 읽을 것)
+## 0. 지금 세션 핸드오프 상태 (2026-09-21, 다음 세션이 먼저 읽을 것)
+
+**AXOS 피드백 폐루프 1회전 완주(FB-0001 — 승인→지시서→구현→complete)** —
+`feedback/FB-0001.json`(브라우저 검증 건, "3D 뷰어 초기 카메라가 측면이라 주요
+형상 확인이 어렵다")을 실제 과제로 소비했다:
+
+- **승인/착수**: `feedback.py approve FB-0001 --by bkimkr0139-blip --org "ALPS
+  ETW"` → `dev_queue/FB-0001.md` 지시서 자동 생성 → `start` 착수.
+- **구현** — S04(model 탭) 3D 뷰어 카메라:
+  (a) 기본 시점을 정면 3/4 뷰로 교체(`ThreeViewer.tsx` DEFAULT_CAM_POS
+  `[7,9,9]`, 고도 ~38° — 구값 `[6,11,8]`은 고도 ~48°라 수직 상부 룩이었음.
+  후보 A `[8,7,10]`은 AirInput 납작 슬라브가 읽히지 않아 기각, TACT·엔코더·
+  MEMS·AirInput 4제품 스크린샷 비교로 선정).
+  (b) **카메라 저장/복원** — `SavedCamera`(Bounds 자식, useBounds)가
+  OrbitControls `end`에서 제품(버전 집합)별 localStorage
+  `alps.s04-cam.<sceneKey>`에 시점 기록, 다음 진입 시 `moveTo().lookAt()`으로
+  fit goal을 덮어써 복원(Bounds의 ~1초 트윈이 저장 시점으로 이어짐 — 사용자
+  드래그 개입 시 Bounds 'start' 리스너가 끊으므로 사용자 항상 우선).
+  (c) **기본 시점 버튼** — TwinControls "기본 시점으로"(store
+  `viewResetNonce` 카운터로 연타도 매번 발화): 저장본 삭제 + `api.reset()`으로
+  기본 방향 리핏. i18n 3 로케일 `twin.viewReset` 신설.
+- **검증**: tsc/vite 빌드 + oxlint 27 warnings 베이스라인(수정 파일 0) +
+  verify:seedl10n 101/0 + Playwright `/tmp/alps-logs/fb0001-check.mjs` 7항목
+  ALL PASS(진입시 저장키 없음→드래그 저장→pose 유한수→리로드 복원→기본 시점
+  버튼→저장본 삭제→pageerror 0) + 4상태 스크린샷 육안 대조(기본/드래그/
+  복원=드래그 동일/리셋=기본 동일).
+
+**핫픽스: ASIC 9단계 ④ ASIC 설계 빈 화면(사용자 리포트)** — 원인은
 
 **핫픽스: ASIC 9단계 ④ ASIC 설계 빈 화면(사용자 리포트)** — 원인은
 `asicCharts.tsx` Histogram의 `counts.map((c, i)` 매개변수 `c`가 테마 토글
@@ -282,18 +309,14 @@ pkg 칩 + B OPT-2 → TSSOP-16 재표적), pkg_internals_e2e(⑤ mold-off+분해
 공정·레이아웃 3D 스크린샷 FIFO/UART/SoC — 71e25a1 육안 검증용).
 
 **다음 세션(또는 사용자)이 할 일**:
-- **AXOS 피드백 폐루프 1회전 완주(이번 세션 신설 — adeb9da)** —
-  (a) 사용자 웹검증: 아무 화면이나 우측 중앙 세로 "AXOS" 버튼 → 드로어
-  (화면 목적+최근 피드백) → 피드백 제출(경로·메뉴·필터·화면버전·제출자·
-  시각 자동 기록 확인) → 1.4초 성공. (b) 개발팀 루트: 이미 접수된
-  `feedback/FB-0001.json`(브라우저 검증 건, priority 상)을 실제 과제로:
-  `python3 ~/works/axos-si/skills/axos-feedback-loop/scripts/feedback.py
-  --root . approve FB-0001 --by <검토자> --org <소속>` → `dev_queue/FB-0001.md`
-  지시서 생성 → 그 지시서를 Claude 세션이 읽어 구현 → 검증근거와 함께
-  `complete` → 드로어 최근 피드백에서 반영완료 배지 확인. 승인 단계는 아직
-  1회도 실행 전. (c) axos-si 플러그인 쪽 미수정 과제(이미 사용자 보고됨):
-  `check_requirement_coverage.py`가 usage에 `--config`를 표시하지만 실제로는
-  파싱하지 않음(하드코딩 경로).
+- **AXOS 피드백 폐루프 1회전 완료(2026-09-21, 상단 블록)** — (b) 개발팀 루트는
+  approve→start→구현→complete까지 완주. 남은 것: (a) 사용자 웹검증 — 드로어
+  "최근 피드백"에서 FB-0001의 반영완료 배지 확인 포함. (c) axos-si 플러그인
+  쪽 미수정 과제(이미 사용자 보고됨): `check_requirement_coverage.py`가
+  usage에 `--config`를 표시하지만 실제로는 파싱하지 않음(하드코딩 경로).
+  플러그인 쪽 템플릿 치환 누락 1건 추가 발견: 지시서 헤더의
+  `{{RECORD_PATH}}`가 치환되지 않고 리터럴로 남음(feedback.py
+  INSTRUCTION_TEMPLATE 렌더 시 이 키만 누락).
 - **ASIC ④ 설계 빈화면 핫픽스 웹검증(6d0900f)** — ASIC 탭 9단계 레일에서
   "④ ASIC Design" 클릭 → 배경만 보이던 화면에 설계 런 버튼·KPI·VER 매트릭스·
   코너 스터디 히스토그램(24 bins)이 떠야 함. 브라우저 e2e는 ALL PASS

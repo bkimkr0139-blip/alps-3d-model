@@ -2,7 +2,7 @@ import { Component, useEffect, useLayoutEffect, useMemo, useRef, useState, type 
 import { useTranslation } from "react-i18next";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Bounds, ContactShadows, OrbitControls } from "@react-three/drei";
+import { Bounds, ContactShadows, OrbitControls, useBounds } from "@react-three/drei";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { Group, Mesh } from "three";
 import type { ComponentDto } from "../lib/api";
@@ -691,6 +691,103 @@ function ReviewToolbar({
   );
 }
 
+// ── 기본 시점 + 카메라 저장/복원 (FB-0001) ──────────────────────────────────
+// 초기 진입은 정면 3/4 뷰(고도 ~38°, 방위 ~38°): 제품 카탈로그가 찍는 히어로
+// 앵글로, 플런저/샤프트 옆모습 + 바디 정면 + 단자가 동시에 읽힌다. 이전 기본값
+// [6,11,8]은 고도 ~48°라 거의 수직 상부에서 내려다보게 되어 "측면에서 보여
+// 주요 형상 확인이 어렵다"는 리포트가 나왔다. Bounds fit은 이 방향을 유지한 채
+// 거리만 재조정하므로 이 벡터가 기본 시점의 정의 그 자체다.
+const DEFAULT_CAM_POS: [number, number, number] = [7, 9, 9];
+
+// 저장 키는 제품(버전 집합)별 — 제품마다 어울리는 시점이 다르고, 제품을 바꿔
+// 돌아오면 그 제품의 마지막 시점이 복원된다. 버전 id는 DB 식별자라 세션 간에도
+// 안정적이다.
+const CAM_KEY_PREFIX = "alps.s04-cam.";
+
+type CamPose = { p: [number, number, number]; t: [number, number, number] };
+
+function camKey(sceneKey: string) {
+  return CAM_KEY_PREFIX + sceneKey;
+}
+
+function loadCamPose(sceneKey: string): CamPose | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(camKey(sceneKey)) ?? "null");
+    const ok =
+      Array.isArray(v?.p) && v.p.length === 3 &&
+      Array.isArray(v?.t) && v.t.length === 3 &&
+      [...v.p, ...v.t].every((n) => Number.isFinite(n));
+    return ok ? { p: v.p, t: v.t } : null;
+  } catch {
+    return null;
+  }
+}
+
+// makeDefault OrbitControls의 최소 인터페이스(저장/복원에 쓰는 것만).
+type OrbitLike = {
+  target: THREE.Vector3;
+  addEventListener: (type: string, fn: () => void) => void;
+  removeEventListener: (type: string, fn: () => void) => void;
+};
+
+// <Bounds> 바로 안(반드시 자식)에서 마운트되어야 useBounds()가 산다. 순서:
+// (1) Bounds 마운트 fit이 레이아웃 이펙트에서 goal을 계산하고 (2) 아래 passive
+// 이펙트가 moveTo/lookAt으로 goal을 덮어쓴다 — fit의 ~1초 트윈이 저장 시점으로
+// 흘러 들어가므로 사용자는 계단 없이 자기 시점으로 복귀한다. 사용자가 도중에
+// 드래그하면 Bounds의 'start' 리스너가 애니메이션을 끊으므로 사용자가 항상 이긴다.
+function SavedCamera({ sceneKey }: { sceneKey: string }) {
+  const api = useBounds();
+  const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls) as OrbitLike | null;
+  const viewResetNonce = useTwinStore((s) => s.viewResetNonce);
+
+  // 복원 — "저장된 카메라를 기본값으로 제공"(지시서 To-Be). 저장본 없으면
+  // 아무것도 하지 않는다(마운트 fit = 정면 3/4 기본 시점 그대로).
+  useEffect(() => {
+    const pose = loadCamPose(sceneKey);
+    if (!pose || !controls) return;
+    api.moveTo(pose.p).lookAt({ target: pose.t });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- api/camera는 Canvas 라이프사이클에서 불변, 재실행은 sceneKey/controls 변화만 의미한다
+  }, [sceneKey, controls]);
+
+  // 저장 — 제스처가 끝날 때("end"는 실제 상호작용에만 발화; 프로그램적 fit은
+  // 발화하지 않음) 현재 시점을 기록한다.
+  useEffect(() => {
+    if (!controls) return;
+    const save = () => {
+      try {
+        localStorage.setItem(
+          camKey(sceneKey),
+          JSON.stringify({
+            p: [camera.position.x, camera.position.y, camera.position.z],
+            t: [controls.target.x, controls.target.y, controls.target.z],
+          } satisfies CamPose)
+        );
+      } catch {
+        // 사설 창/스토리지 차단 — 메모리 세션만으로 동작한다.
+      }
+    };
+    controls.addEventListener("end", save);
+    return () => controls.removeEventListener("end", save);
+  }, [sceneKey, controls, camera]);
+
+  // 기본 시점 복원(TwinControls 버튼) — 저장본을 지우고 카메라를 기본 방향으로
+  // 돌린 뒤 reset()으로 거리를 리핏한다(reset은 현재 방향 따라 거리만 재계산).
+  useEffect(() => {
+    if (viewResetNonce === 0) return;
+    try {
+      localStorage.removeItem(camKey(sceneKey));
+    } catch {
+      // ignore
+    }
+    camera.position.set(...DEFAULT_CAM_POS);
+    api.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 위와 동일
+  }, [viewResetNonce, sceneKey]);
+
+  return null;
+}
+
 export function ThreeViewer({ components, controlsTop = 10 }: { components: ComponentDto[]; controlsTop?: number }) {
   const setSelected = useTwinStore((s) => s.setSelectedComponentId);
   const viewerBg = useTwinStore((s) => s.viewerBg);
@@ -744,15 +841,11 @@ export function ThreeViewer({ components, controlsTop = 10 }: { components: Comp
     <ViewerErrorBoundary>
       <Canvas
         dpr={[1, 2]}
-        // Elevation matters more than it looks: [8,6,8] sits at only ~28°
-        // above the horizon, so a switch's top-facing button (or an
-        // encoder's top shaft) reads mostly as a sliver on the side of the
-        // body instead of the recognizable face. [6,11,8] raises that to
-        // ~50° — enough to read the top face clearly on first load while
-        // still keeping a 3D perspective (not a flat top-down orthographic
-        // look). Bounds `fit` only rescales distance along this direction,
-        // it never changes the angle, so this is the actual default view.
-        camera={{ position: [6, 11, 8], fov: 40 }}
+        // 기본 시점은 DEFAULT_CAM_POS(정면 3/4, 위 상수 주석 참조). Bounds
+        // `fit`은 이 방향을 유지한 채 거리만 재조정한다 — 각도를 바꾸지 않으므로
+        // 이 벡터가 초기 진입 뷰의 정의다. 사용자가 저장해 둔 시점은 아래
+        // SavedCamera가 fit 직후 덮어쓴다(FB-0001).
+        camera={{ position: DEFAULT_CAM_POS, fov: 40 }}
         onPointerMissed={() => setSelected(null)}
         gl={{ antialias: true }}
         style={{ background: BG_THEMES[viewerBg].canvas, borderRadius: 8, transition: "background 0.25s" }}
@@ -779,6 +872,8 @@ export function ThreeViewer({ components, controlsTop = 10 }: { components: Comp
               ) : null
             )}
           </group>
+          {/* 저장된 시점 복원/기록 — useBounds() 때문에 Bounds 자식이어야 한다 */}
+          <SavedCamera sceneKey={sceneKey} />
         </Bounds>
         {mode === "section" && <SectionPlane scenes={scenes} bbox={bbox} axis={axis} frac={frac} />}
         {/* measurement endpoints + annotation pins, sized off the model bbox */}

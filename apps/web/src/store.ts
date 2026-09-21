@@ -61,6 +61,10 @@ interface TwinStore {
   // newly-loaded product reads as broken, not as a kept preference.
   explodeAmount: number;
   explodePlaying: boolean;
+  // "기본 시점으로" 복원 트리거(FB-0001). TwinControls 버튼이 nonce를 올리고
+  // S04 캔버스 안 SavedCamera가 이를 구독해 저장된 카메라를 지우고 리핏한다 —
+  // 불리언이 아닌 카운터라 연타(같은 값 재클릭)에도 매번 새 이펙트가 돈다.
+  viewResetNonce: number;
   setVariantId: (id: string) => void;
   setSelectedComponentId: (id: string | null) => void;
   setSelectedRequirementId: (id: string | null) => void;
@@ -72,6 +76,7 @@ interface TwinStore {
   setUiTheme: (theme: UiTheme) => void;
   setExplodeAmount: (v: number) => void;
   setExplodePlaying: (on: boolean) => void;
+  bumpViewReset: () => void;
 }
 
 // Cross-panel sync per §6.2: selecting a part in any panel highlights it in
@@ -88,6 +93,7 @@ export const useTwinStore = create<TwinStore>((set) => ({
   uiTheme: initialTheme(),
   explodeAmount: 0,
   explodePlaying: false,
+  viewResetNonce: 0,
   // Switching variant swaps in a different physical product — its twin state
   // (a pressed switch, accumulated cycles) must not leak into the new one.
   setVariantId: (id) =>
@@ -114,6 +120,7 @@ export const useTwinStore = create<TwinStore>((set) => ({
   },
   setExplodeAmount: (v) => set({ explodeAmount: v }),
   setExplodePlaying: (on) => set({ explodePlaying: on }),
+  bumpViewReset: () => set((s) => ({ viewResetNonce: s.viewResetNonce + 1 })),
 }));
 
 // Bench-local DUT state (encoder rotation). Lives here rather than in

@@ -26,6 +26,7 @@ export function TwinControls({ top = 10 }: { top?: number }) {
   const setViewerBg = useTwinStore((s) => s.setViewerBg);
   const setExplodeAmount = useTwinStore((s) => s.setExplodeAmount);
   const setExplodePlaying = useTwinStore((s) => s.setExplodePlaying);
+  const bumpViewReset = useTwinStore((s) => s.bumpViewReset);
 
   const hotspots = rankedStress(Object.keys(CYCLES_TO_SATURATION), cycles, vibration).slice(0, 5);
 
@@ -74,6 +75,11 @@ export function TwinControls({ top = 10 }: { top?: number }) {
         aria-pressed={viewerBg === "light"}
       >
         {viewerBg === "light" ? t("twin.bgDark") : t("twin.bgLight")}
+      </button>
+      {/* 저장된 카메라를 버리고 정면 3/4 기본 시점으로 복귀(FB-0001) — 저장
+          시점이 어긋났을 때의 탈출구. 캔버스 안 SavedCamera가 nonce를 구독한다. */}
+      <button style={buttonStyle(false)} onClick={bumpViewReset}>
+        {t("twin.viewReset")}
       </button>
       <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <span style={{ opacity: 0.8 }}>
