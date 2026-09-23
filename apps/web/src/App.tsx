@@ -340,6 +340,10 @@ function Workbench() {
   // 무관한 자립 모듈이므로 좌우 사이드 패널·온보딩 가이드·하단 비교/상관/
   // 게이트 프레임·어시스턴트를 접어 중앙에 전폭을 내준다.
   const standaloneMode = centerTab === "eda" || centerTab === "asic" || centerTab === "docs";
+  // 시스템 문서는 플랫폼 관리자 전용(사용자 지시): 토큰의 realm 롤로 판정한다
+  // — 새 관리자에게는 Keycloak에서 platform_admin 롤만 부여하면 된다. Workbench는
+  // initKeycloak() 해결 후에 마운트되므로 tokenParsed는 항상 채워져 있다.
+  const isAdmin = !!keycloak.tokenParsed?.realm_access?.roles?.includes("platform_admin");
   // 3D-first cockpit: the model tab (desktop) gives the twin the whole first
   // screen; every other product tab keeps the 3-column dashboard. Mobile
   // keeps the stacked flow — overlay drawers don't work at 820px widths.
@@ -487,21 +491,26 @@ function Workbench() {
           </div>
         </NavGroup>
         {/* Reference material is its own group: readable at any time, still
-            independent of the product/variant context. */}
-        <div className="nav-divider" style={{ width: 1, alignSelf: "stretch", background: border.strong }} />
-        <NavGroup label={t("nav.docs")}>
-          <div role="tablist" aria-label={t("nav.docs")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {DOCS_TABS.map(({ tab, color }) => (
-              <TabButton
-                key={tab}
-                label={tabLabel(tab, t as (k: string) => string)}
-                color={color}
-                active={centerTab === tab}
-                onClick={() => setCenterTab(tab)}
-              />
-            ))}
-          </div>
-        </NavGroup>
+            independent of the product/variant context — 관리자 세션에서만
+            렌더(플랫폼 관리자 전용 시스템 문서). */}
+        {isAdmin && (
+          <>
+            <div className="nav-divider" style={{ width: 1, alignSelf: "stretch", background: border.strong }} />
+            <NavGroup label={t("nav.docs")}>
+              <div role="tablist" aria-label={t("nav.docs")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {DOCS_TABS.map(({ tab, color }) => (
+                  <TabButton
+                    key={tab}
+                    label={tabLabel(tab, t as (k: string) => string)}
+                    color={color}
+                    active={centerTab === tab}
+                    onClick={() => setCenterTab(tab)}
+                  />
+                ))}
+              </div>
+            </NavGroup>
+          </>
+        )}
         <div style={{ flex: 1 }} />
         {standaloneMode && (
           <span style={{ fontSize: 12, color: text.faint, paddingBottom: 8, maxWidth: 340 }}>
