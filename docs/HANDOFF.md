@@ -7,18 +7,18 @@
 
 ## 0. 지금 세션 핸드오프 상태 (2026-09-23, 다음 세션이 먼저 읽을 것)
 
-**시스템 문서 탭 플랫폼 관리자 전용 게이트(사용자 지시 "시스템 문서는
-admin/admin123@ 로 로긴하면 보이게")** — 역할 기반 설계: `App.tsx`가 토큰
-`realm_access.roles`의 `platform_admin`으로 `isAdmin` 판정, DOCS 네비 그룹
-(디바이더+System Docs 탭)을 관리자 세션에서만 렌더. username 매칭이 아니라서
-새 관리자는 Keycloak에서 platform_admin 롤만 부여하면 된다. 데모 계정 중
-문서 보이는 계정: `admin`, `demo.admin`(둘 다 platform_admin — 신설 admin은
-gitignored `infra/keycloak/realm-export.json`에도 반영해 배포 패리티 유지).
-시스템 문서 v1.1→v1.2(2026-09-23): 3 로케일 버전·날짜 행 + 도입부 "관리자
-로그인 시 표시" 문구 + §3.11 관리자 전용 불릿, `SystemDocs.tsx` 다운로드
-파일명 v1.2.
+**시스템 문서 탭 admin 계정 전용 게이트(사용자 지시 "시스템 문서는
+admin/admin123@ 로 로긴하면 보이게" + 2차 지시 "demo.admin/demo1234도 보이면
+안 된다")** — 최종 설계는 **사용자명 기반**: `App.tsx`가 토큰
+`preferred_username === "admin"`으로 판정, DOCS 네비 그룹(디바이더+System
+Docs 탭)을 admin 세션에서만 렌더. 1차 구현은 역할 기반(platform_admin)이었으나
+demo.admin도 롤을 보유해 사용자 지시로 사용자명 게이트로 정정 — **역할 보유
+여부와 무관하게 admin 계정만 통과**. 신설 admin은 gitignored
+`infra/keycloak/realm-export.json`에도 반영해 배포 패리티 유지. 시스템 문서
+v1.1→v1.3(2026-09-23): 3 로케일 버전·날짜 행 + 도입부 "admin 계정 로그인 시
+표시" 문구 + §3.11 전용 불릿, `SystemDocs.tsx` 다운로드 파일명 v1.3.
 
-- **디버그 교훈(재발 방지)**: 첫 검증에서 탭이 안 보였던 원인은 앱이 아니라
+- **디버그 교훈(재발 방지)**: 1차 검증에서 탭이 안 보였던 원인은 앱이 아니라
   **라이브 realm에 platform_admin 롤 매핑이 실제로는 없었던 것** — kcadm
   `role-mappings/realm` 확인을 "available" 목록으로 대신해 오판. 또 kcadm을
   docker exec bash -s로 돌릴 때 `UID`는 bash 읽기전용 변수라 사용자 id 조회가
@@ -27,9 +27,10 @@ gitignored `infra/keycloak/realm-export.json`에도 반영해 배포 패리티 �
   -d username=admin --data-urlencode "password=..."` → JWT payload 2번째
   세그먼트 base64url 디코드(토큰 자체는 출력 금지, 클레임만).
 - **검증**: 빌드 + oxlint 베이스라인 이하 + Playwright
-  `/tmp/alps-logs/docs-admin-check.mjs` 9항목 ALL PASS — demo.architect 탭
-  숨김/네비 정상/pageerror 0, admin 탭 표시+v1.2 렌더+다운로드 v1.2+모델 탭
-  회귀+pageerror 0, 스크린샷 육안 대조.
+  `/tmp/alps-logs/docs-admin-check.mjs` 15항목 ALL PASS — demo.architect(롤
+  없음)·demo.admin(platform_admin 보유) 모두 탭 숨김/네비 정상/pageerror 0,
+  admin 탭 표시+v1.3 렌더+다운로드 v1.3+모델 탭 회귀+pageerror 0, 스크린샷
+  육안 대조.
 
 **AXOS 피드백 폐루프 1회전 완주(FB-0001 — 승인→지시서→구현→complete)** —
 `feedback/FB-0001.json`(브라우저 검증 건, "3D 뷰어 초기 카메라가 측면이라 주요

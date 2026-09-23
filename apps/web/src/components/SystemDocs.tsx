@@ -8,9 +8,9 @@ import docJa from "../assets/systemDoc.ja.md?raw";
 // prose of this length reads properly only when written in the language.
 // The download filename follows the locale so attachments file sensibly.
 const DOCS: Record<string, { md: string; file: string }> = {
-  ko: { md: docKo, file: "ALPS_Twin_시스템문서_v1.2.md" },
-  en: { md: docEn, file: "ALPS_Twin_System_Documentation_v1.2.md" },
-  ja: { md: docJa, file: "ALPS_Twin_システムドキュメント_v1.2.md" },
+  ko: { md: docKo, file: "ALPS_Twin_시스템문서_v1.3.md" },
+  en: { md: docEn, file: "ALPS_Twin_System_Documentation_v1.3.md" },
+  ja: { md: docJa, file: "ALPS_Twin_システムドキュメント_v1.3.md" },
 };
 
 // System documentation viewer: renders the bundled markdown (a single

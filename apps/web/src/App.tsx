@@ -340,10 +340,11 @@ function Workbench() {
   // 무관한 자립 모듈이므로 좌우 사이드 패널·온보딩 가이드·하단 비교/상관/
   // 게이트 프레임·어시스턴트를 접어 중앙에 전폭을 내준다.
   const standaloneMode = centerTab === "eda" || centerTab === "asic" || centerTab === "docs";
-  // 시스템 문서는 플랫폼 관리자 전용(사용자 지시): 토큰의 realm 롤로 판정한다
-  // — 새 관리자에게는 Keycloak에서 platform_admin 롤만 부여하면 된다. Workbench는
-  // initKeycloak() 해결 후에 마운트되므로 tokenParsed는 항상 채워져 있다.
-  const isAdmin = !!keycloak.tokenParsed?.realm_access?.roles?.includes("platform_admin");
+  // 시스템 문서는 admin 계정 전용(사용자 지시 — platform_admin 롤 보유자라도
+  // demo.admin 등 다른 계정은 제외): preferred_username이 'admin'인 세션만
+  // 노출한다. Workbench는 initKeycloak() 해결 후에 마운트되므로 tokenParsed는
+  // 항상 채워져 있다.
+  const isAdmin = keycloak.tokenParsed?.preferred_username === "admin";
   // 3D-first cockpit: the model tab (desktop) gives the twin the whole first
   // screen; every other product tab keeps the 3-column dashboard. Mobile
   // keeps the stacked flow — overlay drawers don't work at 820px widths.

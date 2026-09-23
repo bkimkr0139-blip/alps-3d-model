@@ -1,12 +1,12 @@
 # ALPS ALPINE Engineering Twin Workbench — System Documentation
 
-**Version v1.2 · as of 2026-09-23 · Complete feature inventory**
+**Version v1.3 · as of 2026-09-23 · Complete feature inventory**
 
-This reference document inventories every feature, screen and characteristic currently implemented in the workbench, the differentiators versus existing solutions, the applicability within Alps Alpine, and the roadmap. It can be read in the in-app **System Docs tab** (visible when signed in as a platform administrator), and downloaded as an `.md` file for meeting attachments, reporting, and onboarding material.
+This reference document inventories every feature, screen and characteristic currently implemented in the workbench, the differentiators versus existing solutions, the applicability within Alps Alpine, and the roadmap. It can be read in the in-app **System Docs tab** (visible when signed in as the admin account), and downloaded as an `.md` file for meeting attachments, reporting, and onboarding material.
 
 > **Honesty principle (the design philosophy of this system)** — every educational estimate on screen carries a △ educational estimate badge, every synthetic dataset a ◇ synthetic fixture badge. In-browser mock run results can never become sign-off evidence, and the gate JSON always shows the `MOCK_RESULT_PRESENT` blocker. Approved evidence is never overwritten — only new revisions are created. Status is conveyed by icon + wording, never color alone. The feature descriptions in this document follow the same principle.
 
-> **v1.2 (2026-09-23)** — the System Docs tab became platform-administrator-only: it appears in the navigation bar only for sessions signed in with an account holding the `platform_admin` role (e.g. admin).
+> **v1.3 (2026-09-23)** — the System Docs tab became admin-account-only: regardless of the `platform_admin` role, it appears in the navigation bar only for sessions signed in as the `admin` user (demo.admin and other admin-persona accounts are excluded).
 >
 > **v1.1 (2026-09-17) highlights** — premium instrument UI (design tokens, embossed shell, premium chart themes), an app-wide dark/light theme toggle (instrument 3D and scope glass stay dark; both modes pass the WCAG contrast audit), the language switcher pinned to the header top-right, the 3D cockpit landing (model tab), the 3D production-line twin (FactoryViewer), 3D review tools (section / measure / annotate), part-ID selection sync across panels, ASIC package-family 3D models with 1:1 bond-map fanout and realistic Au wires, product-chipset-flavored EDA missions and 3D scenes, and a dedicated AirInput test bench board (puck-module DUT).
 
@@ -153,7 +153,7 @@ All 3D scenes (part geometry, wave propagation and waveforms, package cross-sect
 
 - This document rendered in-app + a `.md` download button (reporting / onboarding attachment).
 - A standalone reference menu, independent of the product/variant context.
-- **Platform administrator only (v1.2)** — decided by the `platform_admin` realm role in the token; sessions without the role never render the tab.
+- **admin account only (v1.3)** — matched on the token's `preferred_username` being `admin`; any other session never renders the tab.
 
 ---
 
